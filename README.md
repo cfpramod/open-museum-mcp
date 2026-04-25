@@ -65,14 +65,31 @@ A search call returns license-verified results in one normalized shape:
 
 ## Install
 
+The package is on npm. The simplest setup is to add it directly to your MCP client config; `npx` will fetch and run it on first launch:
+
+```json
+{
+  "mcpServers": {
+    "open-museum": {
+      "command": "npx",
+      "args": ["-y", "open-museum-mcp"]
+    }
+  }
+}
+```
+
+That's it. Restart your MCP client and the tools below become available.
+
+### From source (for contributors)
+
 ```bash
+git clone https://github.com/cfpramod/open-museum-mcp
+cd open-museum-mcp
 npm install
 npm run build
 ```
 
-### Wire into Claude Code
-
-Add to your MCP config (`.mcp.json` in a project, or your user-level config):
+Then point the MCP config at the built binary:
 
 ```json
 {
@@ -84,8 +101,6 @@ Add to your MCP config (`.mcp.json` in a project, or your user-level config):
   }
 }
 ```
-
-After restarting your MCP client, the tools below become available.
 
 ## Tools
 
