@@ -1,12 +1,25 @@
 {
   "name": "open-museum-mcp",
   "version": "0.1.0",
-  "description": "MCP server for federated, license-verified search across open-access museum collections (The Met, Cleveland, AIC and more).",
+  "description": "MCP server for license-verified search across open-access museum collections (The Met, Cleveland, AIC and more).",
   "type": "module",
   "main": "dist/server.js",
   "bin": {
     "open-museum-mcp": "dist/server.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cfpramod/open-museum-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cfpramod/open-museum-mcp/issues"
+  },
+  "homepage": "https://github.com/cfpramod/open-museum-mcp#readme",
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/server.ts",
