@@ -1,15 +1,32 @@
 import Database from 'better-sqlite3';
-import { mkdirSync, existsSync } from 'node:fs';
+import { chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Artwork } from './types.js';
 
 const OBJECT_TTL_DAYS = 90;
 const QUERY_TTL_DAYS = 14;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export interface CacheConfig {
   path: string;
 }
 
+/**
+ * SQLite-backed cache for normalized artworks and search-result IDs.
+ *
+ * TTL contract:
+ *   - `objects` rows live for {@link OBJECT_TTL_DAYS} days. Artworks don't
+ *     change once accessioned, so the long TTL keeps cold-cache HTTP cost low.
+ *   - `query_cache` rows live for {@link QUERY_TTL_DAYS} days. Museums add
+ *     new open-access objects regularly, so queries refresh on a shorter cycle.
+ *
+ * Stale rows are pruned on construction (cheap bulk DELETE) so a long-lived
+ * client doesn't accumulate dead rows indefinitely. Reads also treat expired
+ * rows as misses; the next write overwrites the row via ON CONFLICT.
+ *
+ * The DB file is created with mode 0o600. Parameterized statements only —
+ * no string-concatenated SQL paths.
+ */
 export class Cache {
   private db: Database.Database;
 
@@ -17,9 +34,21 @@ export class Cache {
     if (!existsSync(dirname(config.path))) {
       mkdirSync(dirname(config.path), { recursive: true, mode: 0o700 });
     }
+    const fileExisted = existsSync(config.path);
     this.db = new Database(config.path);
+    if (!fileExisted) {
+      // Tighten file mode immediately on creation so the cache (which can
+      // include rights metadata, snapshots of museum responses, etc.) isn't
+      // group/world-readable under loose umasks.
+      try {
+        chmodSync(config.path, 0o600);
+      } catch {
+        // Best-effort; non-fatal on filesystems that don't support chmod.
+      }
+    }
     this.db.pragma('journal_mode = WAL');
     this.init();
+    this.pruneExpired();
   }
 
   private init(): void {
@@ -115,7 +144,14 @@ export class Cache {
       | undefined;
     if (!row) return null;
     if (this.isExpired(row.cached_at, OBJECT_TTL_DAYS)) return null;
-    return JSON.parse(row.full_record) as Artwork;
+    try {
+      return JSON.parse(row.full_record) as Artwork;
+    } catch {
+      // A malformed row (manual DB tinkering, OS-level corruption, schema
+      // drift from a prior version) shouldn't poison the request — treat it
+      // as a cache miss; the next write will overwrite the row.
+      return null;
+    }
   }
 
   putQuery(cacheKey: string, ids: string[]): void {
@@ -134,12 +170,24 @@ export class Cache {
       | undefined;
     if (!row) return null;
     if (this.isExpired(row.cached_at, QUERY_TTL_DAYS)) return null;
-    return JSON.parse(row.ids_json) as string[];
+    try {
+      return JSON.parse(row.ids_json) as string[];
+    } catch {
+      return null;
+    }
+  }
+
+  pruneExpired(): { objects: number; queries: number } {
+    const objectsCutoff = new Date(Date.now() - OBJECT_TTL_DAYS * MS_PER_DAY).toISOString();
+    const queriesCutoff = new Date(Date.now() - QUERY_TTL_DAYS * MS_PER_DAY).toISOString();
+    const objects = this.db.prepare(`DELETE FROM objects WHERE cached_at < ?`).run(objectsCutoff);
+    const queries = this.db.prepare(`DELETE FROM query_cache WHERE cached_at < ?`).run(queriesCutoff);
+    return { objects: objects.changes, queries: queries.changes };
   }
 
   private isExpired(isoTimestamp: string, ttlDays: number): boolean {
     const cachedAt = new Date(isoTimestamp).getTime();
-    const expiresAt = cachedAt + ttlDays * 24 * 60 * 60 * 1000;
+    const expiresAt = cachedAt + ttlDays * MS_PER_DAY;
     return Date.now() > expiresAt;
   }
 

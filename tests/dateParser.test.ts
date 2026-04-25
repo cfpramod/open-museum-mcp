@@ -183,4 +183,19 @@ describe('parseDisplayDate', () => {
       expect(parseDisplayDate(null)).toEqual({ yearStart: null, yearEnd: null });
     });
   });
+
+  describe('strategy ordering invariants', () => {
+    // Locks down a subtle invariant: tryRangeRegex runs BEFORE
+    // tryCenturyRange in parseDisplayDate. The numeric-range regex looks like
+    // it could match the digits inside "14th-15th century" as `14-15`, but
+    // the "th" between digit and dash breaks the match. If someone relaxes
+    // the regex later, this test catches the regression.
+    it('"14th-15th century" parses as a century range, not a small-number range', () => {
+      expect(parseDisplayDate('14th-15th century')).toEqual({ yearStart: 1301, yearEnd: 1500 });
+    });
+
+    it('"twenty-first century" resolves via word ordinal (regression for hyphen-suffix bug)', () => {
+      expect(parseDisplayDate('twenty-first century')).toEqual({ yearStart: 2001, yearEnd: 2100 });
+    });
+  });
 });

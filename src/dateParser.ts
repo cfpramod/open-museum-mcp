@@ -25,19 +25,29 @@ const ROMAN: Record<string, number> = {
   xix: 19, xx: 20, xxi: 21,
 };
 
+const ORDINAL_WORDS: Record<string, number> = {
+  first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7,
+  eighth: 8, ninth: 9, tenth: 10, eleventh: 11, twelfth: 12, thirteenth: 13,
+  fourteenth: 14, fifteenth: 15, sixteenth: 16, seventeenth: 17,
+  eighteenth: 18, nineteenth: 19, twentieth: 20, 'twenty-first': 21,
+};
+
 function ordinalToNumber(token: string): number | null {
-  const t = token.toLowerCase().replace(/(st|nd|rd|th)$/, '');
-  if (/^\d+$/.test(t)) return parseInt(t, 10);
-  if (ROMAN[t] !== undefined) return ROMAN[t];
-  const words: Record<string, number> = {
-    first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7,
-    eighth: 8, ninth: 9, tenth: 10, eleventh: 11, twelfth: 12, thirteenth: 13,
-    fourteenth: 14, fifteenth: 15, sixteenth: 16, seventeenth: 17,
-    eighteenth: 18, nineteenth: 19, twentieth: 20, 'twenty-first': 21,
-  };
-  return words[t] ?? null;
+  const lower = token.toLowerCase();
+  // Check the word dictionary BEFORE stripping suffixes — otherwise hyphenated
+  // forms like "twenty-first" get mangled into "twenty-fir" by the suffix
+  // regex and never match.
+  if (ORDINAL_WORDS[lower] !== undefined) return ORDINAL_WORDS[lower];
+  const stripped = lower.replace(/(st|nd|rd|th)$/, '');
+  if (/^\d+$/.test(stripped)) return parseInt(stripped, 10);
+  if (ROMAN[stripped] !== undefined) return ROMAN[stripped];
+  return ORDINAL_WORDS[stripped] ?? null;
 }
 
+// 19th century CE = 1801–1900 (no year zero, century N spans years
+// (N-1)*100+1 to N*100). qualifier divides the span into thirds; floor()
+// accepts that the 99-year span doesn't divide evenly — close enough for
+// catalog metadata and matches museum convention.
 function centuryRange(n: number, era: 'ce' | 'bce', qualifier?: string): DateRange {
   let start: number, end: number;
   if (era === 'ce') {
@@ -63,9 +73,11 @@ function centuryRange(n: number, era: 'ce' | 'bce', qualifier?: string): DateRan
   return { yearStart: start, yearEnd: end };
 }
 
+// True only when the string carries BOTH a BCE marker and a CE marker —
+// signals a cross-era range that tryRangeRegex must defer on so
+// tryCrossEraRange can handle it correctly.
 function hasMixedEras(s: string): boolean {
   const hasBce = /\b(b\.?c\.?e?\.?|bc)\b/i.test(s);
-  const hasCe = /\b(c\.?e\.?|ce)\b/i.test(s) && !/\b(b\.?c\.?e?\.?)\b/i.test(s.replace(/\b(c\.?e\.?|ce)\b/i, ''));
   if (!hasBce) return false;
   return /\bce\b/i.test(s) || /\bc\.e\./i.test(s);
 }
@@ -81,6 +93,12 @@ function tryCrossEraRange(s: string): DateRange | null {
   return null;
 }
 
+// Numeric range with optional trailing BCE marker. Bare digits separated by
+// hyphen/en-dash. Note: ordinal-century inputs like "14th-15th century" are
+// NOT matched here because the regex requires the dash to immediately follow
+// digits — the "th" between "14" and "-" breaks the match. Don't relax the
+// regex without locking down that invariant in tests; tryCenturyRange owns
+// ordinal-century parsing.
 function tryRangeRegex(s: string): DateRange | null {
   if (hasMixedEras(s)) return null;
 
@@ -94,6 +112,10 @@ function tryRangeRegex(s: string): DateRange | null {
     const firstIsCleanFourDigit = !firstStr.startsWith('-') && firstStr.length === 4;
     const secondIsShortSuffix = !secondStr.startsWith('-') && (secondStr.length === 1 || secondStr.length === 2);
 
+    // Short-suffix forms expand the second number by reusing digits from the
+    // first: "1820-5" → 1820–1825 (decade rollover), "1899–05" → 1899–1905
+    // (century rollover). When the candidate would land before the start
+    // year, bump it forward by the rollover unit.
     if (!m[3] && firstIsCleanFourDigit && secondIsShortSuffix) {
       const decade = Math.floor(a / 10) * 10;
       const century = Math.floor(a / 100) * 100;
@@ -211,6 +233,21 @@ function tryDynasty(s: string): DateRange | null {
   return null;
 }
 
+/**
+ * Parse a museum-supplied display date into a {yearStart, yearEnd} range.
+ *
+ * Strategies are tried in this exact order — earlier strategies win:
+ *   1. cross-era range ("500 BCE – 50 CE")
+ *   2. numeric range ("1820–1830", "1820-5", "1899–05")
+ *   3. ordinal-century range ("14th-15th century")
+ *   4. ordinal century with optional early/mid/late qualifier
+ *   5. decade ("1820s")
+ *   6. single year ("1888", "ca. 1820", "500 BCE")
+ *   7. dynasty/period lookup (longest key first to avoid prefix shadowing)
+ *
+ * Returns {null, null} when nothing matches — never guesses. BCE is encoded
+ * as negative integers so range arithmetic Just Works.
+ */
 export function parseDisplayDate(input: string | null | undefined): DateRange {
   if (!input || typeof input !== 'string') {
     return { yearStart: null, yearEnd: null };
