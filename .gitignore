@@ -11,3 +11,7 @@ data/cache.db
 coverage/
 .vscode/
 .idea/
+
+# Local-only Claude Code project guidance — kept out of the OSS repo
+CLAUDE.md
+
