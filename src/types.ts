@@ -61,6 +61,7 @@ export interface Artwork {
   source: ArtworkSource;
   description?: string;
   rawTags?: string[];
+  obscurityScore?: number;
 }
 
 export interface RejectedArtwork {

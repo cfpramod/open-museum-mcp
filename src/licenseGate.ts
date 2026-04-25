@@ -1,4 +1,4 @@
-import type { ArtworkLicense, LicenseType } from './types.js';
+import type { ArtworkLicense } from './types.js';
 
 export interface LicenseDecision {
   accepted: boolean;
@@ -24,6 +24,12 @@ function reject(reason: string): LicenseDecision {
   };
 }
 
+// The Met's `isPublicDomain` boolean is the museum's per-object marker for
+// images released under CC0. We accept it as sufficient for both
+// imageOpenAccess and metadataOpenAccess because that is what the Met itself
+// publishes. This is not an independent rights audit — third-party content,
+// model releases, or culturally sensitive material may carry obligations the
+// museum's representation does not surface. See README "Disclaimer".
 export const validateMetLicense: LicenseValidator = (raw) => {
   if (!raw || typeof raw !== 'object') {
     return reject('met: object missing or not an object');
@@ -77,6 +83,15 @@ export const validateClevelandLicense: LicenseValidator = (raw) => {
   );
 };
 
+// The Art Institute of Chicago's API returns is_public_domain as a per-object
+// boolean. AIC's documentation explicitly notes that the API's CC0 framing
+// covers the catalog data, while image reuse rights are described separately
+// in their image licensing materials. The per-object boolean does mark images
+// they release under CC0, so we accept it for imageOpenAccess — but the
+// distinction matters: AIC's docs caution that even CC0-marked content may
+// involve third-party permissions or culturally sensitive material. We
+// surface this caveat in the README "Disclaimer" rather than downgrading
+// confidence here, because the museum's own representation is unambiguous.
 export const validateAicLicense: LicenseValidator = (raw) => {
   if (!raw || typeof raw !== 'object') {
     return reject('aic: object missing or not an object');
@@ -113,8 +128,4 @@ export function validateLicense(museumCode: string, raw: unknown): LicenseDecisi
     return reject(`unknown museum '${museumCode}': strict default reject`);
   }
   return v(raw);
-}
-
-export function expectedLicenseType(_museumCode: string): LicenseType {
-  return 'CC0';
 }

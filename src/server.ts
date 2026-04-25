@@ -120,59 +120,77 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   ],
 }));
 
+function errorResult(message: string) {
+  return { content: [{ type: 'text' as const, text: message }], isError: true };
+}
+
+async function handleSearch(args: unknown) {
+  const input = SearchInput.parse(args);
+  const fetchers = input.museum
+    ? [FETCHERS[input.museum]].filter((f): f is Fetcher => Boolean(f))
+    : Object.values(FETCHERS);
+  if (fetchers.length === 0) {
+    return errorResult(`unknown museum: ${input.museum}`);
+  }
+
+  const idLists = await Promise.all(
+    fetchers.map((f) => f.search(input.query, input.limit).catch(() => [] as string[])),
+  );
+  const allIds = idLists.flat().slice(0, input.limit);
+
+  const fetched = await Promise.all(
+    allIds.map((id) =>
+      fetchAndCache(id).catch((err: unknown) => ({
+        ok: false as const,
+        reason: err instanceof Error ? err.message : 'fetch failed',
+      })),
+    ),
+  );
+  const results: Artwork[] = fetched
+    .filter((r): r is { ok: true; artwork: Artwork } => r.ok)
+    .map((r) => r.artwork)
+    .filter((a) => !input.has_image || Boolean(a.imageUrls.full));
+
+  return {
+    content: [
+      {
+        type: 'text' as const,
+        text: JSON.stringify({ count: results.length, results }, null, 2),
+      },
+    ],
+  };
+}
+
+async function handleGet(args: unknown) {
+  const input = GetInput.parse(args);
+  const out = await fetchAndCache(input.id);
+  if (!out.ok) return errorResult(out.reason);
+  return { content: [{ type: 'text' as const, text: JSON.stringify(out.artwork, null, 2) }] };
+}
+
+async function handleCite(args: unknown) {
+  const input = CiteInput.parse(args);
+  const out = await fetchAndCache(input.id);
+  if (!out.ok) return errorResult(out.reason);
+  return { content: [{ type: 'text' as const, text: cite(out.artwork, input.style as CiteStyle) }] };
+}
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
-
-  if (name === 'search_artworks') {
-    const input = SearchInput.parse(args);
-    const fetchers = input.museum ? [FETCHERS[input.museum]].filter(Boolean) : Object.values(FETCHERS);
-    if (fetchers.length === 0) {
-      return { content: [{ type: 'text', text: `unknown museum: ${input.museum}` }], isError: true };
+  try {
+    if (name === 'search_artworks') return await handleSearch(args);
+    if (name === 'get_artwork') return await handleGet(args);
+    if (name === 'cite') return await handleCite(args);
+    return errorResult(`unknown tool: ${name}`);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return errorResult(`invalid input: ${err.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
     }
-
-    const results: Artwork[] = [];
-    for (const f of fetchers) {
-      const ids = await f.search(input.query, input.limit);
-      for (const id of ids) {
-        const out = await fetchAndCache(id);
-        if (out.ok) {
-          if (input.has_image && !out.artwork.imageUrls.full) continue;
-          results.push(out.artwork);
-        }
-        if (results.length >= input.limit) break;
-      }
-      if (results.length >= input.limit) break;
+    if (err instanceof Error) {
+      return errorResult(`${name} failed: ${err.message}`);
     }
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({ count: results.length, results }, null, 2),
-        },
-      ],
-    };
+    return errorResult(`${name} failed with unknown error`);
   }
-
-  if (name === 'get_artwork') {
-    const input = GetInput.parse(args);
-    const out = await fetchAndCache(input.id);
-    if (!out.ok) {
-      return { content: [{ type: 'text', text: out.reason }], isError: true };
-    }
-    return { content: [{ type: 'text', text: JSON.stringify(out.artwork, null, 2) }] };
-  }
-
-  if (name === 'cite') {
-    const input = CiteInput.parse(args);
-    const out = await fetchAndCache(input.id);
-    if (!out.ok) {
-      return { content: [{ type: 'text', text: out.reason }], isError: true };
-    }
-    return { content: [{ type: 'text', text: cite(out.artwork, input.style as CiteStyle) }] };
-  }
-
-  return { content: [{ type: 'text', text: `unknown tool: ${name}` }], isError: true };
 });
 
 server.setRequestHandler(ListResourcesRequestSchema, async () => ({

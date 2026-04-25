@@ -58,7 +58,11 @@ export const validateXyzLicense: LicenseValidator = (raw) => {
 
 Then register in the `VALIDATORS` map at the bottom of the file.
 
-**Strict-default rule.** If any rights field is missing, ambiguous, or unrecognized, the validator must reject. New museum rules should err strictly. If a museum's rights model is genuinely two-tier (e.g. metadata open, images restricted), set `imageOpenAccess: false` and `metadataOpenAccess: true` rather than rejecting outright.
+**Strict-default rule.** If any rights field is missing, ambiguous, or unrecognized, the validator must reject. New museum rules should err strictly — when in doubt, write the test that proves the ambiguous record gets rejected, then write the validator. The discipline of this project is its main value; bugs that allow a non-open record through are P0 and outweigh false negatives.
+
+**Two-tier rights models.** If a museum's rights model is genuinely two-tier (e.g. metadata open, images restricted), set `imageOpenAccess: false` and `metadataOpenAccess: true` rather than rejecting outright. Add a comment in the validator explaining the museum's published distinction so future maintainers understand the asymmetry.
+
+**`rawSnapshot` on rejected records.** The `RejectedArtwork.rawSnapshot` field is intentionally typed as `unknown` and preserved verbatim. It exists for two reasons: debugging when a museum quietly changes a field name (the snapshot tells you what they actually returned), and authoring fixtures (copy a real rejection into `tests/fixtures/` to lock the behaviour). Don't strip or transform it.
 
 ### 3. Extend the mappings
 

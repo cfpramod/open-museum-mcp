@@ -97,6 +97,12 @@ After restarting your MCP client, the tools below become available.
 
 - `museum://{museum_code}/{id}` — read or list any indexed artwork by URI. Listable resources let you build a per-session shortlist without re-invoking tools.
 
+## Performance notes
+
+- The Met API has no batch endpoint for object retrieval. A `search_artworks` call with `limit: 10` makes one search request plus up to ten parallel object fetches (eleven HTTP round trips total on a cold cache). On warm cache the search is one round trip and most objects are local. Plan accordingly.
+- Where possible, search-side filters are pushed to the museum (`isPublicDomain=true` is sent with every Met search) so the rights gate has fewer rejections to handle.
+- Object records are cached for 90 days (artworks don't change). Search result IDs are cached for 14 days (museums add new open-access objects regularly).
+
 ## Verification model
 
 This is the heart of the project. Each museum exposes rights information in its own way; the server's job is to decide acceptance per museum and never default to "open" on ambiguity.

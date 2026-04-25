@@ -14,6 +14,7 @@ export const metFetcher: Fetcher = {
     const url = new URL(`${MET_API}/search`);
     url.searchParams.set('q', query);
     url.searchParams.set('hasImages', 'true');
+    url.searchParams.set('isPublicDomain', 'true');
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Met search failed: ${res.status}`);

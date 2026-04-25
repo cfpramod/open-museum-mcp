@@ -60,8 +60,24 @@ function centuryRange(n: number, era: 'ce' | 'bce', qualifier?: string): DateRan
 function tryRangeRegex(s: string): DateRange | null {
   const m = s.match(/(-?\d{1,5})\s*[-–]\s*(-?\d{1,5})\s*(b\.?c\.?e?\.?|bc)?/i);
   if (m) {
-    let a = parseInt(m[1], 10);
-    let b = parseInt(m[2], 10);
+    const firstStr = m[1];
+    const secondStr = m[2];
+    let a = parseInt(firstStr, 10);
+    let b = parseInt(secondStr, 10);
+
+    if (
+      !m[3] &&
+      !firstStr.startsWith('-') &&
+      !secondStr.startsWith('-') &&
+      firstStr.length === 4 &&
+      secondStr.length === 2
+    ) {
+      const century = Math.floor(a / 100) * 100;
+      b = century + b;
+      if (b < a) b += 100;
+      return { yearStart: a, yearEnd: b };
+    }
+
     if (m[3]) {
       a = -Math.abs(a);
       b = -Math.abs(b);

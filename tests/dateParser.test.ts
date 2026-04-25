@@ -14,6 +14,28 @@ describe('parseDisplayDate', () => {
     it('parses BCE range', () => {
       expect(parseDisplayDate('500–300 BCE')).toEqual({ yearStart: -500, yearEnd: -300 });
     });
+
+    it('parses abbreviated range "ca. 1850–60" as 1850–1860', () => {
+      expect(parseDisplayDate('ca. 1850–60')).toEqual({ yearStart: 1850, yearEnd: 1860 });
+    });
+
+    it('parses abbreviated range "1899–05" as 1899–1905 (century rollover)', () => {
+      expect(parseDisplayDate('1899–05')).toEqual({ yearStart: 1899, yearEnd: 1905 });
+    });
+  });
+
+  describe('prefix tolerance', () => {
+    it('parses "dated 1782" as exact year', () => {
+      expect(parseDisplayDate('dated 1782')).toEqual({ yearStart: 1782, yearEnd: 1782 });
+    });
+
+    it('parses "Dated, 1782" with punctuation', () => {
+      expect(parseDisplayDate('Dated, 1782')).toEqual({ yearStart: 1782, yearEnd: 1782 });
+    });
+
+    it('parses "made 1782" with alternative prefix', () => {
+      expect(parseDisplayDate('made 1782')).toEqual({ yearStart: 1782, yearEnd: 1782 });
+    });
   });
 
   describe('single years', () => {
