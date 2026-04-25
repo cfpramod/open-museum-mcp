@@ -62,6 +62,17 @@ describe('licenseGate', () => {
       const r = validateAicLicense({ is_public_domain: false });
       expect(r.accepted).toBe(false);
     });
+
+    it('rejects when is_public_domain is missing (strict default)', () => {
+      const r = validateAicLicense({});
+      expect(r.accepted).toBe(false);
+      expect(r.reason).toContain('strict default');
+    });
+
+    it('rejects malformed input', () => {
+      const r = validateAicLicense(null);
+      expect(r.accepted).toBe(false);
+    });
   });
 
   describe('dispatcher', () => {

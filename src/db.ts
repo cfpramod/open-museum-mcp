@@ -15,7 +15,7 @@ export class Cache {
 
   constructor(config: CacheConfig) {
     if (!existsSync(dirname(config.path))) {
-      mkdirSync(dirname(config.path), { recursive: true });
+      mkdirSync(dirname(config.path), { recursive: true, mode: 0o700 });
     }
     this.db = new Database(config.path);
     this.db.pragma('journal_mode = WAL');
@@ -54,6 +54,8 @@ export class Cache {
         cached_at TEXT NOT NULL
       );
 
+      -- Forward-compat scaffold for v1.0 artist obscurity scoring across the
+      -- federated corpus. Not yet populated; do not depend on these columns.
       CREATE TABLE IF NOT EXISTS artists (
         name TEXT PRIMARY KEY,
         object_count INTEGER NOT NULL DEFAULT 0,

@@ -5,9 +5,15 @@ const dynasties = dynastiesData as unknown as Record<string, Record<string, [num
 
 const flatDynasties: Record<string, [number, number]> = (() => {
   const out: Record<string, [number, number]> = {};
+  const seen = new Set<string>();
   for (const culture of Object.keys(dynasties)) {
     for (const [period, range] of Object.entries(dynasties[culture])) {
-      out[period.toLowerCase()] = range;
+      const key = period.toLowerCase();
+      if (seen.has(key)) {
+        console.warn(`[open-museum-mcp] dynasty table: duplicate period "${key}" across cultures; last definition wins`);
+      }
+      seen.add(key);
+      out[key] = range;
     }
   }
   return out;
@@ -57,7 +63,27 @@ function centuryRange(n: number, era: 'ce' | 'bce', qualifier?: string): DateRan
   return { yearStart: start, yearEnd: end };
 }
 
+function hasMixedEras(s: string): boolean {
+  const hasBce = /\b(b\.?c\.?e?\.?|bc)\b/i.test(s);
+  const hasCe = /\b(c\.?e\.?|ce)\b/i.test(s) && !/\b(b\.?c\.?e?\.?)\b/i.test(s.replace(/\b(c\.?e\.?|ce)\b/i, ''));
+  if (!hasBce) return false;
+  return /\bce\b/i.test(s) || /\bc\.e\./i.test(s);
+}
+
+function tryCrossEraRange(s: string): DateRange | null {
+  const m = s.match(/(\d{1,5})\s*(?:b\.?c\.?e?\.?|bc)\s*[-–]\s*(\d{1,5})\s*(?:c\.?e\.?|ce)/i);
+  if (m) {
+    return {
+      yearStart: -parseInt(m[1], 10),
+      yearEnd: parseInt(m[2], 10),
+    };
+  }
+  return null;
+}
+
 function tryRangeRegex(s: string): DateRange | null {
+  if (hasMixedEras(s)) return null;
+
   const m = s.match(/(-?\d{1,5})\s*[-–]\s*(-?\d{1,5})\s*(b\.?c\.?e?\.?|bc)?/i);
   if (m) {
     const firstStr = m[1];
@@ -65,17 +91,21 @@ function tryRangeRegex(s: string): DateRange | null {
     let a = parseInt(firstStr, 10);
     let b = parseInt(secondStr, 10);
 
-    if (
-      !m[3] &&
-      !firstStr.startsWith('-') &&
-      !secondStr.startsWith('-') &&
-      firstStr.length === 4 &&
-      secondStr.length === 2
-    ) {
+    const firstIsCleanFourDigit = !firstStr.startsWith('-') && firstStr.length === 4;
+    const secondIsShortSuffix = !secondStr.startsWith('-') && (secondStr.length === 1 || secondStr.length === 2);
+
+    if (!m[3] && firstIsCleanFourDigit && secondIsShortSuffix) {
+      const decade = Math.floor(a / 10) * 10;
       const century = Math.floor(a / 100) * 100;
-      b = century + b;
-      if (b < a) b += 100;
-      return { yearStart: a, yearEnd: b };
+      const candidateDecade = decade + b;
+      const candidateCentury = century + b;
+      let resolved: number;
+      if (secondStr.length === 1) {
+        resolved = candidateDecade < a ? candidateDecade + 10 : candidateDecade;
+      } else {
+        resolved = candidateCentury < a ? candidateCentury + 100 : candidateCentury;
+      }
+      return { yearStart: a, yearEnd: resolved };
     }
 
     if (m[3]) {
@@ -87,17 +117,49 @@ function tryRangeRegex(s: string): DateRange | null {
   return null;
 }
 
+function tryCenturyRange(s: string): DateRange | null {
+  const m = s.match(/([\w-]+)\s*[-–]\s*([\w-]+)\s*(?:-|\s)?\s*century\s*(b\.?c\.?e?\.?|bc)?/i);
+  if (!m) return null;
+  const startN = ordinalToNumber(m[1]);
+  const endN = ordinalToNumber(m[2]);
+  if (startN === null || endN === null) return null;
+  const era: 'ce' | 'bce' = m[3] ? 'bce' : 'ce';
+  const startRange = centuryRange(startN, era);
+  const endRange = centuryRange(endN, era);
+  return {
+    yearStart: Math.min(startRange.yearStart!, endRange.yearStart!),
+    yearEnd: Math.max(startRange.yearEnd!, endRange.yearEnd!),
+  };
+}
+
+function tryDecade(s: string): DateRange | null {
+  const m = s.match(/(?<![\d-])(\d{3,4})s\b/i);
+  if (m) {
+    const y = parseInt(m[1], 10);
+    return { yearStart: y, yearEnd: y + 9 };
+  }
+  return null;
+}
+
 function trySingleYear(s: string): DateRange | null {
-  const bce = s.match(/(\d{1,5})\s*(b\.?c\.?e?\.?|bc)/i);
+  const bce = s.match(/(\d{1,5})\s*(b\.?c\.?e?\.?|bc)\b/i);
   if (bce) {
     const y = -parseInt(bce[1], 10);
     return { yearStart: y, yearEnd: y };
   }
+
+  const ce = s.match(/(?<!\w)(\d{1,5})\s*(c\.?e\.?|ce)\b/i);
+  if (ce) {
+    const y = parseInt(ce[1], 10);
+    return { yearStart: y, yearEnd: y };
+  }
+
   const circa = s.match(/(?:c\.?|ca\.?|circa|approximately|around|about)\s*(-?\d{1,5})/i);
   if (circa) {
     const y = parseInt(circa[1], 10);
     return { yearStart: y - 5, yearEnd: y + 5 };
   }
+
   const exact = s.match(/(?<![\d-])(\d{3,4})(?![\d-])/);
   if (exact) {
     const y = parseInt(exact[1], 10);
@@ -156,11 +218,20 @@ export function parseDisplayDate(input: string | null | undefined): DateRange {
   const s = input.trim();
   if (!s) return { yearStart: null, yearEnd: null };
 
+  const cross = tryCrossEraRange(s);
+  if (cross) return cross;
+
   const range = tryRangeRegex(s);
   if (range) return range;
 
+  const centuryRangeMatch = tryCenturyRange(s);
+  if (centuryRangeMatch) return centuryRangeMatch;
+
   const century = tryCentury(s);
   if (century) return century;
+
+  const decade = tryDecade(s);
+  if (decade) return decade;
 
   const single = trySingleYear(s);
   if (single) return single;

@@ -20,9 +20,10 @@ const FETCHERS: Record<string, Fetcher> = {
   [metFetcher.code]: metFetcher,
 };
 
-const cache = new Cache({
-  path: join(homedir(), '.open-museum-mcp', 'cache.db'),
-});
+const CACHE_PATH = process.env.OMM_CACHE_PATH ?? join(homedir(), '.open-museum-mcp', 'cache.db');
+const cache = new Cache({ path: CACHE_PATH });
+
+const ID_REGEX = /^[a-z]+:\d+$/;
 
 const SearchInput = z.object({
   query: z.string().min(1),
@@ -32,19 +33,24 @@ const SearchInput = z.object({
 });
 
 const GetInput = z.object({
-  id: z.string().regex(/^[a-z]+:[\w-]+$/),
+  id: z.string().regex(ID_REGEX),
 });
 
 const CiteInput = z.object({
-  id: z.string().regex(/^[a-z]+:[\w-]+$/),
+  id: z.string().regex(ID_REGEX),
   style: z.enum(['short', 'full', 'caption']).default('full'),
 });
 
 async function fetchAndCache(id: string): Promise<{ ok: true; artwork: Artwork } | { ok: false; reason: string }> {
+  if (!ID_REGEX.test(id)) {
+    return { ok: false, reason: `invalid artwork id: ${id}` };
+  }
+
   const cached = cache.getObject(id);
   if (cached) return { ok: true, artwork: cached };
 
   const [code] = id.split(':');
+  if (!code) return { ok: false, reason: `invalid artwork id: ${id}` };
   const fetcher = FETCHERS[code];
   if (!fetcher) return { ok: false, reason: `unknown museum code: ${code}` };
 
@@ -82,7 +88,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           has_image: {
             type: 'boolean',
             default: true,
-            description: 'Restrict to records with an image URL. Defaults to true.',
+            description: 'Restrict to records with an image URL. Defaults to true. Note: some museums (e.g. The Met) only expose images-only search server-side.',
           },
           limit: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
         },
@@ -124,19 +130,32 @@ function errorResult(message: string) {
   return { content: [{ type: 'text' as const, text: message }], isError: true };
 }
 
+function searchCacheKey(query: string, museum: string | undefined, hasImage: boolean, limit: number): string {
+  return JSON.stringify({ q: query, m: museum ?? '*', hi: hasImage, lim: limit });
+}
+
 async function handleSearch(args: unknown) {
   const input = SearchInput.parse(args);
   const fetchers = input.museum
-    ? [FETCHERS[input.museum]].filter((f): f is Fetcher => Boolean(f))
+    ? (FETCHERS[input.museum] ? [FETCHERS[input.museum]] : [])
     : Object.values(FETCHERS);
   if (fetchers.length === 0) {
     return errorResult(`unknown museum: ${input.museum}`);
   }
 
-  const idLists = await Promise.all(
-    fetchers.map((f) => f.search(input.query, input.limit).catch(() => [] as string[])),
-  );
-  const allIds = idLists.flat().slice(0, input.limit);
+  const overFetch = input.has_image ? input.limit * 2 : input.limit;
+  const cacheKey = searchCacheKey(input.query, input.museum, input.has_image, overFetch);
+
+  let allIds = cache.getQuery(cacheKey);
+  if (!allIds) {
+    const idLists = await Promise.all(
+      fetchers.map((f) =>
+        f.search(input.query, overFetch, { hasImage: input.has_image }).catch(() => [] as string[]),
+      ),
+    );
+    allIds = idLists.flat();
+    cache.putQuery(cacheKey, allIds);
+  }
 
   const fetched = await Promise.all(
     allIds.map((id) =>
@@ -146,10 +165,11 @@ async function handleSearch(args: unknown) {
       })),
     ),
   );
-  const results: Artwork[] = fetched
+  const accepted: Artwork[] = fetched
     .filter((r): r is { ok: true; artwork: Artwork } => r.ok)
-    .map((r) => r.artwork)
-    .filter((a) => !input.has_image || Boolean(a.imageUrls.full));
+    .map((r) => r.artwork);
+  const filtered = accepted.filter((a) => !input.has_image || Boolean(a.imageUrls.full));
+  const results = filtered.slice(0, input.limit);
 
   return {
     content: [
@@ -200,11 +220,16 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => ({
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const uri = request.params.uri;
   const m = uri.match(/^museum:\/\/([a-z]+)\/(.+)$/);
-  if (!m) throw new Error(`invalid museum URI: ${uri}`);
+  if (!m) {
+    throw new Error(`invalid museum URI scheme: ${uri}`);
+  }
   const id = `${m[1]}:${m[2]}`;
+  if (!ID_REGEX.test(id)) {
+    throw new Error(`invalid museum URI: ${uri} (id must match ${ID_REGEX})`);
+  }
   const out = await fetchAndCache(id);
-  if (!out.ok || !out.artwork) {
-    throw new Error(`cannot resolve resource ${uri}: ${out.ok ? 'not found' : out.reason}`);
+  if (!out.ok) {
+    throw new Error(`cannot resolve ${uri}: ${out.reason}`);
   }
   return {
     contents: [

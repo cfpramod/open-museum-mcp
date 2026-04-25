@@ -11,7 +11,8 @@ function metFull(a: Artwork): string {
   const head = joinNonEmpty([artist, a.title], ', ');
   const date = a.displayDate;
   const tail = `${a.museum.name}. ${a.license.type}. ${a.source.pageUrl}`;
-  return joinNonEmpty([head, date, tail], '. ') + '.';
+  const joined = joinNonEmpty([head, date, tail], '. ');
+  return joined.endsWith('.') ? joined : `${joined}.`;
 }
 
 function metCaption(a: Artwork): string {

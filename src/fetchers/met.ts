@@ -2,7 +2,7 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateMetLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import type { Fetcher } from './types.js';
+import type { Fetcher, SearchOptions } from './types.js';
 
 const MET_API = 'https://collectionapi.metmuseum.org/public/collection/v1';
 
@@ -10,10 +10,12 @@ export const metFetcher: Fetcher = {
   code: 'met',
   name: 'The Metropolitan Museum of Art',
 
-  async search(query: string, limit: number): Promise<string[]> {
+  async search(query: string, limit: number, options: SearchOptions = {}): Promise<string[]> {
     const url = new URL(`${MET_API}/search`);
     url.searchParams.set('q', query);
-    url.searchParams.set('hasImages', 'true');
+    if (options.hasImage !== false) {
+      url.searchParams.set('hasImages', 'true');
+    }
     url.searchParams.set('isPublicDomain', 'true');
 
     const res = await fetch(url);
@@ -70,7 +72,8 @@ export const metFetcher: Fetcher = {
       (r.culture as string) || (r.country as string) || (r.classification as string) || '';
     const region = normalizeRegion(cultureOrCountry);
 
-    const period = ((r.period as string) || (r.dynasty as string) || '').toLowerCase().trim() || null;
+    const periodRaw = ((r.period as string) || (r.dynasty as string) || '').toLowerCase().trim();
+    const period = periodRaw.replace(/\s*\([^)]*\)\s*$/, '').trim() || null;
 
     const fullImage =
       (r.primaryImage as string) || (r.primaryImageSmall as string) || '';

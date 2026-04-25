@@ -22,6 +22,54 @@ describe('parseDisplayDate', () => {
     it('parses abbreviated range "1899–05" as 1899–1905 (century rollover)', () => {
       expect(parseDisplayDate('1899–05')).toEqual({ yearStart: 1899, yearEnd: 1905 });
     });
+
+    it('parses single-digit suffix "1820-5" as 1820–1825', () => {
+      expect(parseDisplayDate('1820-5')).toEqual({ yearStart: 1820, yearEnd: 1825 });
+    });
+
+    it('parses single-digit rollover "1829-2" as 1829–1832', () => {
+      expect(parseDisplayDate('1829-2')).toEqual({ yearStart: 1829, yearEnd: 1832 });
+    });
+  });
+
+  describe('cross-era ranges', () => {
+    it('parses "500 BCE – 50 CE" as -500 to 50', () => {
+      expect(parseDisplayDate('500 BCE – 50 CE')).toEqual({ yearStart: -500, yearEnd: 50 });
+    });
+
+    it('parses "100 BC - 200 CE" as -100 to 200', () => {
+      expect(parseDisplayDate('100 BC - 200 CE')).toEqual({ yearStart: -100, yearEnd: 200 });
+    });
+  });
+
+  describe('CE marker', () => {
+    it('parses "50 CE" as exact year', () => {
+      expect(parseDisplayDate('50 CE')).toEqual({ yearStart: 50, yearEnd: 50 });
+    });
+
+    it('parses "200 C.E." with periods', () => {
+      expect(parseDisplayDate('200 C.E.')).toEqual({ yearStart: 200, yearEnd: 200 });
+    });
+  });
+
+  describe('decades', () => {
+    it('parses "1820s" as 1820–1829', () => {
+      expect(parseDisplayDate('1820s')).toEqual({ yearStart: 1820, yearEnd: 1829 });
+    });
+
+    it('parses "1900s" as 1900–1909', () => {
+      expect(parseDisplayDate('1900s')).toEqual({ yearStart: 1900, yearEnd: 1909 });
+    });
+  });
+
+  describe('century-to-century ranges', () => {
+    it('parses "14th-15th century" as 1301–1500', () => {
+      expect(parseDisplayDate('14th-15th century')).toEqual({ yearStart: 1301, yearEnd: 1500 });
+    });
+
+    it('parses "5th-6th century BCE" as -600 to -401', () => {
+      expect(parseDisplayDate('5th-6th century BCE')).toEqual({ yearStart: -600, yearEnd: -401 });
+    });
   });
 
   describe('prefix tolerance', () => {

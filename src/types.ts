@@ -61,9 +61,20 @@ export interface Artwork {
   source: ArtworkSource;
   description?: string;
   rawTags?: string[];
+  /** Reserved for v1.0 artist-obscurity scoring across the federated corpus. Not yet populated by any fetcher. */
   obscurityScore?: number;
 }
 
+/**
+ * `rawSnapshot` preserves the museum's verbatim response when a record is
+ * rejected by the rights gate. It exists for two purposes only:
+ *   1. Debugging when a museum quietly changes a field name; the snapshot
+ *      shows what they actually returned.
+ *   2. Authoring rejection fixtures by copying a real-world rejection into
+ *      `tests/fixtures/`.
+ * Never expose this on the wire to MCP clients — it can include arbitrary
+ * museum payload contents that aren't meant for end users.
+ */
 export interface RejectedArtwork {
   id: string;
   museumCode: string;
@@ -80,6 +91,11 @@ export interface DateRange {
   yearEnd: number | null;
 }
 
+/**
+ * Reserved for v0.2 list_traditions tool: each normalized tradition tag will
+ * carry per-museum coverage counts so callers can see where holdings live
+ * before searching. Not yet emitted by any tool.
+ */
 export interface Tradition {
   tag: string;
   label: string;
