@@ -93,6 +93,25 @@ After restarting your MCP client, the tools below become available.
 | `get_artwork(id)` | Fetch a single artwork by its normalized ID (e.g. `met:436535`). |
 | `cite(id, style?)` | Render a citation. `style`: `full` (artist, title, date, museum, license, URL), `caption` (image attribution), `short` (inline). |
 
+### `cite` example outputs
+
+For Van Gogh's *Wheat Field with Cypresses* (`met:436535`):
+
+```text
+caption: "Vincent van Gogh, Wheat Field with Cypresses, 1889. Oil on canvas.
+          The Metropolitan Museum of Art, CC0.
+          https://www.metmuseum.org/art/collection/search/436535"
+
+full:    "Vincent van Gogh, Wheat Field with Cypresses. 1889. The Metropolitan
+          Museum of Art. CC0. https://www.metmuseum.org/art/collection/search/436535."
+
+short:   "Wheat Field with Cypresses (Vincent van Gogh, 1889)"
+```
+
+The `caption` style follows museum-publication convention: comma-separated head, medium called out, terse end. The `full` style is suitable for footnotes and bibliographies. The `short` style is for inline references where you've already established context.
+
+For anonymous works (e.g. a Tang dynasty funerary vessel), the artist field becomes `"Unknown artist"` in caption form.
+
 ## Resources
 
 - `museum://{museum_code}/{id}` — read or list any indexed artwork by URI. Listable resources let you build a per-session shortlist without re-invoking tools.
@@ -174,6 +193,17 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). The short version:
 5. Register the adapter in `src/server.ts`.
 
 The license gate is the most opinionated part of the codebase — additions should err on the side of stricter rules.
+
+## Security
+
+- **`npm audit` clean at launch.** Zero vulnerabilities (low, moderate, high, or critical) across runtime and dev dependencies as of v0.1.
+- **stdio-only transport.** No HTTP listener, no auth surface to bypass. The server only speaks to the MCP client over standard streams.
+- **Strict input validation.** All tool arguments pass through Zod schemas; artwork IDs are constrained to `/^[a-z]+:\d+$/`. The resource URI handler re-validates the constructed ID against the same regex, so URI-form requests can't bypass the constraint.
+- **Defense-in-depth on rights.** The Met search filter `isPublicDomain=true` is sometimes inconsistent with the per-object boolean. The license gate runs again on every fetched record and rejects any disagreement.
+- **Parameterized SQL.** All `better-sqlite3` calls use named/positional parameters; zero string-concatenated SQL paths.
+- **No file writes from user input.** The cache directory is created at `~/.open-museum-mcp/cache.db` (or wherever `OMM_CACHE_PATH` points) with mode `0o700`; no fetcher rehosts media bytes locally.
+
+If you find a record the gate accepts that shouldn't pass, please file an issue with the artwork ID and the museum's raw API response. Rights correctness is the project's most important property.
 
 ## Disclaimer
 

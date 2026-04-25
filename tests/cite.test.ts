@@ -49,12 +49,18 @@ describe('cite', () => {
     expect(out).toContain('https://www.metmuseum.org/art/collection/search/436535');
   });
 
-  it('renders a caption suitable for image attribution', () => {
+  it('renders a museum-style caption with artist, title, date, medium, museum, license, URL', () => {
     const out = cite(sample, 'caption');
-    expect(out).toContain('Wheat Field with Cypresses');
-    expect(out).toContain('Vincent van Gogh');
-    expect(out).toContain('Image courtesy of The Metropolitan Museum of Art');
-    expect(out).toContain('CC0');
+    expect(out).toBe(
+      'Vincent van Gogh, Wheat Field with Cypresses, 1889. Oil on canvas. The Metropolitan Museum of Art, CC0. https://www.metmuseum.org/art/collection/search/436535',
+    );
+  });
+
+  it('omits the medium element from captions when not present', () => {
+    const noMedium: Artwork = { ...sample, medium: '' };
+    const out = cite(noMedium, 'caption');
+    expect(out).not.toContain('Oil on canvas');
+    expect(out).toContain('Vincent van Gogh, Wheat Field with Cypresses, 1889. The Metropolitan Museum of Art, CC0.');
   });
 
   it('renders a short citation', () => {

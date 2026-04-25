@@ -17,7 +17,12 @@ function metFull(a: Artwork): string {
 
 function metCaption(a: Artwork): string {
   const artist = a.artist.attributionType === 'anonymous' ? 'Unknown artist' : a.artist.name;
-  return `${a.title} — ${artist}, ${a.displayDate}. Image courtesy of ${a.museum.name} (${a.license.type}).`;
+  const parts: string[] = [`${artist}, ${a.title}, ${a.displayDate}`];
+  if (a.medium && a.medium.trim()) parts.push(a.medium.trim());
+  parts.push(`${a.museum.name}, ${a.license.type}`);
+  const body = parts.join('. ');
+  const terminated = body.endsWith('.') ? body : `${body}.`;
+  return `${terminated} ${a.source.pageUrl}`;
 }
 
 function shortStyle(a: Artwork): string {
