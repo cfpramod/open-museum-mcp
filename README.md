@@ -1,21 +1,23 @@
 # open-museum-mcp
 
-> Federated, rights-verified museum search for MCP clients.
+> Open-access museum search for MCP clients, with rights verification per museum.
 
-A Model Context Protocol server for discovery across open-access museum collections. It normalizes museum metadata into one schema and only returns artworks whose open-access status passes source-specific verification rules; ambiguous records are excluded by default.
+## Why I built this
 
-Built for writers, researchers, and LLM agents who want to find reuse-safe artwork across many museums through a single interface, with attribution metadata that does not require a manual rights review on every result.
+I kept wanting reuse-safe artwork for my writing, and every museum's rights model is different. So I built one MCP interface that only returns records that pass per-museum verification rules, with strict deny on ambiguity. It lets me search by artist, period, region, and other fields, and pulls the image and description back in one normalized shape.
 
-## What it gives you
+If anyone else is exploring open-access art, I hope this helps. The plan is to keep adding museums from around the world.
 
-- **Federated discovery** across The Met (Cleveland and the Art Institute of Chicago in progress) through one MCP interface.
-- **Rights-first filtering.** Records are validated against per-museum rules implemented in code. If a museum's open-access indicator is missing or ambiguous, the record is dropped, never defaulted to "open."
-- **Normalized cultural metadata.** Display dates parse into start/end years using a dynasty-aware parser (Tang, Edo, Safavid, Mughal, etc.); regions normalize across museums; attribution types separate named artists from anonymous, workshop, "after," and attributed works.
-- **LLM-friendly tools and resources.** Listable `museum://{code}/{id}` resources, deterministic citation rendering, and structured search results.
+## What you get
+
+- **One interface, registered museums.** The Met is live. Cleveland and the Art Institute of Chicago are next.
+- **Strict deny on ambiguity.** Records are validated against per-museum rights rules in code. Missing or unclear indicators drop the record; nothing is defaulted to "open".
+- **Catalog-grade metadata.** A dynasty-aware date parser handles Tang, Edo, Safavid, Mughal and the rest. Regions normalize across museums. Attribution separates named artists from anonymous, workshop, "after", and attributed works.
+- **Listable resources and deterministic citations.** `museum://{code}/{id}` resources, three citation styles, structured JSON search results.
 
 ## Quick example
 
-A search call from an MCP client returns license-verified results in a single normalized shape:
+A search call returns license-verified results in one normalized shape:
 
 ```jsonc
 // Tool call: search_artworks({ query: "van gogh wheat", museum: "met", limit: 1 })
@@ -89,7 +91,7 @@ After restarting your MCP client, the tools below become available.
 
 | Tool | Description |
 |---|---|
-| `search_artworks(query, museum?, has_image?, limit?)` | Federated search. Returns only records that pass the rights gate. |
+| `search_artworks(query, museum?, has_image?, limit?)` | Search across registered museums. Returns only records that pass the rights gate. |
 | `get_artwork(id)` | Fetch a single artwork by its normalized ID (e.g. `met:436535`). |
 | `cite(id, style?)` | Render a citation. `style`: `full` (artist, title, date, museum, license, URL), `caption` (image attribution), `short` (inline). |
 
@@ -114,11 +116,11 @@ For anonymous works (e.g. a Tang dynasty funerary vessel), the artist field beco
 
 ## Resources
 
-- `museum://{museum_code}/{id}` — read or list any indexed artwork by URI. Listable resources let you build a per-session shortlist without re-invoking tools.
+- `museum://{museum_code}/{id}`: read or list any indexed artwork by URI. Listable resources let you build a per-session shortlist without re-invoking tools.
 
 ## Performance notes
 
-- The Met API has no batch endpoint for object retrieval. A `search_artworks` call with `limit: 10` makes one search request plus up to ten parallel object fetches (eleven HTTP round trips total on a cold cache). On warm cache the search is one round trip and most objects are local. Plan accordingly.
+- The Met API has no batch endpoint for object retrieval. A `search_artworks` call with `limit: 10` makes one search request plus up to ten parallel object fetches (eleven HTTP round trips total on a cold cache). On warm cache the search is one round trip and most objects are local.
 - Where possible, search-side filters are pushed to the museum (`isPublicDomain=true` is sent with every Met search) so the rights gate has fewer rejections to handle.
 - Object records are cached for 90 days (artworks don't change). Search result IDs are cached for 14 days (museums add new open-access objects regularly).
 
@@ -136,13 +138,13 @@ This is the heart of the project. Each museum exposes rights information in its 
 
 Each accepted record carries:
 
-- `imageOpenAccess` — the artwork's image may be reused under the recorded license.
-- `metadataOpenAccess` — the artwork's catalog metadata may be reused (often broader than image rights).
-- `license.type` — normalized license tier (`CC0`, `PD`, `CC-BY`, ...; v0.1 only emits `CC0`).
-- `license.rawValue` — the museum's own field value, preserved.
-- `license.verificationSource` — the exact museum field that was checked (e.g. `met.isPublicDomain`).
-- `license.confidence` — `high` for unambiguous accepts (the only level v0.1 emits).
-- `license.verifiedAt` — ISO timestamp of when this verification ran.
+- `imageOpenAccess`: the artwork's image may be reused under the recorded license.
+- `metadataOpenAccess`: the artwork's catalog metadata may be reused (often broader than image rights).
+- `license.type`: normalized license tier (`CC0`, `PD`, `CC-BY`, …; v0.1 only emits `CC0`).
+- `license.rawValue`: the museum's own field value, preserved.
+- `license.verificationSource`: the exact museum field that was checked (e.g. `met.isPublicDomain`).
+- `license.confidence`: `high` for unambiguous accepts (the only level v0.1 emits).
+- `license.verifiedAt`: ISO timestamp of when this verification ran.
 
 This is what "rights-verified" means here: validated against published museum metadata using source-specific rules implemented in this repo, with strict deny on ambiguity. It is **not** a guarantee of third-party rights beyond what each museum's API publicly represents. See [Disclaimer](#disclaimer).
 
@@ -162,7 +164,7 @@ Full TypeScript definitions in [`src/types.ts`](src/types.ts). The `Artwork` sha
 
 Highlights:
 
-- `displayDate` (string, museum-provided) preserved alongside parsed `yearStart` / `yearEnd` (signed integers — BCE supported as negative years).
+- `displayDate` (string, museum-provided) preserved alongside parsed `yearStart` / `yearEnd` (signed integers, BCE encoded as negatives).
 - `region` and `period` normalized across museums (`china`, `japan`, `tang dynasty`, etc.).
 - `artist.attributionType` distinguishes `named` / `anonymous` / `workshop` / `after` / `attributed` / `circle` / `follower`.
 - `imageOpenAccess` is held distinct from `metadataOpenAccess` because museums frequently publish open metadata for objects whose images are not openly licensed.
@@ -176,11 +178,11 @@ Highlights:
 
 ## Roadmap
 
-- v0.1 — Met adapter, dynasty-aware date parser, license gate, `cite` tool, MCP resources. **(here)**
-- v0.2 — Cleveland and AIC adapters, `discover_random` with constraints (`region`, `period`, `not_artist`), `list_traditions`.
-- v0.5 — Federated dominant-color extraction (`color: "#3a5f7d"` discovery across museums via `sharp`).
-- v1.0 — Artist-obscurity scoring (`object_count_total`, `museum_count`) for deliberate exploration of less-canonical work.
-- v2.0 — Smithsonian, Rijksmuseum, Wikimedia Commons (long-tail).
+- v0.1: Met adapter, dynasty-aware date parser, license gate, `cite` tool, MCP resources. **(here)**
+- v0.2: Cleveland and AIC adapters, `discover_random` with constraints (`region`, `period`, `not_artist`), `list_traditions`.
+- v0.5: Dominant-color extraction across museums (`color: "#3a5f7d"` discovery via `sharp`).
+- v1.0: Artist-obscurity scoring (`object_count_total`, `museum_count`) for deliberate exploration of less-canonical work.
+- v2.0: Smithsonian, Rijksmuseum, Wikimedia Commons (long-tail).
 
 ## Contributing a museum adapter
 
@@ -192,18 +194,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). The short version:
 4. Add fixture-based tests in `tests/{code}.test.ts` covering: one accepted record, one rejected (non-open) record, one rejected (missing field) record.
 5. Register the adapter in `src/server.ts`.
 
-The license gate is the most opinionated part of the codebase — additions should err on the side of stricter rules.
+The license gate is the most opinionated part of the codebase. Additions should err strict.
 
 ## Security
 
-- **`npm audit` clean at launch.** Zero vulnerabilities (low, moderate, high, or critical) across runtime and dev dependencies as of v0.1.
+- **`npm audit` clean at launch.** Zero vulnerabilities at any severity level across runtime and dev dependencies as of v0.1.
 - **stdio-only transport.** No HTTP listener, no auth surface to bypass. The server only speaks to the MCP client over standard streams.
-- **Strict input validation.** All tool arguments pass through Zod schemas; artwork IDs are constrained to `/^[a-z]+:\d+$/`. The resource URI handler re-validates the constructed ID against the same regex, so URI-form requests can't bypass the constraint.
+- **Strict input validation.** All tool arguments pass through Zod schemas; artwork IDs are constrained to `/^[a-z]+:[1-9]\d*$/`. The resource URI handler re-validates the constructed ID against the same regex, so URI-form requests can't bypass the constraint.
 - **Defense-in-depth on rights.** The Met search filter `isPublicDomain=true` is sometimes inconsistent with the per-object boolean. The license gate runs again on every fetched record and rejects any disagreement.
 - **Parameterized SQL.** All `better-sqlite3` calls use named/positional parameters; zero string-concatenated SQL paths.
-- **No file writes from user input.** The cache directory is created at `~/.open-museum-mcp/cache.db` (or wherever `OMM_CACHE_PATH` points) with mode `0o700`; no fetcher rehosts media bytes locally.
+- **No file writes from user input.** The cache directory is created at `~/.open-museum-mcp/cache.db` (or wherever `OMM_CACHE_PATH` points) with mode `0o700` and the cache file at `0o600`; no fetcher rehosts media bytes locally.
 
-If you find a record the gate accepts that shouldn't pass, please file an issue with the artwork ID and the museum's raw API response. Rights correctness is the project's most important property.
+If you find a record the gate accepts that shouldn't pass, please open an issue with the artwork ID and the museum's raw API response. Rights correctness is the project's most important property, and the part where outside review most helps.
 
 ## Disclaimer
 
