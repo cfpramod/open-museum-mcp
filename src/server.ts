@@ -23,7 +23,34 @@ const FETCHERS: Record<string, Fetcher> = {
 const CACHE_PATH = process.env.OMM_CACHE_PATH ?? join(homedir(), '.open-museum-mcp', 'cache.db');
 const cache = new Cache({ path: CACHE_PATH });
 
-const ID_REGEX = /^[a-z]+:\d+$/;
+// Museum IDs are positive integers (no leading zeros). Tightening the regex
+// here makes `met:000123` and `met:0` user errors rather than valid IDs that
+// produce duplicate cache rows.
+const ID_REGEX = /^[a-z]+:[1-9]\d*$/;
+
+// Cap concurrent fetches to one museum's API. The Met has no batch endpoint,
+// so a search of limit 50 fans out into up to 50 object fetches; without a
+// cap, we'd hammer the upstream and risk rate-limit errors. 8 is empirically
+// gentle and keeps wall-clock time within the same order of magnitude.
+const FETCH_CONCURRENCY = 8;
+
+async function withConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const idx = next++;
+      if (idx >= items.length) return;
+      results[idx] = await fn(items[idx]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 const SearchInput = z.object({
   query: z.string().min(1),
@@ -49,14 +76,18 @@ async function fetchAndCache(id: string): Promise<{ ok: true; artwork: Artwork }
   const cached = cache.getObject(id);
   if (cached) return { ok: true, artwork: cached };
 
-  const [code] = id.split(':');
-  if (!code) return { ok: false, reason: `invalid artwork id: ${id}` };
+  // ID_REGEX guarantees a non-empty `[a-z]+` segment before ':'.
+  const code = id.slice(0, id.indexOf(':'));
   const fetcher = FETCHERS[code];
   if (!fetcher) return { ok: false, reason: `unknown museum code: ${code}` };
 
   const raw = await fetcher.getRaw(id);
   const result = fetcher.normalize(raw);
   if (result.status === 'rejected') {
+    // Rejections are expected — strict-default-deny is the project's spine.
+    // Log to stderr (stdout is the MCP protocol channel) so operators can
+    // diagnose "why did my search return fewer results than expected?".
+    console.error(`[open-museum-mcp] rejected ${id}: ${result.rejection.reason}`);
     return { ok: false, reason: result.rejection.reason };
   }
 
@@ -84,7 +115,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         type: 'object',
         properties: {
           query: { type: 'string', description: 'Free-text query.' },
-          museum: { type: 'string', description: 'Optional museum code (met, cleveland, aic).' },
+          museum: {
+            type: 'string',
+            description:
+              'Optional museum code. Currently registered: met. (Cleveland, AIC adapters are planned for v0.2.)',
+          },
           has_image: {
             type: 'boolean',
             default: true,
@@ -130,8 +165,13 @@ function errorResult(message: string) {
   return { content: [{ type: 'text' as const, text: message }], isError: true };
 }
 
-function searchCacheKey(query: string, museum: string | undefined, hasImage: boolean, limit: number): string {
-  return JSON.stringify({ q: query, m: museum ?? '*', hi: hasImage, lim: limit });
+// The cache key includes the overfetch count, not the user-facing `limit`.
+// That means limit:5 and limit:6 produce different keys (since 5*2=10 vs
+// 6*2=12). The trade-off: more cache rows, but each row is guaranteed to
+// hold enough IDs to satisfy a request at its overfetch tier even after
+// rights-gate rejections. Bucketing would need explicit refill logic.
+function searchCacheKey(query: string, museum: string | undefined, hasImage: boolean, overFetch: number): string {
+  return JSON.stringify({ q: query, m: museum ?? '*', hi: hasImage, of: overFetch });
 }
 
 async function handleSearch(args: unknown) {
@@ -157,13 +197,11 @@ async function handleSearch(args: unknown) {
     cache.putQuery(cacheKey, allIds);
   }
 
-  const fetched = await Promise.all(
-    allIds.map((id) =>
-      fetchAndCache(id).catch((err: unknown) => ({
-        ok: false as const,
-        reason: err instanceof Error ? err.message : 'fetch failed',
-      })),
-    ),
+  const fetched = await withConcurrency(allIds, FETCH_CONCURRENCY, (id) =>
+    fetchAndCache(id).catch((err: unknown) => ({
+      ok: false as const,
+      reason: err instanceof Error ? err.message : 'fetch failed',
+    })),
   );
   const accepted: Artwork[] = fetched
     .filter((r): r is { ok: true; artwork: Artwork } => r.ok)
