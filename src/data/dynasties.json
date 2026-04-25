@@ -1,0 +1,93 @@
+{
+  "japan": {
+    "jomon": [-14000, -300],
+    "yayoi": [-300, 250],
+    "kofun": [250, 538],
+    "asuka": [538, 710],
+    "nara": [710, 794],
+    "heian": [794, 1185],
+    "kamakura": [1185, 1333],
+    "muromachi": [1336, 1573],
+    "azuchi-momoyama": [1573, 1603],
+    "momoyama": [1573, 1603],
+    "edo": [1603, 1868],
+    "meiji": [1868, 1912],
+    "taisho": [1912, 1926],
+    "showa": [1926, 1989]
+  },
+  "china": {
+    "shang": [-1600, -1046],
+    "zhou": [-1046, -256],
+    "qin": [-221, -206],
+    "han": [-206, 220],
+    "three kingdoms": [220, 280],
+    "jin": [266, 420],
+    "northern and southern": [420, 589],
+    "sui": [581, 618],
+    "tang": [618, 907],
+    "five dynasties": [907, 960],
+    "song": [960, 1279],
+    "northern song": [960, 1127],
+    "southern song": [1127, 1279],
+    "yuan": [1271, 1368],
+    "ming": [1368, 1644],
+    "qing": [1644, 1912]
+  },
+  "korea": {
+    "three kingdoms korea": [-57, 668],
+    "silla": [-57, 935],
+    "unified silla": [668, 935],
+    "goryeo": [918, 1392],
+    "joseon": [1392, 1897]
+  },
+  "iran": {
+    "achaemenid": [-550, -330],
+    "parthian": [-247, 224],
+    "sasanian": [224, 651],
+    "umayyad caliphate": [661, 750],
+    "abbasid caliphate": [750, 1258],
+    "ilkhanid": [1256, 1335],
+    "timurid": [1370, 1507],
+    "safavid": [1501, 1736],
+    "qajar": [1789, 1925],
+    "pahlavi": [1925, 1979]
+  },
+  "india": {
+    "maurya": [-322, -185],
+    "gupta": [320, 550],
+    "chola": [848, 1279],
+    "delhi sultanate": [1206, 1526],
+    "mughal": [1526, 1857],
+    "british raj": [1858, 1947]
+  },
+  "islamic": {
+    "umayyad": [661, 750],
+    "abbasid": [750, 1258],
+    "fatimid": [909, 1171],
+    "ayyubid": [1171, 1260],
+    "mamluk": [1250, 1517],
+    "ottoman": [1299, 1922]
+  },
+  "egypt": {
+    "old kingdom": [-2686, -2181],
+    "middle kingdom": [-2055, -1650],
+    "new kingdom": [-1550, -1069],
+    "ptolemaic": [-305, -30],
+    "late period": [-664, -332]
+  },
+  "europe": {
+    "merovingian": [481, 751],
+    "carolingian": [800, 888],
+    "ottonian": [919, 1024],
+    "romanesque": [1000, 1200],
+    "gothic": [1200, 1500],
+    "early renaissance": [1400, 1495],
+    "high renaissance": [1495, 1527],
+    "mannerism": [1527, 1600],
+    "baroque": [1600, 1750],
+    "rococo": [1730, 1770],
+    "neoclassical": [1750, 1830],
+    "romanticism": [1800, 1850],
+    "victorian": [1837, 1901]
+  }
+}

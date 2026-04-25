@@ -1,0 +1,21 @@
+{
+  "japan": ["japan", "japanese", "edo", "kyoto", "tokyo", "osaka"],
+  "china": ["china", "chinese", "tang", "song", "ming", "qing", "tibet"],
+  "korea": ["korea", "korean", "joseon", "goryeo"],
+  "iran": ["iran", "iranian", "persian", "persia", "safavid", "qajar"],
+  "india": ["india", "indian", "mughal", "rajasthani", "punjabi"],
+  "islamic": ["islamic art", "ottoman", "mamluk", "fatimid"],
+  "egypt": ["egypt", "egyptian", "ptolemaic"],
+  "greece": ["greece", "greek", "hellenistic", "attic"],
+  "rome": ["rome", "roman", "roman empire"],
+  "byzantine": ["byzantine", "byzantium"],
+  "italy": ["italy", "italian", "florentine", "venetian", "roman renaissance"],
+  "france": ["france", "french", "parisian"],
+  "netherlands": ["netherlands", "dutch", "flemish", "holland"],
+  "germany": ["germany", "german", "bavarian", "prussian"],
+  "spain": ["spain", "spanish", "andalusian", "catalan"],
+  "england": ["england", "english", "british", "great britain"],
+  "americas": ["united states", "american", "mexican", "peruvian"],
+  "africa": ["africa", "african", "yoruba", "kongo", "asante"],
+  "oceania": ["oceania", "polynesian", "maori", "papua"]
+}

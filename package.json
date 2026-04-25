@@ -1,0 +1,44 @@
+{
+  "name": "open-museum-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for federated, license-verified search across open-access museum collections (The Met, Cleveland, AIC and more).",
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "open-museum-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/server.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "museum",
+    "open-access",
+    "art",
+    "metropolitan-museum",
+    "cleveland-museum",
+    "art-institute-chicago"
+  ],
+  "author": "Pramod Prasanth",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "better-sqlite3": "^11.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
