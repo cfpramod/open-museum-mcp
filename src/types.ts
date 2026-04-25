@@ -16,11 +16,14 @@ export interface Artist {
   attributionType: AttributionType;
 }
 
+export type RightsConfidence = 'high' | 'medium' | 'low';
+
 export interface ArtworkLicense {
   type: LicenseType;
+  rawValue: string;
+  verificationSource: string;
   verifiedAt: string;
-  museumField: string;
-  museumValue: string;
+  confidence: RightsConfidence;
 }
 
 export interface ArtworkImages {
@@ -52,6 +55,8 @@ export interface Artwork {
   region: string | null;
   period: string | null;
   imageUrls: ArtworkImages;
+  imageOpenAccess: boolean;
+  metadataOpenAccess: boolean;
   license: ArtworkLicense;
   source: ArtworkSource;
   description?: string;

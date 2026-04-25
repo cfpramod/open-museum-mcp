@@ -45,14 +45,14 @@ export const metFetcher: Fetcher = {
     const objectID = r.objectID;
     const id = typeof objectID === 'number' ? `met:${objectID}` : 'met:unknown';
 
-    const license = validateMetLicense(raw);
-    if (!license.accepted || !license.license) {
+    const decision = validateMetLicense(raw);
+    if (!decision.accepted || !decision.license) {
       return {
         status: 'rejected',
         rejection: {
           id,
           museumCode: 'met',
-          reason: license.reason,
+          reason: decision.reason,
           rawSnapshot: raw,
         },
       };
@@ -102,7 +102,9 @@ export const metFetcher: Fetcher = {
         full: fullImage,
         thumbnail,
       },
-      license: license.license,
+      imageOpenAccess: decision.imageOpenAccess,
+      metadataOpenAccess: decision.metadataOpenAccess,
+      license: decision.license,
       source: {
         apiUrl: `${MET_API}/objects/${objectID}`,
         pageUrl: (r.objectURL as string) || `https://www.metmuseum.org/art/collection/search/${objectID}`,

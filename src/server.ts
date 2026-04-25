@@ -10,9 +10,11 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { cite, type CiteStyle } from './cite.js';
 import { Cache } from './db.js';
 import { metFetcher } from './fetchers/met.js';
 import type { Fetcher } from './fetchers/types.js';
+import type { Artwork } from './types.js';
 
 const FETCHERS: Record<string, Fetcher> = {
   [metFetcher.code]: metFetcher,
@@ -25,6 +27,7 @@ const cache = new Cache({
 const SearchInput = z.object({
   query: z.string().min(1),
   museum: z.string().optional(),
+  has_image: z.boolean().default(true),
   limit: z.number().int().min(1).max(50).default(10),
 });
 
@@ -32,7 +35,12 @@ const GetInput = z.object({
   id: z.string().regex(/^[a-z]+:[\w-]+$/),
 });
 
-async function fetchAndCache(id: string): Promise<{ ok: true; artwork: ReturnType<Cache['getObject']> } | { ok: false; reason: string }> {
+const CiteInput = z.object({
+  id: z.string().regex(/^[a-z]+:[\w-]+$/),
+  style: z.enum(['short', 'full', 'caption']).default('full'),
+});
+
+async function fetchAndCache(id: string): Promise<{ ok: true; artwork: Artwork } | { ok: false; reason: string }> {
   const cached = cache.getObject(id);
   if (cached) return { ok: true, artwork: cached };
 
@@ -65,12 +73,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'search_artworks',
       description:
-        'Search across registered open-access museum collections. Returns license-verified artwork records.',
+        'Search across registered open-access museum collections. Returns artwork records that pass source-specific rights verification (ambiguous records excluded by default).',
       inputSchema: {
         type: 'object',
         properties: {
           query: { type: 'string', description: 'Free-text query.' },
           museum: { type: 'string', description: 'Optional museum code (met, cleveland, aic).' },
+          has_image: {
+            type: 'boolean',
+            default: true,
+            description: 'Restrict to records with an image URL. Defaults to true.',
+          },
           limit: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
         },
         required: ['query'],
@@ -83,6 +96,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         type: 'object',
         properties: {
           id: { type: 'string', description: 'Normalized artwork ID, format museumcode:numericid' },
+        },
+        required: ['id'],
+      },
+    },
+    {
+      name: 'cite',
+      description:
+        'Render a citation for an artwork. Styles: "full" (artist, title, date, museum, license, URL), "caption" (image caption form), "short" (inline reference).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Normalized artwork ID.' },
+          style: {
+            type: 'string',
+            enum: ['short', 'full', 'caption'],
+            default: 'full',
+          },
         },
         required: ['id'],
       },
@@ -100,12 +130,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: 'text', text: `unknown museum: ${input.museum}` }], isError: true };
     }
 
-    const results = [];
+    const results: Artwork[] = [];
     for (const f of fetchers) {
       const ids = await f.search(input.query, input.limit);
       for (const id of ids) {
         const out = await fetchAndCache(id);
-        if (out.ok && out.artwork) results.push(out.artwork);
+        if (out.ok) {
+          if (input.has_image && !out.artwork.imageUrls.full) continue;
+          results.push(out.artwork);
+        }
         if (results.length >= input.limit) break;
       }
       if (results.length >= input.limit) break;
@@ -128,6 +161,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: 'text', text: out.reason }], isError: true };
     }
     return { content: [{ type: 'text', text: JSON.stringify(out.artwork, null, 2) }] };
+  }
+
+  if (name === 'cite') {
+    const input = CiteInput.parse(args);
+    const out = await fetchAndCache(input.id);
+    if (!out.ok) {
+      return { content: [{ type: 'text', text: out.reason }], isError: true };
+    }
+    return { content: [{ type: 'text', text: cite(out.artwork, input.style as CiteStyle) }] };
   }
 
   return { content: [{ type: 'text', text: `unknown tool: ${name}` }], isError: true };

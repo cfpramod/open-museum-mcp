@@ -3,6 +3,8 @@ import type { ArtworkLicense, LicenseType } from './types.js';
 export interface LicenseDecision {
   accepted: boolean;
   license: ArtworkLicense | null;
+  imageOpenAccess: boolean;
+  metadataOpenAccess: boolean;
   reason: string;
 }
 
@@ -12,9 +14,19 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function reject(reason: string): LicenseDecision {
+  return {
+    accepted: false,
+    license: null,
+    imageOpenAccess: false,
+    metadataOpenAccess: false,
+    reason,
+  };
+}
+
 export const validateMetLicense: LicenseValidator = (raw) => {
   if (!raw || typeof raw !== 'object') {
-    return { accepted: false, license: null, reason: 'met: object missing or not an object' };
+    return reject('met: object missing or not an object');
   }
   const obj = raw as Record<string, unknown>;
   const isPD = obj.isPublicDomain;
@@ -23,26 +35,25 @@ export const validateMetLicense: LicenseValidator = (raw) => {
       accepted: true,
       license: {
         type: 'CC0',
+        rawValue: 'true',
+        verificationSource: 'met.isPublicDomain',
         verifiedAt: nowIso(),
-        museumField: 'isPublicDomain',
-        museumValue: 'true',
+        confidence: 'high',
       },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
       reason: 'met: isPublicDomain=true',
     };
   }
   if (isPD === false) {
-    return { accepted: false, license: null, reason: 'met: isPublicDomain=false' };
+    return reject('met: isPublicDomain=false');
   }
-  return {
-    accepted: false,
-    license: null,
-    reason: 'met: isPublicDomain field missing or non-boolean (strict default reject)',
-  };
+  return reject('met: isPublicDomain field missing or non-boolean (strict default reject)');
 };
 
 export const validateClevelandLicense: LicenseValidator = (raw) => {
   if (!raw || typeof raw !== 'object') {
-    return { accepted: false, license: null, reason: 'cleveland: object missing or not an object' };
+    return reject('cleveland: object missing or not an object');
   }
   const obj = raw as Record<string, unknown>;
   const status = obj.share_license_status;
@@ -51,23 +62,24 @@ export const validateClevelandLicense: LicenseValidator = (raw) => {
       accepted: true,
       license: {
         type: 'CC0',
+        rawValue: status,
+        verificationSource: 'cleveland.share_license_status',
         verifiedAt: nowIso(),
-        museumField: 'share_license_status',
-        museumValue: status,
+        confidence: 'high',
       },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
       reason: 'cleveland: share_license_status=CC0',
     };
   }
-  return {
-    accepted: false,
-    license: null,
-    reason: `cleveland: share_license_status=${typeof status === 'string' ? status : 'missing'} (strict default reject)`,
-  };
+  return reject(
+    `cleveland: share_license_status=${typeof status === 'string' ? status : 'missing'} (strict default reject)`,
+  );
 };
 
 export const validateAicLicense: LicenseValidator = (raw) => {
   if (!raw || typeof raw !== 'object') {
-    return { accepted: false, license: null, reason: 'aic: object missing or not an object' };
+    return reject('aic: object missing or not an object');
   }
   const obj = raw as Record<string, unknown>;
   const isPD = obj.is_public_domain;
@@ -76,18 +88,17 @@ export const validateAicLicense: LicenseValidator = (raw) => {
       accepted: true,
       license: {
         type: 'CC0',
+        rawValue: 'true',
+        verificationSource: 'aic.is_public_domain',
         verifiedAt: nowIso(),
-        museumField: 'is_public_domain',
-        museumValue: 'true',
+        confidence: 'high',
       },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
       reason: 'aic: is_public_domain=true',
     };
   }
-  return {
-    accepted: false,
-    license: null,
-    reason: `aic: is_public_domain=${isPD} (strict default reject)`,
-  };
+  return reject(`aic: is_public_domain=${isPD} (strict default reject)`);
 };
 
 const VALIDATORS: Record<string, LicenseValidator> = {
@@ -99,11 +110,7 @@ const VALIDATORS: Record<string, LicenseValidator> = {
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {
   const v = VALIDATORS[museumCode];
   if (!v) {
-    return {
-      accepted: false,
-      license: null,
-      reason: `unknown museum '${museumCode}': strict default reject`,
-    };
+    return reject(`unknown museum '${museumCode}': strict default reject`);
   }
   return v(raw);
 }

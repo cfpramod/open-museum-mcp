@@ -22,6 +22,10 @@ describe('Met adapter normalization', () => {
     expect(a.yearStart).toBe(618);
     expect(a.yearEnd).toBe(907);
     expect(a.license.type).toBe('CC0');
+    expect(a.license.verificationSource).toBe('met.isPublicDomain');
+    expect(a.license.confidence).toBe('high');
+    expect(a.imageOpenAccess).toBe(true);
+    expect(a.metadataOpenAccess).toBe(true);
     expect(a.museum.code).toBe('met');
     expect(a.region).toBe('china');
     expect(a.title).toContain('Funerary');
