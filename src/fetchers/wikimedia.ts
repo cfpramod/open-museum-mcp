@@ -41,6 +41,44 @@ const HTML_ENTITIES: Record<string, string> = {
   nbsp: ' ',
 };
 
+// Wikidata Quick Statements markers that Commons concatenates into
+// ObjectName / ImageDescription for structured-data fields. These never
+// belong in user-facing text. Examples seen on real records:
+//   "Landscape with the Fall of Icarus title QS:P1476,en:..."
+//   "Water Liliestitle QS:P1476,de:..."  (no leading space)
+//   "Water-Lily Pond and Weeping Willow label QS:Lfr,..."
+// Strip everything from the first `(title|label) QS:` marker onward.
+const QS_TRAILING_RE = /\s*(?:title|label)\s*QS:.*$/s;
+
+function stripQsMetadata(s: string): string {
+  return s.replace(QS_TRAILING_RE, '').trim();
+}
+
+// Commons surfaces multilingual ObjectName as `<Language>: <native form>`,
+// often concatenated with an English transliteration:
+//   "German: Seerosen Water Lilies"
+//   "Japanese: 『神奈川沖浪裏』 - Kanagawa oki nami ura"
+// Strip the leading language prefix. Conservative known-language list — we
+// don't strip an arbitrary capitalised word followed by ":" because real
+// titles like "Lions: An Allegory" exist.
+const LANGUAGE_PREFIX_RE =
+  /^(?:English|French|German|Spanish|Italian|Japanese|Chinese|Russian|Dutch|Latin|Portuguese|Polish|Greek|Arabic|Hebrew|Korean|Hindi|Persian|Turkish|Swedish|Norwegian|Danish|Finnish|Czech|Hungarian|Sanskrit|Tamil|Bengali):\s+/i;
+
+function stripLanguagePrefix(s: string): string {
+  return s.replace(LANGUAGE_PREFIX_RE, '').trim();
+}
+
+// Commons file-numbering convention: uploaders suffix filenames with " 02",
+// " 03", " 010" etc. when posting multiple files of the same subject. The
+// suffix is file-management metadata, not part of the artwork title. Strict
+// pattern: zero-padded 2–3 digit trailing number (matches " 02", " 099"
+// but not " 5" or " 12" — those are far less likely to be file numbers).
+const FILE_NUMBER_SUFFIX_RE = /\s+0\d{1,2}$/;
+
+function stripFileNumberSuffix(s: string): string {
+  return s.replace(FILE_NUMBER_SUFFIX_RE, '').trim();
+}
+
 function decodeEntities(s: string): string {
   return s
     .replace(/&([a-z]+);/gi, (match, name: string) => HTML_ENTITIES[name.toLowerCase()] ?? match)
@@ -176,23 +214,33 @@ export const wikimediaFetcher: Fetcher = {
         ? (info.extmetadata as Record<string, unknown>)
         : undefined;
 
-    const objectName = stripHtml(getExtField(ext, 'ObjectName'));
+    const objectName = stripQsMetadata(stripHtml(getExtField(ext, 'ObjectName')));
     const fileTitle = asString(page.title)
       .replace(/^File:/, '')
       .replace(/\.[^.]+$/, '');
-    const title = (objectName || fileTitle).trim() || '(Untitled)';
+    // Polish: drop multilingual `<Lang>:` prefix and Commons file-numbering
+    // suffix (" 02"). Apply to both ObjectName and fileTitle paths since
+    // either can carry the conventions in the wild.
+    const cleanObjectName = stripFileNumberSuffix(stripLanguagePrefix(objectName));
+    const cleanFileTitle = stripFileNumberSuffix(fileTitle);
+    const rawTitle = (cleanObjectName || cleanFileTitle).trim();
+    const title = rawTitle || '(Untitled)';
 
     const artistRaw = stripHtml(getExtField(ext, 'Artist'));
     const attributionType = detectAttributionType(artistRaw);
     const cleanName = cleanArtistName(artistRaw);
 
-    const description = stripHtml(getExtField(ext, 'ImageDescription'));
+    const description = stripQsMetadata(stripHtml(getExtField(ext, 'ImageDescription')));
     // Commons does not surface a structured creation-date field. The DateTime
-    // extmetadata is the upload timestamp, not the artwork's date. Parse the
-    // ImageDescription only — the Artist field often carries the artist's
-    // lifespan ("(1526–1569)"), which is NOT the artwork's date and would
-    // mislead readers if surfaced as `yearStart`/`yearEnd`.
-    const dateRange = parseDisplayDate(description);
+    // extmetadata is the upload timestamp, not the artwork's date. Parse from
+    // the description first, then the title (titles often read "Water Lilies
+    // (1916)"). The Artist field is NOT used as a fallback because it carries
+    // the artist's lifespan ("(1526–1569)"), which is NOT the artwork's date.
+    const fromDesc = parseDisplayDate(description);
+    const dateRange =
+      fromDesc.yearStart !== null || fromDesc.yearEnd !== null
+        ? fromDesc
+        : parseDisplayDate(title);
 
     const fullImage = asString(info.url);
     const pageUrl = asString(info.descriptionurl) || `${COMMONS_PAGE}/?curid=${pageId}`;

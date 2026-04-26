@@ -265,6 +265,233 @@ describe('Wikimedia Commons adapter normalization', () => {
     expect(result.artwork.description).toContain('Made in 1850. Gallery — West Wing.');
   });
 
+  it('strips Wikidata Quick Statements metadata from ObjectName', () => {
+    // Real Commons records concatenate "title QS:P1476,en:..." into the
+    // ObjectName field for structured-data tracking. Strip it.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000010,
+            title: 'File:Test.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/Test.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:Test.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: {
+                    value: 'Landscape with the Fall of Icarus title QS:P1476,en:"Landscape with the Fall of Icarus"',
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.title).toBe('Landscape with the Fall of Icarus');
+  });
+
+  it('strips QS metadata even with no leading space (Liliestitle QS:...)', () => {
+    // The pathological case: "Water Liliestitle QS:..." with no separator.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000011,
+            title: 'File:Lilies.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/Lilies.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:Lilies.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: 'Water Liliestitle QS:P1476,de:"Seerosen"' },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.title).toBe('Water Lilies');
+  });
+
+  it('strips multilingual language prefix from ObjectName', () => {
+    // Real Commons records carry concatenated multilingual labels:
+    //   "German: Seerosen Water Lilies"
+    //   "Japanese: 『神奈川沖浪裏』 - Kanagawa oki nami ura"
+    // Strip the leading `<Language>: ` prefix.
+    const german = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000020,
+            title: 'File:Seerosen.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/Seerosen.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:Seerosen.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: 'German: Seerosen Water Lilies' },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(german.status).toBe('accepted');
+    if (german.status !== 'accepted') return;
+    expect(german.artwork.title).toBe('Seerosen Water Lilies');
+
+    const japanese = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000021,
+            title: 'File:GreatWave.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/GW.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:GW.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: 'Japanese: 『神奈川沖浪裏』 - Kanagawa oki nami ura' },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(japanese.status).toBe('accepted');
+    if (japanese.status !== 'accepted') return;
+    expect(japanese.artwork.title).toBe('『神奈川沖浪裏』 - Kanagawa oki nami ura');
+  });
+
+  it('does not strip a real "<Word>:" prefix that is not a known language', () => {
+    // Defensive: real titles like "Lions: An Allegory" should survive.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000022,
+            title: 'File:Lions.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/Lions.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:Lions.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: 'Lions: An Allegory' },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.title).toBe('Lions: An Allegory');
+  });
+
+  it('strips zero-padded file-numbering suffix from fileTitle fallback', () => {
+    // No ObjectName in extmetadata → use page.title (filename) as fallback.
+    // Commons file-numbering convention: " 02", " 03", etc.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000023,
+            title: 'File:Detail of "The Water-Lily Pond" by Claude Monet 02.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/M02.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:M02.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  // ObjectName intentionally absent so fileTitle is used
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.title).toBe('Detail of "The Water-Lily Pond" by Claude Monet');
+  });
+
+  it('does not strip non-zero-padded trailing numbers from fileTitle', () => {
+    // "Symphony No 5" or "Movement 12" are real titles, not file numbering.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000024,
+            title: 'File:Symphony No 5.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/SY.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:SY.jpg',
+                mime: 'image/jpeg',
+                extmetadata: { License: { value: 'pd' } },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.title).toBe('Symphony No 5');
+  });
+
+  it('falls back to title for date parsing when description has no date', () => {
+    // Real Commons titles often carry the year: "Water Lilies (1916) Claude Monet".
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000012,
+            title: 'File:Water Lilies 1916.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/WL1916.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:WL1916.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: 'Water Lilies (1916)' },
+                  ImageDescription: { value: 'A painting of water lilies.' },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.yearStart).toBe(1916);
+    expect(result.artwork.yearEnd).toBe(1916);
+  });
+
   it('emits empty displayDate when no date can be parsed from description', () => {
     const result = wikimediaFetcher.normalize({
       query: {
