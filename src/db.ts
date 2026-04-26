@@ -12,6 +12,20 @@ export interface CacheConfig {
 }
 
 /**
+ * Constraints for {@link Cache.getRandomObject}. All fields are AND-combined.
+ * Region and period are exact matches against the normalized values stored
+ * by each fetcher; museum is the registered code (`met`, `cleveland`, …);
+ * notArtist is an exact-match exclusion list against the canonical
+ * `artist_name` column.
+ */
+export interface DiscoverFilter {
+  region?: string;
+  period?: string;
+  notArtist?: string[];
+  museumCode?: string;
+}
+
+/**
  * SQLite-backed cache for normalized artworks and search-result IDs.
  *
  * TTL contract:
@@ -136,6 +150,56 @@ export class Cache {
       full_record: JSON.stringify(art),
       cached_at: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Pick one random non-expired artwork that matches the constraints, or
+   * null if nothing matches.
+   *
+   * The query operates over the local cache only — meaning what the user
+   * has already searched and pulled. This is intentional: discover_random
+   * is a forcing-function over your search history, not a federated
+   * sample of every museum's catalog. Callers should seed the cache via
+   * search_artworks first.
+   *
+   * Note on `ORDER BY RANDOM()`: SQLite scans the matching set, which is
+   * fine for caches under ~100k rows. The cache here is bounded by what
+   * the user actually fetches and the 90-day object TTL.
+   */
+  getRandomObject(filter: DiscoverFilter): Artwork | null {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (filter.region) {
+      conditions.push('region = ?');
+      params.push(filter.region);
+    }
+    if (filter.period) {
+      conditions.push('period = ?');
+      params.push(filter.period);
+    }
+    if (filter.museumCode) {
+      conditions.push('museum_code = ?');
+      params.push(filter.museumCode);
+    }
+    if (filter.notArtist && filter.notArtist.length > 0) {
+      const placeholders = filter.notArtist.map(() => '?').join(',');
+      conditions.push(`artist_name NOT IN (${placeholders})`);
+      params.push(...filter.notArtist);
+    }
+    // TTL gate: defense in depth on top of pruneExpired() at construction.
+    conditions.push('cached_at > ?');
+    params.push(new Date(Date.now() - OBJECT_TTL_DAYS * MS_PER_DAY).toISOString());
+
+    const where = `WHERE ${conditions.join(' AND ')}`;
+    const sql = `SELECT full_record FROM objects ${where} ORDER BY RANDOM() LIMIT 1`;
+    const row = this.db.prepare(sql).get(...params) as { full_record: string } | undefined;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.full_record) as Artwork;
+    } catch {
+      return null;
+    }
   }
 
   getObject(id: string): Artwork | null {

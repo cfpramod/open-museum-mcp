@@ -72,6 +72,13 @@ const CiteInput = z.object({
   style: z.enum(['short', 'full', 'caption']).default('full'),
 });
 
+const DiscoverInput = z.object({
+  region: z.string().optional(),
+  period: z.string().optional(),
+  not_artist: z.array(z.string()).optional(),
+  museum: z.string().optional(),
+});
+
 async function fetchAndCache(id: string): Promise<{ ok: true; artwork: Artwork } | { ok: false; reason: string }> {
   if (!ID_REGEX.test(id)) {
     return { ok: false, reason: `invalid artwork id: ${id}` };
@@ -162,6 +169,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['id'],
       },
     },
+    {
+      name: 'discover_random',
+      description:
+        'Pick one random artwork from the local cache that matches the given constraints. Useful for breaking out of repetitive search territory (e.g. surface a random Edo-period work to satisfy a no-back-to-back-European-pre-1900 pairing rule). Operates over what has already been searched and cached; returns an error if nothing matches, suggesting the caller seed the cache via search_artworks first.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          region: {
+            type: 'string',
+            description: 'Normalized region tag (e.g. "china", "japan", "netherlands"). Exact match.',
+          },
+          period: {
+            type: 'string',
+            description: 'Normalized period tag (e.g. "tang dynasty", "edo", "safavid"). Exact match.',
+          },
+          not_artist: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Artist names to exclude (exact match against the canonical artist name field).',
+          },
+          museum: {
+            type: 'string',
+            description: 'Optional museum code to restrict to (met, cleveland, aic).',
+          },
+        },
+      },
+    },
   ],
 }));
 
@@ -237,12 +271,32 @@ async function handleCite(args: unknown) {
   return { content: [{ type: 'text' as const, text: cite(out.artwork, input.style as CiteStyle) }] };
 }
 
+async function handleDiscoverRandom(args: unknown) {
+  const input = DiscoverInput.parse(args);
+  if (input.museum && !FETCHERS[input.museum]) {
+    return errorResult(`unknown museum: ${input.museum}`);
+  }
+  const artwork = cache.getRandomObject({
+    region: input.region,
+    period: input.period,
+    notArtist: input.not_artist,
+    museumCode: input.museum,
+  });
+  if (!artwork) {
+    return errorResult(
+      'No cached artwork matches these constraints. Seed the cache with search_artworks first; discover_random samples from records you have already pulled.',
+    );
+  }
+  return { content: [{ type: 'text' as const, text: JSON.stringify(artwork, null, 2) }] };
+}
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   try {
     if (name === 'search_artworks') return await handleSearch(args);
     if (name === 'get_artwork') return await handleGet(args);
     if (name === 'cite') return await handleCite(args);
+    if (name === 'discover_random') return await handleDiscoverRandom(args);
     return errorResult(`unknown tool: ${name}`);
   } catch (err) {
     if (err instanceof z.ZodError) {
