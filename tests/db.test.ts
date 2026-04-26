@@ -342,12 +342,38 @@ describe('Cache.listTraditions', () => {
   });
 
   it('returns regions and periods sorted alphabetically by tag', () => {
-    cache.upsertObject(makeArtwork('met:1', { region: 'iran', period: null }));
-    cache.upsertObject(makeArtwork('met:2', { region: 'china', period: null }));
-    cache.upsertObject(makeArtwork('met:3', { region: 'japan', period: null }));
+    cache.upsertObject(makeArtwork('met:1', { region: 'iran', period: 'safavid' }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'china', period: 'tang dynasty' }));
+    cache.upsertObject(makeArtwork('met:3', { region: 'japan', period: 'edo' }));
+
+    const { regions, periods } = cache.listTraditions();
+    expect(regions.map((r) => r.tag)).toEqual(['china', 'iran', 'japan']);
+    expect(periods.map((p) => p.tag)).toEqual(['edo', 'safavid', 'tang dynasty']);
+  });
+
+  it('case-folds tags so duplicate-by-case rows aggregate under one entry', () => {
+    // Defense in depth: every adapter today lowercases tags before insertion,
+    // but a future fetcher that forgets should not silently fragment counts.
+    cache.upsertObject(makeArtwork('met:1', { region: 'china' }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'CHINA' }));
+    cache.upsertObject(makeArtwork('met:3', { region: 'China' }));
 
     const { regions } = cache.listTraditions();
-    expect(regions.map((r) => r.tag)).toEqual(['china', 'iran', 'japan']);
+    expect(regions).toHaveLength(1);
+    expect(regions[0].tag).toBe('china');
+    expect(regions[0].coverage.met).toBe(3);
+  });
+
+  it('excludes records whose region or period is the empty string', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: '', period: 'baroque' }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'france', period: '' }));
+    cache.upsertObject(makeArtwork('met:3', { region: 'france', period: 'baroque' }));
+
+    const { regions, periods } = cache.listTraditions();
+    expect(regions.map((r) => r.tag)).toEqual(['france']);
+    expect(periods.map((p) => p.tag)).toEqual(['baroque']);
+    // Both 'france' rows aggregate into one entry; the '' row is dropped.
+    expect(regions[0].coverage.met).toBe(2);
   });
 
   it('title-cases multi-word period tags for the label', () => {

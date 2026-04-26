@@ -7,6 +7,10 @@ const OBJECT_TTL_DAYS = 90;
 const QUERY_TTL_DAYS = 14;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// Title-cases the first letter of each whitespace/hyphen-bounded word in
+// an ASCII tag. The tag set in regions.json and dynasties.json is currently
+// ASCII-only; if a future tag introduces non-ASCII letters, switch to a
+// Unicode-aware regex (`/u` flag + `\p{L}` property class).
 function titleCase(s: string): string {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -263,15 +267,23 @@ export class Cache {
     };
   }
 
-  // The `column` argument is constrained to a TypeScript literal union, never
-  // sourced from user input — the `${column}` interpolation here is safe.
+  // Two literal SQL strings instead of `${column}` interpolation, so the
+  // README §Security claim "zero string-concatenated SQL paths" stays
+  // verbatim true. The `LOWER()` case-fold is defense-in-depth: if a future
+  // fetcher forgets to lowercase a tag, the variants still aggregate under
+  // one entry. The `tag != ''` filter drops empty-string ghosts so they
+  // can't surface as "" entries in the output.
   private aggregateByTag(column: 'region' | 'period', cutoff: string): Tradition[] {
-    const sql = `
-      SELECT ${column} AS tag, museum_code, COUNT(*) AS cnt
-      FROM objects
-      WHERE ${column} IS NOT NULL AND cached_at > ?
-      GROUP BY ${column}, museum_code
-    `;
+    const sql =
+      column === 'region'
+        ? `SELECT LOWER(region) AS tag, museum_code, COUNT(*) AS cnt
+           FROM objects
+           WHERE region IS NOT NULL AND region != '' AND cached_at > ?
+           GROUP BY LOWER(region), museum_code`
+        : `SELECT LOWER(period) AS tag, museum_code, COUNT(*) AS cnt
+           FROM objects
+           WHERE period IS NOT NULL AND period != '' AND cached_at > ?
+           GROUP BY LOWER(period), museum_code`;
     const rows = this.db.prepare(sql).all(cutoff) as Array<{
       tag: string;
       museum_code: string;
@@ -280,7 +292,10 @@ export class Cache {
 
     const byTag = new Map<string, Record<string, number>>();
     for (const row of rows) {
-      const existing = byTag.get(row.tag) ?? {};
+      // Object.create(null) prevents prototype pollution if a future
+      // museum_code value ever collides with a built-in property name
+      // (`__proto__`, `constructor`, `toString`).
+      const existing = byTag.get(row.tag) ?? Object.create(null);
       existing[row.museum_code] = row.cnt;
       byTag.set(row.tag, existing);
     }
