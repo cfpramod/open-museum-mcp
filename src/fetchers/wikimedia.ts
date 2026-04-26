@@ -2,7 +2,7 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateWikimediaLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asString } from './helpers.js';
+import { asFiniteNumber, asString } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
@@ -93,6 +93,19 @@ function stripHtml(s: string): string {
   return decodeEntities(s.replace(/<[^>]*>/g, ''))
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// Commons `Credit` extmetadata is the upstream-source field. It is often a
+// snippet of HTML wrapping a link back to the originating museum or archive
+// (e.g. `<a href="https://www.thyssen.org/...">Museo Thyssen-Bornemisza</a>`).
+// Pull the first http(s) href out as the canonical originalUrl. Plain-text
+// Credit values (no link) yield undefined — we don't synthesise URLs.
+const CREDIT_HREF_RE = /href\s*=\s*"(https?:\/\/[^"]+)"/i;
+
+function extractCreditUrl(credit: string): string | undefined {
+  if (!credit) return undefined;
+  const m = credit.match(CREDIT_HREF_RE);
+  return m ? m[1] : undefined;
 }
 
 // Format a parsed year range as a human-readable display string. Single-year
@@ -305,6 +318,14 @@ export const wikimediaFetcher: Fetcher = {
 
     const fullImage = asString(info.url);
     const pageUrl = asString(info.descriptionurl) || `${COMMONS_PAGE}/?curid=${pageId}`;
+    const width = asFiniteNumber(info.width) ?? undefined;
+    const height = asFiniteNumber(info.height) ?? undefined;
+    const byteSize = asFiniteNumber(info.size) ?? undefined;
+    // Credit field is HTML; pull out the first http(s) href as the upstream
+    // pointer. Important: don't strip HTML before extracting — stripHtml
+    // would discard the `<a href>` we need.
+    const creditRaw = getExtField(ext, 'Credit');
+    const originalUrl = extractCreditUrl(creditRaw);
 
     const artwork: Artwork = {
       id,
@@ -336,6 +357,9 @@ export const wikimediaFetcher: Fetcher = {
       imageUrls: {
         full: fullImage,
         thumbnail: undefined,
+        width,
+        height,
+        byteSize,
       },
       imageOpenAccess: decision.imageOpenAccess,
       metadataOpenAccess: decision.metadataOpenAccess,
@@ -343,6 +367,7 @@ export const wikimediaFetcher: Fetcher = {
       source: {
         apiUrl: `${COMMONS_API}?action=query&pageids=${pageId}&prop=imageinfo&format=json`,
         pageUrl,
+        originalUrl,
       },
       description: description || undefined,
     };

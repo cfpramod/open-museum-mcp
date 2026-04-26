@@ -705,6 +705,121 @@ describe('Wikimedia Commons adapter normalization', () => {
     expect(result.artwork.yearEnd).toBe(null);
   });
 
+  it('surfaces image dimensions and byte size on imageUrls', () => {
+    // imageinfo carries width/height/size; we already fetch them via
+    // `iiprop=size`. Surface them so callers can pick the best upload
+    // when multiple Commons records cover the same painting.
+    const result = wikimediaFetcher.normalize(fixture('wikimedia-accepted-bruegel.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.imageUrls.width).toBe(1246);
+    expect(result.artwork.imageUrls.height).toBe(800);
+    expect(result.artwork.imageUrls.byteSize).toBe(152771);
+  });
+
+  it('omits dimensions when the Commons record does not publish them', () => {
+    // Defense: width/height/size missing should not surface as 0 or null —
+    // the fields stay undefined so callers can distinguish "unknown" from
+    // "small image".
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000040,
+            title: 'File:NoDims.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/NoDims.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:NoDims.jpg',
+                mime: 'image/jpeg',
+                extmetadata: { License: { value: 'pd' } },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.imageUrls.width).toBeUndefined();
+    expect(result.artwork.imageUrls.height).toBeUndefined();
+    expect(result.artwork.imageUrls.byteSize).toBeUndefined();
+  });
+
+  it('parses Credit field into source.originalUrl when it carries an upstream link', () => {
+    // Real Commons Credit fields wrap the originating museum's link:
+    //   <a href="https://www.thyssen.org/...">Museo Thyssen-Bornemisza</a>
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000041,
+            title: 'File:Modigliani.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/M.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:M.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  Credit: {
+                    value:
+                      '<a href="https://www.thyssen.org/lunia">Museo Nacional Thyssen-Bornemisza</a>',
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.source.originalUrl).toBe('https://www.thyssen.org/lunia');
+  });
+
+  it('leaves source.originalUrl undefined when Credit is plain text (no link)', () => {
+    // The Bruegel fixture's Credit is "Web Gallery of Art" — plain text, no
+    // anchor. Don't synthesise a URL.
+    const result = wikimediaFetcher.normalize(fixture('wikimedia-accepted-bruegel.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.source.originalUrl).toBeUndefined();
+  });
+
+  it('extracts only the first href from Credit when it contains multiple anchors', () => {
+    // Some Commons records have a long Credit blob with several links
+    // (museum, photographer, license boilerplate). The originating
+    // institution is conventionally the first anchor.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000042,
+            title: 'File:MultiCredit.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/MC.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:MC.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  Credit: {
+                    value:
+                      '<a href="https://museum.example.org/object/123">Example Museum</a>, photographed by <a href="https://example.com/photographer">A Photographer</a>',
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.source.originalUrl).toBe('https://museum.example.org/object/123');
+  });
+
   it('surfaces "wikimedia:unknown" id on rights-pass + bad-pageid rejections', () => {
     const result = wikimediaFetcher.normalize({
       query: {

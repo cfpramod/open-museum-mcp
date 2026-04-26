@@ -30,11 +30,25 @@ export interface ArtworkImages {
   full: string;
   large?: string;
   thumbnail?: string;
+  /** Pixel width of the `full` asset, when the museum publishes it. */
+  width?: number;
+  /** Pixel height of the `full` asset, when the museum publishes it. */
+  height?: number;
+  /** Byte size of the `full` asset, when the museum publishes it. */
+  byteSize?: number;
 }
 
 export interface ArtworkSource {
   apiUrl: string;
   pageUrl: string;
+  /**
+   * Upstream original-source URL when the museum's record points beyond
+   * itself. For Wikimedia Commons records, this is the originating museum
+   * or archive (parsed from the `Credit` extmetadata field). When the
+   * caller needs a higher-resolution canonical asset, this is where to
+   * look first.
+   */
+  originalUrl?: string;
 }
 
 export interface MuseumRef {
