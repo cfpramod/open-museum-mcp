@@ -105,9 +105,11 @@ export const clevelandFetcher: Fetcher = {
     const earliest = asFiniteNumber(r.creation_date_earliest);
     const latest = asFiniteNumber(r.creation_date_latest);
     // Cleveland publishes earliest/latest year fields directly. Trust those
-    // when both are present; fall back to parseDisplayDate when they're not
-    // (or only partially given) so dynasty-aware parsing still helps for
-    // legacy or sparser records.
+    // when both are present; otherwise fall through to parseDisplayDate. We
+    // prefer the display-date parser over a single available bound because
+    // the displayDate string usually carries a richer signal — "1850s"
+    // parses to {1850, 1859}, more informative than an isolated
+    // creation_date_earliest=1850 with creation_date_latest missing.
     const dateRange =
       earliest !== null && latest !== null
         ? { yearStart: earliest, yearEnd: latest }

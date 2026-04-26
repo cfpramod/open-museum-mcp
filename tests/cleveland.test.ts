@@ -67,6 +67,17 @@ describe('Cleveland adapter normalization', () => {
     expect(clevelandFetcher.normalize(42).status).toBe('rejected');
   });
 
+  it('surfaces "cleveland:unknown" id on CC0-but-missing-id rejections', () => {
+    // Record passes the rights gate but has no integer `id` — the fetcher
+    // still rejects (downstream ID_REGEX would reject anyway), and the
+    // rejection carries a placeholder id for log diagnostics.
+    const result = clevelandFetcher.normalize({ data: { share_license_status: 'CC0' } });
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.id).toBe('cleveland:unknown');
+    expect(result.rejection.reason).toContain('missing or non-integer id');
+  });
+
   it('accepts a record passed without the {data:...} envelope', () => {
     // A direct-record caller (e.g. a future test author) might pass the inner
     // object straight through. The fetcher tolerates either shape.
