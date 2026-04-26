@@ -196,6 +196,19 @@ describe('parseDisplayDate', () => {
       expect(parseDisplayDate('No.1820-30')).toEqual({ yearStart: null, yearEnd: null });
     });
 
+    it('rejects "year.digit" patterns from museum acquisition numbers', () => {
+      // British Museum format: "BM 1906.1220.0.533" — 1906 is acquisition
+      // year, NOT artwork creation. Block standalone "1906" when followed
+      // by ".digit" (catalogue context). End-of-sentence "1906." stays
+      // valid (period followed by space or end, not digit).
+      expect(parseDisplayDate('BM 1906.1220.0.533')).toEqual({ yearStart: null, yearEnd: null });
+      expect(parseDisplayDate('Made in 1906.')).toEqual({ yearStart: 1906, yearEnd: 1906 });
+      expect(parseDisplayDate('Made in 1906. Then more text.')).toEqual({
+        yearStart: 1906,
+        yearEnd: 1906,
+      });
+    });
+
     it('still recovers a real year from prose containing an inventory number', () => {
       // The full smoke-test scenario: "(1916) by Claude Monet ... Collection
       // Number : P.2017-0004". Range regex skips the inventory; trySingleYear

@@ -492,6 +492,186 @@ describe('Wikimedia Commons adapter normalization', () => {
     expect(result.artwork.yearEnd).toBe(1916);
   });
 
+  it('does NOT parse fileTitle as a date source (filenames encode inventory numbers)', () => {
+    // British Museum file naming convention: "BM 1906.1220.0.533" — the
+    // 1906 is acquisition year, not artwork creation. Filenames carry
+    // these patterns reliably enough that we exclude fileTitle from date
+    // sources. The honest output is null years here.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000030,
+            title: 'File:Great Wave Hokusai BM 1906.1220.0.533 n02.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/G.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:G.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: '『神奈川沖浪裏』' },
+                  ImageDescription: { value: 'A famous wave print by Hokusai.' },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.yearStart).toBe(null);
+    expect(result.artwork.yearEnd).toBe(null);
+  });
+
+  it('falls back to categories when neither description nor title carry a date', () => {
+    // Real Commons records often have year-bearing categories like
+    // "Category:1910s paintings by Claude Monet" even when the description
+    // and title don't carry creation dates.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000031,
+            title: 'File:Water Lilies.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/W.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:W.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: 'Water Lilies' },
+                },
+              },
+            ],
+            categories: [
+              { ns: 14, title: 'Category:Paintings by Claude Monet' },
+              { ns: 14, title: 'Category:1910s paintings by Claude Monet' },
+              { ns: 14, title: 'Category:Water Lilies by Claude Monet' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    // Decade "1910s" → {1910, 1919}
+    expect(result.artwork.yearStart).toBe(1910);
+    expect(result.artwork.yearEnd).toBe(1919);
+  });
+
+  it('picks the narrowest range across categories with multiple year signals', () => {
+    // When a file is in both "1916 paintings" (single year, span 0) and
+    // "1910s paintings" (decade, span 9) and "16th-century paintings"
+    // (century, span 99), the narrowest wins because it's most specific.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000032,
+            title: 'File:Some Painting.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/S.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:S.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: 'Some Painting' },
+                },
+              },
+            ],
+            categories: [
+              { ns: 14, title: 'Category:20th-century paintings' },
+              { ns: 14, title: 'Category:1910s paintings' },
+              { ns: 14, title: 'Category:1916 paintings' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.yearStart).toBe(1916);
+    expect(result.artwork.yearEnd).toBe(1916);
+  });
+
+  it('skips non-art-medium categories (exhibitions, catalogue entries, locations)', () => {
+    // Real false-positive cases observed on live records:
+    //   "GLAMhybrid Museum Barberini 2023" → 2023 (exhibition, not creation)
+    //   "October 2010 in Munich" → 2010 (photo upload location, not creation)
+    //   "Le Bassin aux nymphéas (Wildenstein 1884)" → 1884 (catalogue entry, not creation)
+    // Only categories naming an art medium (paintings, prints, sculpture, etc.)
+    // are parsed for dates.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000034,
+            title: 'File:Some Work.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/SW.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:SW.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: 'Some Work' },
+                },
+              },
+            ],
+            categories: [
+              { ns: 14, title: 'Category:GLAMhybrid Museum Barberini 2023' },
+              { ns: 14, title: 'Category:October 2010 in Munich' },
+              { ns: 14, title: 'Category:Le Bassin aux nymphéas (Wildenstein 1884)' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    // No art-medium category present → honest empty.
+    expect(result.artwork.yearStart).toBe(null);
+    expect(result.artwork.yearEnd).toBe(null);
+  });
+
+  it('description date wins over category date (description is more authoritative)', () => {
+    // Sanity check the source-order precedence: description > title > categories.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000033,
+            title: 'File:Some Work.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/SW.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:SW.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: 'Some Work' },
+                  ImageDescription: { value: 'Made in 1850.' },
+                },
+              },
+            ],
+            categories: [
+              // Categories say something different — description should win.
+              { ns: 14, title: 'Category:1916 paintings' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.yearStart).toBe(1850);
+    expect(result.artwork.yearEnd).toBe(1850);
+  });
+
   it('emits empty displayDate when no date can be parsed from description', () => {
     const result = wikimediaFetcher.normalize({
       query: {

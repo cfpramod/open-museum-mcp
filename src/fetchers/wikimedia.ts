@@ -104,6 +104,48 @@ function formatYearRange(start: number | null, end: number | null): string {
   return String(start ?? end);
 }
 
+interface CategoryEntry {
+  title?: unknown;
+}
+
+// Pick the most specific (narrowest) parseable year range from a list of
+// Commons category titles. Categories like "1916 paintings" yield a single
+// year (span 0); "1910s paintings" yield a decade (span 9); "16th-century
+// paintings" yield a century (span 99). When multiple categories carry
+// dates, the narrowest wins because it's the most informative signal.
+//
+// CRITICAL: only parse categories that explicitly name an art medium.
+// Wikimedia categories carry many year-bearing labels unrelated to artwork
+// creation: "GLAMhybrid Museum Barberini 2023" (exhibition), "October 2010
+// in Munich" (photo upload), "Wildenstein 1884" (catalogue entry number).
+// The art-medium keyword filter restricts parsing to categories that are
+// clearly about works of art: "paintings", "drawings", "prints", etc.
+const ART_MEDIUM_RE =
+  /\b(paintings?|drawings?|prints?|engravings?|etchings?|woodcuts?|sculptures?|manuscripts?|illuminations?|photographs?|frescos?|frescoes|miniatures?|tapestries|tapestry|works|art|ukiyo-e|century)\b/i;
+
+function pickBestRangeFromCategories(categories: unknown[]): {
+  yearStart: number | null;
+  yearEnd: number | null;
+} | null {
+  let best: { yearStart: number; yearEnd: number } | null = null;
+  let bestSpan = Infinity;
+  for (const entry of categories) {
+    if (!entry || typeof entry !== 'object') continue;
+    const title = (entry as CategoryEntry).title;
+    if (typeof title !== 'string') continue;
+    const cleaned = title.replace(/^Category:/, '');
+    if (!ART_MEDIUM_RE.test(cleaned)) continue;
+    const parsed = parseDisplayDate(cleaned);
+    if (parsed.yearStart === null || parsed.yearEnd === null) continue;
+    const span = parsed.yearEnd - parsed.yearStart;
+    if (span < bestSpan) {
+      best = { yearStart: parsed.yearStart, yearEnd: parsed.yearEnd };
+      bestSpan = span;
+    }
+  }
+  return best;
+}
+
 // Parse the inner page object out of a MediaWiki API query response.
 // formatversion=2 returns pages as an array; formatversion=1 keys by pageid.
 // Tolerate both shapes plus a direct page object (test fixture convenience).
@@ -156,12 +198,17 @@ export const wikimediaFetcher: Fetcher = {
     const url = new URL(COMMONS_API);
     url.searchParams.set('action', 'query');
     url.searchParams.set('pageids', numeric);
-    url.searchParams.set('prop', 'imageinfo');
+    // Fetch imageinfo + categories. Categories provide a curatorial
+    // year-signal for records whose description and title don't carry
+    // creation dates ("1910s paintings by Claude Monet" etc).
+    url.searchParams.set('prop', 'imageinfo|categories');
     url.searchParams.set('iiprop', 'url|size|mime|extmetadata');
     url.searchParams.set(
       'iiextmetadatafilter',
       'License|LicenseShortName|LicenseUrl|UsageTerms|Artist|ObjectName|DateTime|Credit|ImageDescription',
     );
+    url.searchParams.set('clshow', '!hidden');
+    url.searchParams.set('cllimit', '30');
     url.searchParams.set('format', 'json');
     url.searchParams.set('formatversion', '2');
 
@@ -231,16 +278,30 @@ export const wikimediaFetcher: Fetcher = {
     const cleanName = cleanArtistName(artistRaw);
 
     const description = stripQsMetadata(stripHtml(getExtField(ext, 'ImageDescription')));
-    // Commons does not surface a structured creation-date field. The DateTime
-    // extmetadata is the upload timestamp, not the artwork's date. Parse from
-    // the description first, then the title (titles often read "Water Lilies
-    // (1916)"). The Artist field is NOT used as a fallback because it carries
-    // the artist's lifespan ("(1526–1569)"), which is NOT the artwork's date.
+    // Commons has no structured creation-date field. DateTime extmetadata is
+    // upload time, not artwork time. Source order, most-trustworthy first:
+    //   1. ImageDescription prose ("c. 1560s." → {1560, 1569})
+    //   2. ObjectName ("Water Lilies (1916)" → {1916, 1916})
+    //   3. Art-medium-tagged categories ("1910s paintings by Claude Monet")
+    //
+    // fileTitle is deliberately NOT a date source: filenames frequently
+    // encode inventory numbers ("BM 1906.1220.0.533") that look like years
+    // but mark museum acquisition events, not creation dates. The Artist
+    // field is excluded for the same reason — its years are the artist's
+    // lifespan, which is wider than (and not equal to) the artwork date.
     const fromDesc = parseDisplayDate(description);
-    const dateRange =
-      fromDesc.yearStart !== null || fromDesc.yearEnd !== null
-        ? fromDesc
-        : parseDisplayDate(title);
+    let dateRange: { yearStart: number | null; yearEnd: number | null } = fromDesc;
+    if (dateRange.yearStart === null && dateRange.yearEnd === null) {
+      const fromObject = parseDisplayDate(cleanObjectName);
+      if (fromObject.yearStart !== null || fromObject.yearEnd !== null) {
+        dateRange = fromObject;
+      }
+    }
+    if (dateRange.yearStart === null && dateRange.yearEnd === null) {
+      const cats = Array.isArray(page.categories) ? page.categories : [];
+      const fromCats = pickBestRangeFromCategories(cats);
+      if (fromCats) dateRange = fromCats;
+    }
 
     const fullImage = asString(info.url);
     const pageUrl = asString(info.descriptionurl) || `${COMMONS_PAGE}/?curid=${pageId}`;
