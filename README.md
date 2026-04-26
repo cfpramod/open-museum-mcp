@@ -196,8 +196,8 @@ Highlights:
 
 ## Roadmap
 
-- v0.1: Met adapter, dynasty-aware date parser, license gate, `cite` tool, MCP resources. **(here)**
-- v0.2: Cleveland and AIC adapters, `discover_random` with constraints (`region`, `period`, `not_artist`), `list_traditions`.
+- v0.1: Met adapter, dynasty-aware date parser, license gate, `cite` tool, MCP resources.
+- v0.2: Cleveland adapter (shipped); AIC adapter, `discover_random` with constraints (`region`, `period`, `not_artist`), `list_traditions` next. **(here)**
 - v0.5: Dominant-color extraction across museums (`color: "#3a5f7d"` discovery via `sharp`).
 - v1.0: Artist-obscurity scoring (`object_count_total`, `museum_count`) for deliberate exploration of less-canonical work.
 - v2.0: Smithsonian, Rijksmuseum, Wikimedia Commons (long-tail).
