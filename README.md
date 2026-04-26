@@ -1,5 +1,8 @@
 # open-museum-mcp
 
+[![CI](https://github.com/cfpramod/open-museum-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cfpramod/open-museum-mcp/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/open-museum-mcp.svg)](https://www.npmjs.com/package/open-museum-mcp)
+
 > Open-access museum search for MCP clients, with rights verification per museum.
 
 ## Why I built this
