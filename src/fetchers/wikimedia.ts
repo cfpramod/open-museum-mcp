@@ -30,9 +30,40 @@ function getExtField(ext: Record<string, unknown> | undefined, field: string): s
   return typeof v === 'string' ? v : '';
 }
 
-// Commons text fields are HTML-laden. Strip tags and collapse whitespace.
+// Common HTML entities seen in Commons text fields. Numeric escapes
+// (`&#39;`, `&#x2014;`) are handled by separate regex passes below.
+const HTML_ENTITIES: Record<string, string> = {
+  amp: '&',
+  quot: '"',
+  apos: "'",
+  lt: '<',
+  gt: '>',
+  nbsp: ' ',
+};
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&([a-z]+);/gi, (match, name: string) => HTML_ENTITIES[name.toLowerCase()] ?? match)
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(parseInt(code, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)));
+}
+
+// Commons text fields are HTML-laden. Strip tags, decode entities, collapse
+// whitespace. Order matters: strip tags first so entity decoding doesn't
+// reintroduce angle brackets that we then have to re-strip.
 function stripHtml(s: string): string {
-  return s.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  return decodeEntities(s.replace(/<[^>]*>/g, ''))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Format a parsed year range as a human-readable display string. Single-year
+// ranges collapse to "1889"; spans render as "1526–1569"; null becomes "".
+function formatYearRange(start: number | null, end: number | null): string {
+  if (start === null && end === null) return '';
+  if (start === end) return String(start);
+  if (start !== null && end !== null) return `${start}–${end}`;
+  return String(start ?? end);
 }
 
 // Parse the inner page object out of a MediaWiki API query response.
@@ -71,7 +102,6 @@ export const wikimediaFetcher: Fetcher = {
     url.searchParams.set('srlimit', String(limit));
     url.searchParams.set('format', 'json');
     url.searchParams.set('formatversion', '2');
-    url.searchParams.set('origin', '*'); // CORS-safe; harmless for server-side fetch
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Wikimedia search failed: ${res.status}`);
@@ -96,7 +126,6 @@ export const wikimediaFetcher: Fetcher = {
     );
     url.searchParams.set('format', 'json');
     url.searchParams.set('formatversion', '2');
-    url.searchParams.set('origin', '*');
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Wikimedia get failed for ${id}: ${res.status}`);
@@ -134,9 +163,12 @@ export const wikimediaFetcher: Fetcher = {
       return reject(id, 'wikimedia: missing or non-integer pageid', raw);
     }
 
+    // Strict default: require a present, image-typed MIME field. A missing
+    // MIME is rejected on the same grounds as a non-image one — without a
+    // declared type we can't honestly promise `imageUrls.full` is an image.
     const mime = asString(info.mime);
-    if (mime && !mime.startsWith(IMAGE_MIME_PREFIX)) {
-      return reject(id, `wikimedia: non-image mime type (${mime})`, raw);
+    if (!mime || !mime.startsWith(IMAGE_MIME_PREFIX)) {
+      return reject(id, `wikimedia: non-image or missing mime type (${mime || 'missing'})`, raw);
     }
 
     const ext =
@@ -156,10 +188,11 @@ export const wikimediaFetcher: Fetcher = {
 
     const description = stripHtml(getExtField(ext, 'ImageDescription'));
     // Commons does not surface a structured creation-date field. The DateTime
-    // extmetadata is upload time, not creation. Best effort: parse a date out
-    // of the description or the artist line (which often reads "(1526–1569)").
-    const dateRange =
-      parseDisplayDate(description) || parseDisplayDate(artistRaw) || { yearStart: null, yearEnd: null };
+    // extmetadata is the upload timestamp, not the artwork's date. Parse the
+    // ImageDescription only — the Artist field often carries the artist's
+    // lifespan ("(1526–1569)"), which is NOT the artwork's date and would
+    // mislead readers if surfaced as `yearStart`/`yearEnd`.
+    const dateRange = parseDisplayDate(description);
 
     const fullImage = asString(info.url);
     const pageUrl = asString(info.descriptionurl) || `${COMMONS_PAGE}/?curid=${pageId}`;
@@ -178,9 +211,11 @@ export const wikimediaFetcher: Fetcher = {
         lifespan: undefined,
         attributionType,
       },
-      // Commons doesn't separate display-date from creation-date; surface
-      // whatever description text we found, parsed years go to yearStart/End.
-      displayDate: description.slice(0, 200) || '',
+      // displayDate carries the artwork's date string. Commons records don't
+      // have a structured date field, so we render the parsed year range
+      // back to a string ("1560–1569"). Empty when no date was parseable —
+      // honest about absence rather than dumping the description prose.
+      displayDate: formatYearRange(dateRange.yearStart, dateRange.yearEnd),
       yearStart: dateRange.yearStart,
       yearEnd: dateRange.yearEnd,
       medium: '',

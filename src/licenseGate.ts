@@ -120,9 +120,9 @@ export const validateAicLicense: LicenseValidator = (raw) => {
 // not per-source. The MediaWiki API surfaces a machine-readable License token
 // in `imageinfo[0].extmetadata.License.value`. We accept the strict open-access
 // subset only:
-//   - 'cc0'      → CC0 dedication
-//   - 'pd'       → Public Domain
-//   - 'pd-*'     → PD subtypes (PD-Art, PD-old, PD-US, PD-self, etc.)
+//   - 'cc0'           → CC0 dedication
+//   - 'pd', 'pd-*'    → Public Domain (PD-Art, PD-old, PD-US, PD-self, etc.)
+//   - 'pdm', 'pdm-*'  → Creative Commons Public Domain Mark
 // Everything else (CC-BY, CC-BY-SA, CC-BY-NC, GFDL, fair-use, etc.) is rejected.
 // Even though CC-BY is "free", it imposes attribution that the project's
 // per-museum gate model is not designed to verify or carry.
@@ -131,6 +131,8 @@ export const validateAicLicense: LicenseValidator = (raw) => {
 // photographs of 2D public-domain works (per Bridgeman v. Corel). The license
 // gate trusts Commons' editorial decision to apply that template; we do not
 // independently re-evaluate the underlying work's status.
+const PD_PREFIXES = ['pd', 'pdm'];
+
 export const validateWikimediaLicense: LicenseValidator = (raw) => {
   if (!raw || typeof raw !== 'object') {
     return reject('wikimedia: object missing or not an object');
@@ -162,7 +164,8 @@ export const validateWikimediaLicense: LicenseValidator = (raw) => {
       reason: 'wikimedia: License=cc0',
     };
   }
-  if (license === 'pd' || license.startsWith('pd-')) {
+  const isPd = PD_PREFIXES.some((p) => license === p || license.startsWith(`${p}-`));
+  if (isPd) {
     return {
       accepted: true,
       license: {

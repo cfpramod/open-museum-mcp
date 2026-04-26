@@ -32,6 +32,11 @@ describe('Wikimedia Commons adapter normalization', () => {
     expect(a.metadataOpenAccess).toBe(true);
     expect(a.imageUrls.full).toContain('upload.wikimedia.org');
     expect(a.source.pageUrl).toContain('commons.wikimedia.org');
+    // Description carries "c. 1560s." → tryDecade matches "1560s" → {1560, 1569}.
+    // Locks down the parseDisplayDate(description) path.
+    expect(a.yearStart).toBe(1560);
+    expect(a.yearEnd).toBe(1569);
+    expect(a.displayDate).toBe('1560–1569');
   });
 
   it('normalizes a CC0-licensed file with the CC0 license tier', () => {
@@ -99,7 +104,32 @@ describe('Wikimedia Commons adapter normalization', () => {
     });
     expect(result.status).toBe('rejected');
     if (result.status !== 'rejected') return;
-    expect(result.rejection.reason).toContain('non-image mime');
+    expect(result.rejection.reason).toContain('non-image or missing mime');
+  });
+
+  it('rejects a record with missing mime type even when license is PD', () => {
+    // Defense in depth: a PD-licensed record without a declared MIME can't
+    // honestly promise imageUrls.full is an image, so reject.
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 99000005,
+            title: 'File:No Mime.bin',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/NoMime.bin',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:No_Mime.bin',
+                extmetadata: { License: { value: 'pd' } },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.reason).toContain('missing mime');
   });
 
   it('accepts a file passed as a direct page object (unwrapped fixture form)', () => {
@@ -158,6 +188,114 @@ describe('Wikimedia Commons adapter normalization', () => {
     if (result.status !== 'accepted') return;
     expect(result.artwork.license.type).toBe('PD');
     expect(result.artwork.license.rawValue).toBe('pd-art');
+  });
+
+  it('accepts the Public Domain Mark (pdm) and pdm-* subtypes', () => {
+    // Creative Commons' Public Domain Mark template. Genuinely PD; locked
+    // down separately so a future regex tightening doesn't drop it.
+    const pdm = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000002,
+            title: 'File:PDM File.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/PDM.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:PDM.jpg',
+                mime: 'image/jpeg',
+                extmetadata: { License: { value: 'pdm' } },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(pdm.status).toBe('accepted');
+
+    const pdmVersioned = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000003,
+            title: 'File:PDM 1.0.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/PDMv.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:PDMv.jpg',
+                mime: 'image/jpeg',
+                extmetadata: { License: { value: 'pdm-1.0' } },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(pdmVersioned.status).toBe('accepted');
+  });
+
+  it('decodes HTML entities in artist and description fields', () => {
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000004,
+            title: 'File:Entity Test.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/Entity.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:Entity.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ObjectName: { value: 'Picasso &amp; Friends' },
+                  Artist: { value: '&quot;Anonymous&quot;' },
+                  ImageDescription: { value: 'Made in 1850. Gallery &#x2014; West Wing.' },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.title).toBe('Picasso & Friends');
+    expect(result.artwork.artist.name).toContain('"Anonymous"');
+    expect(result.artwork.description).toContain('Made in 1850. Gallery — West Wing.');
+  });
+
+  it('emits empty displayDate when no date can be parsed from description', () => {
+    const result = wikimediaFetcher.normalize({
+      query: {
+        pages: [
+          {
+            pageid: 88000005,
+            title: 'File:Undated.jpg',
+            imageinfo: [
+              {
+                url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/Undated.jpg',
+                descriptionurl: 'https://commons.wikimedia.org/wiki/File:Undated.jpg',
+                mime: 'image/jpeg',
+                extmetadata: {
+                  License: { value: 'pd' },
+                  ImageDescription: { value: 'A photograph with no recoverable date.' },
+                  Artist: { value: 'Photographer (1900–1980)' },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    // Honest absence: no date in description → empty displayDate, null years.
+    // The artist's lifespan is NOT used as a fallback (it's the artist's
+    // life, not the artwork's date).
+    expect(result.artwork.displayDate).toBe('');
+    expect(result.artwork.yearStart).toBe(null);
+    expect(result.artwork.yearEnd).toBe(null);
   });
 
   it('surfaces "wikimedia:unknown" id on rights-pass + bad-pageid rejections', () => {
