@@ -1,0 +1,41 @@
+{
+  "data": {
+    "id": 135299,
+    "accession_number": "1958.31",
+    "share_license_status": "CC0",
+    "title": "Adeline Ravoux",
+    "creation_date": "1890",
+    "creation_date_earliest": 1890,
+    "creation_date_latest": 1890,
+    "culture": ["Netherlands"],
+    "technique": "oil on fabric",
+    "type": "Painting",
+    "url": "https://clevelandart.org/art/1958.31",
+    "images": {
+      "web": {
+        "url": "https://openaccess-cdn.clevelandart.org/1958.31/1958.31_web.jpg",
+        "width": "900",
+        "height": "897"
+      },
+      "print": {
+        "url": "https://openaccess-cdn.clevelandart.org/1958.31/1958.31_print.jpg",
+        "width": "3400",
+        "height": "3389"
+      },
+      "full": {
+        "url": "https://openaccess-cdn.clevelandart.org/1958.31/1958.31_full.tif",
+        "width": "11512",
+        "height": "11476"
+      }
+    },
+    "creators": [
+      {
+        "id": 1779,
+        "description": "Vincent van Gogh (Dutch, 1853–1890)",
+        "role": "artist",
+        "birth_year": "1853",
+        "death_year": "1890"
+      }
+    ]
+  }
+}

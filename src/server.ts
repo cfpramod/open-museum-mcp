@@ -12,12 +12,14 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { cite, type CiteStyle } from './cite.js';
 import { Cache } from './db.js';
+import { clevelandFetcher } from './fetchers/cleveland.js';
 import { metFetcher } from './fetchers/met.js';
 import type { Fetcher } from './fetchers/types.js';
 import type { Artwork } from './types.js';
 
 const FETCHERS: Record<string, Fetcher> = {
   [metFetcher.code]: metFetcher,
+  [clevelandFetcher.code]: clevelandFetcher,
 };
 
 const CACHE_PATH = process.env.OMM_CACHE_PATH ?? join(homedir(), '.open-museum-mcp', 'cache.db');
@@ -118,7 +120,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           museum: {
             type: 'string',
             description:
-              'Optional museum code. Currently registered: met. (Cleveland, AIC adapters are planned for v0.2.)',
+              'Optional museum code. Currently registered: met, cleveland. (AIC adapter is planned for v0.2.)',
           },
           has_image: {
             type: 'boolean',
