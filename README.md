@@ -10,7 +10,7 @@ If anyone else is exploring open-access art, I hope this helps. The plan is to k
 
 ## What you get
 
-- **One interface, registered museums.** The Met is live. Cleveland and the Art Institute of Chicago are next.
+- **One interface, registered museums.** The Met and Cleveland Museum of Art are live. The Art Institute of Chicago is next.
 - **Strict deny on ambiguity.** Records are validated against per-museum rights rules in code. Missing or unclear indicators drop the record; nothing is defaulted to "open".
 - **Catalog-grade metadata.** A dynasty-aware date parser handles Tang, Edo, Safavid, Mughal and the rest. Regions normalize across museums. Attribution separates named artists from anonymous, workshop, "after", and attributed works.
 - **Listable resources and deterministic citations.** `museum://{code}/{id}` resources, three citation styles, structured JSON search results.
@@ -153,7 +153,7 @@ This is what "rights-verified" means here: validated against published museum me
 | Museum | Code | Auth | Status |
 |---|---|---|---|
 | The Metropolitan Museum of Art | `met` | none | ✅ v0.1 |
-| Cleveland Museum of Art | `cleveland` | none | 🚧 next |
+| Cleveland Museum of Art | `cleveland` | none | ✅ v0.2 |
 | Art Institute of Chicago | `aic` | none | 🚧 next |
 | Smithsonian Open Access | `si` | API key (free) | 📋 v2 |
 | Rijksmuseum | `rijks` | API key (free) | 📋 v2 |
