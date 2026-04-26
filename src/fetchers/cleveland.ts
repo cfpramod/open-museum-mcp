@@ -2,21 +2,10 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateClevelandLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import type { Artwork, ValidationResult } from '../types.js';
+import { asFiniteNumber, asOptionalString, asString } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const CLEVELAND_API = 'https://openaccess-api.clevelandart.org/api';
-
-function asString(v: unknown): string {
-  return typeof v === 'string' ? v : '';
-}
-
-function asOptionalString(v: unknown): string | undefined {
-  return typeof v === 'string' && v.length > 0 ? v : undefined;
-}
-
-function asFiniteNumber(v: unknown): number | null {
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
-}
 
 function reject(id: string, reason: string, rawSnapshot: unknown): ValidationResult {
   return {
