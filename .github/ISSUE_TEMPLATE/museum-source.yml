@@ -1,0 +1,107 @@
+name: Museum source
+description: Suggest an open-access museum collection that should be added to open-museum-mcp.
+title: "[museum] "
+labels: ["museum-source"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for thinking of a collection. **You don't need to write code to file this.** The form asks for the API URL, the rights field, and a sample record. Anyone — me or a future contributor — can pick it up from there and build the adapter.
+
+        The contribution that matters is the source knowledge. Knowing what's in a collection and how that museum represents rights is the part the code can't do for itself.
+
+  - type: input
+    id: museum_name
+    attributes:
+      label: Museum name
+      placeholder: e.g. The Walters Art Museum
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      description: City and country.
+      placeholder: e.g. Baltimore, USA
+
+  - type: input
+    id: api_url
+    attributes:
+      label: API base URL
+      description: Where the JSON API lives.
+      placeholder: e.g. https://api.thewalters.org
+    validations:
+      required: true
+
+  - type: input
+    id: docs_url
+    attributes:
+      label: API documentation URL
+      placeholder: e.g. https://api.thewalters.org/docs
+
+  - type: input
+    id: license_field
+    attributes:
+      label: Rights / license field name
+      description: The exact JSON field in each artwork record that signals open-access status (e.g. `is_public_domain`, `share_license_status`, `rights_statement`, `rights_uri`).
+    validations:
+      required: true
+
+  - type: input
+    id: license_value
+    attributes:
+      label: Field value that indicates open access
+      description: What value of the field above means "open"? (e.g. `true`, `"CC0"`, `"Public Domain"`, a specific rights URL.)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth
+    attributes:
+      label: Authentication required
+      options:
+        - none
+        - API key (free)
+        - API key (paid)
+        - OAuth / login required
+        - unsure
+    validations:
+      required: true
+
+  - type: input
+    id: sample_record
+    attributes:
+      label: Sample artwork URL or JSON
+      description: A real open-access record we can verify the rights field against. A link to the API response is ideal.
+
+  - type: input
+    id: collection_size
+    attributes:
+      label: Approximate open-access collection size
+      description: Rough is fine. "Half the records have images" type observations help.
+      placeholder: e.g. ~12,000 records, ~half with images
+
+  - type: dropdown
+    id: rights_complexity
+    attributes:
+      label: Are there caveats on the open-access rights?
+      description: Some museums (e.g. Art Institute of Chicago) note that even CC0 images may carry obligations around third-party permissions or culturally sensitive material. Anything you know up front saves a lot of time.
+      options:
+        - "No: open is open"
+        - "Yes: third-party permissions sometimes apply"
+        - "Yes: cultural-heritage sensitivities flagged"
+        - "Yes: image rights and metadata rights differ"
+        - "Unsure"
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Quirks, search-endpoint shape, IIIF or no-IIIF, regions/periods covered, contact at the museum, anything you wish you'd known. No length limit.
+
+  - type: input
+    id: contact
+    attributes:
+      label: Want credit if the adapter ships?
+      description: Optional. Your name or handle for the contributors list.

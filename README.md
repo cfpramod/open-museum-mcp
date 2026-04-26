@@ -178,6 +178,14 @@ This is what "rights-verified" means here: validated against published museum me
 | Smithsonian Open Access | `si` | API key (free) | 📋 v2 |
 | Rijksmuseum | `rijks` | API key (free) | 📋 v2 |
 
+## Suggest a museum
+
+If you know an open-access collection that should be on this list and you can't write the adapter yourself, [open a museum-source issue](https://github.com/cfpramod/open-museum-mcp/issues/new?template=museum-source.yml). The form asks for the API URL, the rights field, and a sample record. Anyone — me, or a future contributor — can pick it up from there and build the adapter.
+
+The contribution that matters is the source knowledge. Knowing what's in a collection and how that museum represents rights is the part the code can't do for itself.
+
+If you can write the adapter, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Schema
 
 Full TypeScript definitions in [`src/types.ts`](src/types.ts). The `Artwork` shape is stable; additional fields may be added but existing fields will not be repurposed.
