@@ -1,0 +1,45 @@
+{
+  "batchcomplete": "",
+  "query": {
+    "pages": [
+      {
+        "pageid": 99000001,
+        "ns": 6,
+        "title": "File:Some CC0 Photograph.jpg",
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 421013,
+            "width": 2400,
+            "height": 1600,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/0/00/Some_CC0_Photograph.jpg",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Some_CC0_Photograph.jpg",
+            "extmetadata": {
+              "ObjectName": {
+                "value": "Some CC0 Photograph",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "Anonymous",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "CC0",
+                "source": "commons-desc-page"
+              },
+              "UsageTerms": {
+                "value": "Creative Commons Zero, Public Domain Dedication",
+                "source": "commons-desc-page"
+              },
+              "License": {
+                "value": "cc0",
+                "source": "commons-templates"
+              }
+            },
+            "mime": "image/jpeg"
+          }
+        ]
+      }
+    ]
+  }
+}

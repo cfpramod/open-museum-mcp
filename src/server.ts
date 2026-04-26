@@ -15,6 +15,7 @@ import { Cache } from './db.js';
 import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
 import { metFetcher } from './fetchers/met.js';
+import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import type { Fetcher } from './fetchers/types.js';
 import type { Artwork } from './types.js';
 
@@ -22,6 +23,7 @@ const FETCHERS: Record<string, Fetcher> = {
   [metFetcher.code]: metFetcher,
   [clevelandFetcher.code]: clevelandFetcher,
   [aicFetcher.code]: aicFetcher,
+  [wikimediaFetcher.code]: wikimediaFetcher,
 };
 
 const CACHE_PATH = process.env.OMM_CACHE_PATH ?? join(homedir(), '.open-museum-mcp', 'cache.db');
@@ -129,7 +131,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           museum: {
             type: 'string',
             description:
-              'Optional museum code. Currently registered: met, cleveland, aic.',
+              'Optional museum code. Currently registered: met, cleveland, aic, wikimedia (Commons).',
           },
           has_image: {
             type: 'boolean',
