@@ -38,14 +38,22 @@ function reject(id: string, reason: string, rawSnapshot: unknown): ValidationRes
 // birthYear–deathYear)". The structured `artist_title` field gives us the
 // canonical name without the parenthetical, so we use that and only mine
 // the display string for nationality and lifespan.
+function looksLikeNationality(token: string): boolean {
+  // Nationality words are short, alphabetic, no digits, and don't start with
+  // "born" (which AIC sometimes uses for living artists, e.g.
+  // "X (born 1950)"). The strict shape check here keeps year tokens and
+  // birth-line tokens out of the nationality field.
+  return token.length > 0 && !/\d/.test(token) && !/^born\b/i.test(token);
+}
+
 function parseArtistDisplay(display: string): { nationality?: string; lifespan?: string } {
   const parenStart = display.indexOf('(');
   if (parenStart < 0) return {};
   const parenEnd = display.lastIndexOf(')');
   const inside = parenEnd > parenStart ? display.slice(parenStart + 1, parenEnd) : '';
   const tokens = inside.split(',').map((t) => t.trim()).filter(Boolean);
-  const nationality = tokens[0] && !/^\d/.test(tokens[0]) ? tokens[0] : undefined;
-  const yearLine = tokens.find((t) => /^\d{1,4}/.test(t));
+  const nationality = tokens[0] && looksLikeNationality(tokens[0]) ? tokens[0] : undefined;
+  const yearLine = tokens.find((t) => /^\d{1,4}/.test(t) || /^born\b/i.test(t));
   return { nationality, lifespan: yearLine || undefined };
 }
 

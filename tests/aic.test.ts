@@ -123,4 +123,44 @@ describe('AIC adapter normalization', () => {
     expect(result.artwork.imageUrls.full).toBe('');
     expect(result.artwork.imageUrls.thumbnail).toBeUndefined();
   });
+
+  it('does not surface "born YYYY" tokens as artist nationality', () => {
+    // AIC's artist_display occasionally reads "X (born 1950)" for living
+    // artists. Such records will normally fail the rights gate, but if one
+    // ever flows through, the nationality field must not get the birth line.
+    const baseline = fixture('aic-accepted.json') as { data: Record<string, unknown> };
+    const livingArtist = {
+      data: {
+        ...baseline.data,
+        artist_display: 'Some Artist (born 1950)',
+        artist_title: 'Some Artist',
+      },
+    };
+    const result = aicFetcher.normalize(livingArtist);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.artist.nationality).toBeUndefined();
+    expect(result.artwork.artist.lifespan).toBe('born 1950');
+  });
+
+  it('does not surface digit-bearing tokens as nationality', () => {
+    const baseline = fixture('aic-accepted.json') as { data: Record<string, unknown> };
+    const malformed = {
+      data: { ...baseline.data, artist_display: 'X (1880–1960)', artist_title: 'X' },
+    };
+    const result = aicFetcher.normalize(malformed);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.artist.nationality).toBeUndefined();
+    expect(result.artwork.artist.lifespan).toBe('1880–1960');
+  });
+
+  it('rejects when is_public_domain is explicitly null (strict default)', () => {
+    // Belt-and-suspenders contract: explicit `null` and field-absent both
+    // hit the strict-default-deny path.
+    const result = aicFetcher.normalize({ data: { id: 1, is_public_domain: null } });
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.reason).toContain('strict default reject');
+  });
 });
