@@ -260,11 +260,19 @@ export class Cache {
    * grows enough to warrant one.
    */
   listTraditions(): { regions: Tradition[]; periods: Tradition[] } {
-    const cutoff = new Date(Date.now() - OBJECT_TTL_DAYS * MS_PER_DAY).toISOString();
+    const cutoff = this.objectsCutoff();
     return {
       regions: this.aggregateByTag('region', cutoff),
       periods: this.aggregateByTag('period', cutoff),
     };
+  }
+
+  private objectsCutoff(): string {
+    return new Date(Date.now() - OBJECT_TTL_DAYS * MS_PER_DAY).toISOString();
+  }
+
+  private queriesCutoff(): string {
+    return new Date(Date.now() - QUERY_TTL_DAYS * MS_PER_DAY).toISOString();
   }
 
   // Two literal SQL strings instead of `${column}` interpolation, so the
@@ -306,10 +314,8 @@ export class Cache {
   }
 
   pruneExpired(): { objects: number; queries: number } {
-    const objectsCutoff = new Date(Date.now() - OBJECT_TTL_DAYS * MS_PER_DAY).toISOString();
-    const queriesCutoff = new Date(Date.now() - QUERY_TTL_DAYS * MS_PER_DAY).toISOString();
-    const objects = this.db.prepare(`DELETE FROM objects WHERE cached_at < ?`).run(objectsCutoff);
-    const queries = this.db.prepare(`DELETE FROM query_cache WHERE cached_at < ?`).run(queriesCutoff);
+    const objects = this.db.prepare(`DELETE FROM objects WHERE cached_at < ?`).run(this.objectsCutoff());
+    const queries = this.db.prepare(`DELETE FROM query_cache WHERE cached_at < ?`).run(this.queriesCutoff());
     return { objects: objects.changes, queries: queries.changes };
   }
 
