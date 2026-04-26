@@ -288,3 +288,86 @@ describe('Cache.getRandomObject', () => {
     expect(seen.size).toBeGreaterThan(1);
   });
 });
+
+describe('Cache.listTraditions', () => {
+  let dir: string;
+  let path: string;
+  let cache: Cache;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'open-museum-mcp-cache-'));
+    path = join(dir, 'cache.db');
+    cache = new Cache({ path });
+  });
+
+  afterEach(() => {
+    cache.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns empty arrays when the cache is empty', () => {
+    expect(cache.listTraditions()).toEqual({ regions: [], periods: [] });
+  });
+
+  it('aggregates regions and periods with per-museum coverage', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: 'china', period: 'tang dynasty' }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'china', period: 'song' }));
+    cache.upsertObject(makeArtwork('cleveland:3', { region: 'china', period: null }));
+    cache.upsertObject(makeArtwork('met:4', { region: 'japan', period: 'edo' }));
+
+    const { regions, periods } = cache.listTraditions();
+
+    const china = regions.find((r) => r.tag === 'china');
+    expect(china).toBeDefined();
+    expect(china?.coverage).toEqual({ met: 2, cleveland: 1 });
+    expect(china?.label).toBe('China');
+
+    const japan = regions.find((r) => r.tag === 'japan');
+    expect(japan?.coverage).toEqual({ met: 1 });
+    expect(japan?.label).toBe('Japan');
+
+    const tang = periods.find((p) => p.tag === 'tang dynasty');
+    expect(tang?.coverage).toEqual({ met: 1 });
+    expect(tang?.label).toBe('Tang Dynasty');
+  });
+
+  it('excludes records whose region or period is null', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: null, period: null }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'france', period: null }));
+    cache.upsertObject(makeArtwork('met:3', { region: null, period: 'baroque' }));
+
+    const { regions, periods } = cache.listTraditions();
+    expect(regions.map((r) => r.tag)).toEqual(['france']);
+    expect(periods.map((p) => p.tag)).toEqual(['baroque']);
+  });
+
+  it('returns regions and periods sorted alphabetically by tag', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: 'iran', period: null }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'china', period: null }));
+    cache.upsertObject(makeArtwork('met:3', { region: 'japan', period: null }));
+
+    const { regions } = cache.listTraditions();
+    expect(regions.map((r) => r.tag)).toEqual(['china', 'iran', 'japan']);
+  });
+
+  it('title-cases multi-word period tags for the label', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: null, period: 'early renaissance' }));
+    cache.upsertObject(makeArtwork('met:2', { region: null, period: 'qajar' }));
+
+    const { periods } = cache.listTraditions();
+    const labels = Object.fromEntries(periods.map((p) => [p.tag, p.label]));
+    expect(labels['early renaissance']).toBe('Early Renaissance');
+    expect(labels['qajar']).toBe('Qajar');
+  });
+
+  it('skips expired rows', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: 'china', period: 'tang dynasty' }));
+    cache.close();
+    const db = new Database(path);
+    const longAgo = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
+    db.prepare('UPDATE objects SET cached_at = ?').run(longAgo);
+    db.close();
+    cache = new Cache({ path });
+    expect(cache.listTraditions()).toEqual({ regions: [], periods: [] });
+  });
+});

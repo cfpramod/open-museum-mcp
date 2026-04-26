@@ -1,11 +1,15 @@
 import Database from 'better-sqlite3';
 import { chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Artwork } from './types.js';
+import type { Artwork, Tradition } from './types.js';
 
 const OBJECT_TTL_DAYS = 90;
 const QUERY_TTL_DAYS = 14;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function titleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export interface CacheConfig {
   path: string;
@@ -239,6 +243,51 @@ export class Cache {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * List the regions and periods present in non-expired cached records,
+   * with per-museum coverage counts. Useful for the `list_traditions`
+   * tool — callers see which traditions are well-represented before
+   * searching, and where holdings are sparse.
+   *
+   * `label` is currently the title-cased tag; v1.0+ may swap in a curated
+   * lookup (e.g. "tang" → "Tang Dynasty (618–907)") if the tag set
+   * grows enough to warrant one.
+   */
+  listTraditions(): { regions: Tradition[]; periods: Tradition[] } {
+    const cutoff = new Date(Date.now() - OBJECT_TTL_DAYS * MS_PER_DAY).toISOString();
+    return {
+      regions: this.aggregateByTag('region', cutoff),
+      periods: this.aggregateByTag('period', cutoff),
+    };
+  }
+
+  // The `column` argument is constrained to a TypeScript literal union, never
+  // sourced from user input — the `${column}` interpolation here is safe.
+  private aggregateByTag(column: 'region' | 'period', cutoff: string): Tradition[] {
+    const sql = `
+      SELECT ${column} AS tag, museum_code, COUNT(*) AS cnt
+      FROM objects
+      WHERE ${column} IS NOT NULL AND cached_at > ?
+      GROUP BY ${column}, museum_code
+    `;
+    const rows = this.db.prepare(sql).all(cutoff) as Array<{
+      tag: string;
+      museum_code: string;
+      cnt: number;
+    }>;
+
+    const byTag = new Map<string, Record<string, number>>();
+    for (const row of rows) {
+      const existing = byTag.get(row.tag) ?? {};
+      existing[row.museum_code] = row.cnt;
+      byTag.set(row.tag, existing);
+    }
+
+    return Array.from(byTag.entries())
+      .map(([tag, coverage]) => ({ tag, label: titleCase(tag), coverage }))
+      .sort((a, b) => a.tag.localeCompare(b.tag));
   }
 
   pruneExpired(): { objects: number; queries: number } {

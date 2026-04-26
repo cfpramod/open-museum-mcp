@@ -196,6 +196,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
       },
     },
+    {
+      name: 'list_traditions',
+      description:
+        'List the regions and periods present in non-expired cached records, with per-museum record counts. Helps you see which traditions are well-represented before searching, and where holdings are sparse. Returns { regions, periods } where each entry has { tag, label, coverage: { museumCode: count } }.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+      },
+    },
   ],
 }));
 
@@ -290,6 +299,11 @@ async function handleDiscoverRandom(args: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(artwork, null, 2) }] };
 }
 
+function handleListTraditions() {
+  const traditions = cache.listTraditions();
+  return { content: [{ type: 'text' as const, text: JSON.stringify(traditions, null, 2) }] };
+}
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   try {
@@ -297,6 +311,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === 'get_artwork') return await handleGet(args);
     if (name === 'cite') return await handleCite(args);
     if (name === 'discover_random') return await handleDiscoverRandom(args);
+    if (name === 'list_traditions') return handleListTraditions();
     return errorResult(`unknown tool: ${name}`);
   } catch (err) {
     if (err instanceof z.ZodError) {

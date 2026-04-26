@@ -113,6 +113,7 @@ Then point the MCP config at the built binary:
 | `get_artwork(id)` | Fetch a single artwork by its normalized ID (e.g. `met:436535`). |
 | `cite(id, style?)` | Render a citation. `style`: `full` (artist, title, date, museum, license, URL), `caption` (image attribution), `short` (inline). |
 | `discover_random(region?, period?, not_artist?, museum?)` | Pick one random artwork from the local cache that matches the constraints. Operates over what has already been searched and cached. Useful for breaking out of repetitive search territory. |
+| `list_traditions()` | List the regions and periods present in the local cache, with per-museum record counts. Lets you see where holdings are well-represented and where they're sparse. |
 
 ### `cite` example outputs
 
