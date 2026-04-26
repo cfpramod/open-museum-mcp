@@ -2,17 +2,10 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateMetLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import type { Artwork, ValidationResult } from '../types.js';
+import { asOptionalString, asString } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const MET_API = 'https://collectionapi.metmuseum.org/public/collection/v1';
-
-function asString(v: unknown): string {
-  return typeof v === 'string' ? v : '';
-}
-
-function asOptionalString(v: unknown): string | undefined {
-  return typeof v === 'string' && v.length > 0 ? v : undefined;
-}
 
 export const metFetcher: Fetcher = {
   code: 'met',

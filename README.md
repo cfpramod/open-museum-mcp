@@ -13,7 +13,7 @@ If anyone else is exploring open-access art, I hope this helps. The plan is to k
 
 ## What you get
 
-- **One interface, registered museums.** The Met and Cleveland Museum of Art are live. The Art Institute of Chicago is next.
+- **One interface, registered museums.** The Met, Cleveland Museum of Art, and the Art Institute of Chicago are live. Smithsonian and Rijksmuseum are next.
 - **Strict deny on ambiguity.** Records are validated against per-museum rights rules in code. Missing or unclear indicators drop the record; nothing is defaulted to "open".
 - **Catalog-grade metadata.** A dynasty-aware date parser handles Tang, Edo, Safavid, Mughal and the rest. Regions normalize across museums. Attribution separates named artists from anonymous, workshop, "after", and attributed works.
 - **Listable resources and deterministic citations.** `museum://{code}/{id}` resources, three citation styles, structured JSON search results.
@@ -172,7 +172,7 @@ This is what "rights-verified" means here: validated against published museum me
 |---|---|---|---|
 | The Metropolitan Museum of Art | `met` | none | ✅ v0.1 |
 | Cleveland Museum of Art | `cleveland` | none | ✅ v0.2 |
-| Art Institute of Chicago | `aic` | none | 🚧 next |
+| Art Institute of Chicago | `aic` | none | ✅ v0.2 |
 | Smithsonian Open Access | `si` | API key (free) | 📋 v2 |
 | Rijksmuseum | `rijks` | API key (free) | 📋 v2 |
 
@@ -197,7 +197,7 @@ Highlights:
 ## Roadmap
 
 - v0.1: Met adapter, dynasty-aware date parser, license gate, `cite` tool, MCP resources.
-- v0.2: Cleveland adapter (shipped); AIC adapter, `discover_random` with constraints (`region`, `period`, `not_artist`), `list_traditions` next. **(here)**
+- v0.2: Cleveland and AIC adapters (shipped); `discover_random` with constraints (`region`, `period`, `not_artist`), `list_traditions` next. **(here)**
 - v0.5: Dominant-color extraction across museums (`color: "#3a5f7d"` discovery via `sharp`).
 - v1.0: Artist-obscurity scoring (`object_count_total`, `museum_count`) for deliberate exploration of less-canonical work.
 - v2.0: Smithsonian, Rijksmuseum, Wikimedia Commons (long-tail).
