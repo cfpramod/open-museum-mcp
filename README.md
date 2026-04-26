@@ -160,10 +160,10 @@ Each accepted record carries:
 
 - `imageOpenAccess`: the artwork's image may be reused under the recorded license.
 - `metadataOpenAccess`: the artwork's catalog metadata may be reused (often broader than image rights).
-- `license.type`: normalized license tier (`CC0`, `PD`, `CC-BY`, …; v0.1 only emits `CC0`).
+- `license.type`: normalized license tier (`CC0`, `PD`, `CC-BY`, …; currently only emits `CC0`).
 - `license.rawValue`: the museum's own field value, preserved.
 - `license.verificationSource`: the exact museum field that was checked (e.g. `met.isPublicDomain`).
-- `license.confidence`: `high` for unambiguous accepts (the only level v0.1 emits).
+- `license.confidence`: `high` for unambiguous accepts (the only level emitted today).
 - `license.verifiedAt`: ISO timestamp of when this verification ran.
 
 This is what "rights-verified" means here: validated against published museum metadata using source-specific rules implemented in this repo, with strict deny on ambiguity. It is **not** a guarantee of third-party rights beyond what each museum's API publicly represents. See [Disclaimer](#disclaimer).
