@@ -112,6 +112,7 @@ Then point the MCP config at the built binary:
 | `search_artworks(query, museum?, has_image?, limit?)` | Search across registered museums. Returns only records that pass the rights gate. |
 | `get_artwork(id)` | Fetch a single artwork by its normalized ID (e.g. `met:436535`). |
 | `cite(id, style?)` | Render a citation. `style`: `full` (artist, title, date, museum, license, URL), `caption` (image attribution), `short` (inline). |
+| `discover_random(region?, period?, not_artist?, museum?)` | Pick one random artwork from the local cache that matches the constraints. Operates over what has already been searched and cached. Useful for breaking out of repetitive search territory. |
 
 ### `cite` example outputs
 
