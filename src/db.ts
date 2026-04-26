@@ -1,14 +1,36 @@
 import Database from 'better-sqlite3';
 import { chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Artwork } from './types.js';
+import type { Artwork, Tradition } from './types.js';
 
 const OBJECT_TTL_DAYS = 90;
 const QUERY_TTL_DAYS = 14;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// Title-cases the first letter of each whitespace/hyphen-bounded word in
+// an ASCII tag. The tag set in regions.json and dynasties.json is currently
+// ASCII-only; if a future tag introduces non-ASCII letters, switch to a
+// Unicode-aware regex (`/u` flag + `\p{L}` property class).
+function titleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export interface CacheConfig {
   path: string;
+}
+
+/**
+ * Constraints for {@link Cache.getRandomObject}. All fields are AND-combined.
+ * Region and period are exact matches against the normalized values stored
+ * by each fetcher; museum is the registered code (`met`, `cleveland`, …);
+ * notArtist is an exact-match exclusion list against the canonical
+ * `artist_name` column.
+ */
+export interface DiscoverFilter {
+  region?: string;
+  period?: string;
+  notArtist?: string[];
+  museumCode?: string;
 }
 
 /**
@@ -138,6 +160,56 @@ export class Cache {
     });
   }
 
+  /**
+   * Pick one random non-expired artwork that matches the constraints, or
+   * null if nothing matches.
+   *
+   * The query operates over the local cache only — meaning what the user
+   * has already searched and pulled. This is intentional: discover_random
+   * is a forcing-function over your search history, not a federated
+   * sample of every museum's catalog. Callers should seed the cache via
+   * search_artworks first.
+   *
+   * Note on `ORDER BY RANDOM()`: SQLite scans the matching set, which is
+   * fine for caches under ~100k rows. The cache here is bounded by what
+   * the user actually fetches and the 90-day object TTL.
+   */
+  getRandomObject(filter: DiscoverFilter): Artwork | null {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (filter.region) {
+      conditions.push('region = ?');
+      params.push(filter.region);
+    }
+    if (filter.period) {
+      conditions.push('period = ?');
+      params.push(filter.period);
+    }
+    if (filter.museumCode) {
+      conditions.push('museum_code = ?');
+      params.push(filter.museumCode);
+    }
+    if (filter.notArtist && filter.notArtist.length > 0) {
+      const placeholders = filter.notArtist.map(() => '?').join(',');
+      conditions.push(`artist_name NOT IN (${placeholders})`);
+      params.push(...filter.notArtist);
+    }
+    // TTL gate: defense in depth on top of pruneExpired() at construction.
+    conditions.push('cached_at > ?');
+    params.push(new Date(Date.now() - OBJECT_TTL_DAYS * MS_PER_DAY).toISOString());
+
+    const where = `WHERE ${conditions.join(' AND ')}`;
+    const sql = `SELECT full_record FROM objects ${where} ORDER BY RANDOM() LIMIT 1`;
+    const row = this.db.prepare(sql).get(...params) as { full_record: string } | undefined;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.full_record) as Artwork;
+    } catch {
+      return null;
+    }
+  }
+
   getObject(id: string): Artwork | null {
     const row = this.db.prepare(`SELECT full_record, cached_at FROM objects WHERE id = ?`).get(id) as
       | { full_record: string; cached_at: string }
@@ -177,11 +249,73 @@ export class Cache {
     }
   }
 
+  /**
+   * List the regions and periods present in non-expired cached records,
+   * with per-museum coverage counts. Useful for the `list_traditions`
+   * tool — callers see which traditions are well-represented before
+   * searching, and where holdings are sparse.
+   *
+   * `label` is currently the title-cased tag; v1.0+ may swap in a curated
+   * lookup (e.g. "tang" → "Tang Dynasty (618–907)") if the tag set
+   * grows enough to warrant one.
+   */
+  listTraditions(): { regions: Tradition[]; periods: Tradition[] } {
+    const cutoff = this.objectsCutoff();
+    return {
+      regions: this.aggregateByTag('region', cutoff),
+      periods: this.aggregateByTag('period', cutoff),
+    };
+  }
+
+  private objectsCutoff(): string {
+    return new Date(Date.now() - OBJECT_TTL_DAYS * MS_PER_DAY).toISOString();
+  }
+
+  private queriesCutoff(): string {
+    return new Date(Date.now() - QUERY_TTL_DAYS * MS_PER_DAY).toISOString();
+  }
+
+  // Two literal SQL strings instead of `${column}` interpolation, so the
+  // README §Security claim "zero string-concatenated SQL paths" stays
+  // verbatim true. The `LOWER()` case-fold is defense-in-depth: if a future
+  // fetcher forgets to lowercase a tag, the variants still aggregate under
+  // one entry. The `tag != ''` filter drops empty-string ghosts so they
+  // can't surface as "" entries in the output.
+  private aggregateByTag(column: 'region' | 'period', cutoff: string): Tradition[] {
+    const sql =
+      column === 'region'
+        ? `SELECT LOWER(region) AS tag, museum_code, COUNT(*) AS cnt
+           FROM objects
+           WHERE region IS NOT NULL AND region != '' AND cached_at > ?
+           GROUP BY LOWER(region), museum_code`
+        : `SELECT LOWER(period) AS tag, museum_code, COUNT(*) AS cnt
+           FROM objects
+           WHERE period IS NOT NULL AND period != '' AND cached_at > ?
+           GROUP BY LOWER(period), museum_code`;
+    const rows = this.db.prepare(sql).all(cutoff) as Array<{
+      tag: string;
+      museum_code: string;
+      cnt: number;
+    }>;
+
+    const byTag = new Map<string, Record<string, number>>();
+    for (const row of rows) {
+      // Object.create(null) prevents prototype pollution if a future
+      // museum_code value ever collides with a built-in property name
+      // (`__proto__`, `constructor`, `toString`).
+      const existing = byTag.get(row.tag) ?? Object.create(null);
+      existing[row.museum_code] = row.cnt;
+      byTag.set(row.tag, existing);
+    }
+
+    return Array.from(byTag.entries())
+      .map(([tag, coverage]) => ({ tag, label: titleCase(tag), coverage }))
+      .sort((a, b) => a.tag.localeCompare(b.tag));
+  }
+
   pruneExpired(): { objects: number; queries: number } {
-    const objectsCutoff = new Date(Date.now() - OBJECT_TTL_DAYS * MS_PER_DAY).toISOString();
-    const queriesCutoff = new Date(Date.now() - QUERY_TTL_DAYS * MS_PER_DAY).toISOString();
-    const objects = this.db.prepare(`DELETE FROM objects WHERE cached_at < ?`).run(objectsCutoff);
-    const queries = this.db.prepare(`DELETE FROM query_cache WHERE cached_at < ?`).run(queriesCutoff);
+    const objects = this.db.prepare(`DELETE FROM objects WHERE cached_at < ?`).run(this.objectsCutoff());
+    const queries = this.db.prepare(`DELETE FROM query_cache WHERE cached_at < ?`).run(this.queriesCutoff());
     return { objects: objects.changes, queries: queries.changes };
   }
 

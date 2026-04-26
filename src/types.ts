@@ -92,9 +92,10 @@ export interface DateRange {
 }
 
 /**
- * Reserved for v0.2 list_traditions tool: each normalized tradition tag will
- * carry per-museum coverage counts so callers can see where holdings live
- * before searching. Not yet emitted by any tool.
+ * One tradition tag (a normalized region or period) plus per-museum
+ * coverage counts in the local cache. Emitted by the `list_traditions`
+ * tool so callers can see where holdings are well-represented and where
+ * they're sparse before searching.
  */
 export interface Tradition {
   tag: string;

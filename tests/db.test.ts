@@ -6,10 +6,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Cache } from '../src/db.js';
 import type { Artwork } from '../src/types.js';
 
-function makeArtwork(id: string): Artwork {
+const MUSEUMS: Record<string, { code: string; name: string; url: string }> = {
+  met: { code: 'met', name: 'The Metropolitan Museum of Art', url: 'https://www.metmuseum.org' },
+  cleveland: { code: 'cleveland', name: 'Cleveland Museum of Art', url: 'https://www.clevelandart.org' },
+  aic: { code: 'aic', name: 'Art Institute of Chicago', url: 'https://www.artic.edu' },
+};
+
+function makeArtwork(id: string, overrides: Partial<Artwork> = {}): Artwork {
+  const code = id.split(':')[0];
   return {
     id,
-    museum: { code: 'met', name: 'The Metropolitan Museum of Art', url: 'https://www.metmuseum.org' },
+    museum: MUSEUMS[code] ?? MUSEUMS.met,
     title: 'Test Work',
     artist: { name: 'Test Artist', attributionType: 'named' },
     displayDate: '1900',
@@ -29,6 +36,7 @@ function makeArtwork(id: string): Artwork {
       confidence: 'high',
     },
     source: { apiUrl: 'https://example.org/api', pageUrl: 'https://example.org/page' },
+    ...overrides,
   };
 }
 
@@ -145,5 +153,247 @@ describe('Cache', () => {
     const mode = statSync(path).mode & 0o777;
     expect(mode).toBe(0o600);
     cache.close();
+  });
+});
+
+describe('Cache.getRandomObject', () => {
+  let dir: string;
+  let path: string;
+  let cache: Cache;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'open-museum-mcp-cache-'));
+    path = join(dir, 'cache.db');
+    cache = new Cache({ path });
+
+    cache.upsertObject(
+      makeArtwork('met:1', {
+        region: 'china',
+        period: 'tang dynasty',
+        artist: { name: 'Anonymous', attributionType: 'anonymous' },
+      }),
+    );
+    cache.upsertObject(
+      makeArtwork('met:2', {
+        region: 'japan',
+        period: 'edo',
+        artist: { name: 'Hokusai', attributionType: 'named' },
+      }),
+    );
+    cache.upsertObject(
+      makeArtwork('cleveland:3', {
+        region: 'netherlands',
+        period: null,
+        artist: { name: 'Vincent van Gogh', attributionType: 'named' },
+      }),
+    );
+    cache.upsertObject(
+      makeArtwork('cleveland:4', {
+        region: 'iran',
+        period: 'safavid',
+        artist: { name: 'Anonymous', attributionType: 'anonymous' },
+      }),
+    );
+    cache.upsertObject(
+      makeArtwork('aic:5', {
+        region: 'france',
+        period: null,
+        artist: { name: 'Claude Monet', attributionType: 'named' },
+      }),
+    );
+  });
+
+  afterEach(() => {
+    cache.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('filters by region', () => {
+    const result = cache.getRandomObject({ region: 'japan' });
+    expect(result?.region).toBe('japan');
+    expect(result?.id).toBe('met:2');
+  });
+
+  it('filters by period', () => {
+    const result = cache.getRandomObject({ period: 'tang dynasty' });
+    expect(result?.period).toBe('tang dynasty');
+    expect(result?.id).toBe('met:1');
+  });
+
+  it('filters by museum code', () => {
+    for (let i = 0; i < 10; i++) {
+      const result = cache.getRandomObject({ museumCode: 'cleveland' });
+      expect(result?.museum.code).toBe('cleveland');
+    }
+  });
+
+  it('combines multiple constraints (AND)', () => {
+    const result = cache.getRandomObject({ region: 'iran', period: 'safavid' });
+    expect(result?.id).toBe('cleveland:4');
+  });
+
+  it('excludes artists in notArtist list', () => {
+    for (let i = 0; i < 30; i++) {
+      const result = cache.getRandomObject({ notArtist: ['Vincent van Gogh', 'Claude Monet'] });
+      if (result) {
+        expect(result.artist.name).not.toBe('Vincent van Gogh');
+        expect(result.artist.name).not.toBe('Claude Monet');
+      }
+    }
+  });
+
+  it('returns null when no records match', () => {
+    expect(cache.getRandomObject({ region: 'oceania' })).toBe(null);
+    expect(cache.getRandomObject({ period: 'jomon' })).toBe(null);
+    expect(cache.getRandomObject({ region: 'china', period: 'edo' })).toBe(null);
+  });
+
+  it('skips expired rows', () => {
+    cache.close();
+    const db = new Database(path);
+    const longAgo = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
+    db.prepare('UPDATE objects SET cached_at = ?').run(longAgo);
+    db.close();
+    // Re-open: pruneExpired runs at construction, removing the rows.
+    cache = new Cache({ path });
+    expect(cache.getRandomObject({})).toBe(null);
+  });
+
+  it('returns randomized results across queries (statistical)', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 100; i++) {
+      const result = cache.getRandomObject({});
+      if (result) seen.add(result.id);
+    }
+    // With 5 records seeded, we should hit at least 2 distinct IDs over 100
+    // pulls (the chance of single-ID outcome under uniform random is < 1e-69).
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it('matches no rows when notArtist excludes everything', () => {
+    const result = cache.getRandomObject({
+      notArtist: ['Anonymous', 'Hokusai', 'Vincent van Gogh', 'Claude Monet'],
+    });
+    expect(result).toBe(null);
+  });
+
+  it('treats an empty notArtist array as no exclusion', () => {
+    // Locks down the `notArtist.length > 0` guard. With an empty list and no
+    // other filters, every cached record remains a candidate.
+    const seen = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      const result = cache.getRandomObject({ notArtist: [] });
+      if (result) seen.add(result.id);
+    }
+    expect(seen.size).toBeGreaterThan(1);
+  });
+});
+
+describe('Cache.listTraditions', () => {
+  let dir: string;
+  let path: string;
+  let cache: Cache;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'open-museum-mcp-cache-'));
+    path = join(dir, 'cache.db');
+    cache = new Cache({ path });
+  });
+
+  afterEach(() => {
+    cache.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns empty arrays when the cache is empty', () => {
+    expect(cache.listTraditions()).toEqual({ regions: [], periods: [] });
+  });
+
+  it('aggregates regions and periods with per-museum coverage', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: 'china', period: 'tang dynasty' }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'china', period: 'song' }));
+    cache.upsertObject(makeArtwork('cleveland:3', { region: 'china', period: null }));
+    cache.upsertObject(makeArtwork('met:4', { region: 'japan', period: 'edo' }));
+
+    const { regions, periods } = cache.listTraditions();
+
+    const china = regions.find((r) => r.tag === 'china');
+    expect(china).toBeDefined();
+    expect(china?.coverage).toEqual({ met: 2, cleveland: 1 });
+    expect(china?.label).toBe('China');
+
+    const japan = regions.find((r) => r.tag === 'japan');
+    expect(japan?.coverage).toEqual({ met: 1 });
+    expect(japan?.label).toBe('Japan');
+
+    const tang = periods.find((p) => p.tag === 'tang dynasty');
+    expect(tang?.coverage).toEqual({ met: 1 });
+    expect(tang?.label).toBe('Tang Dynasty');
+  });
+
+  it('excludes records whose region or period is null', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: null, period: null }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'france', period: null }));
+    cache.upsertObject(makeArtwork('met:3', { region: null, period: 'baroque' }));
+
+    const { regions, periods } = cache.listTraditions();
+    expect(regions.map((r) => r.tag)).toEqual(['france']);
+    expect(periods.map((p) => p.tag)).toEqual(['baroque']);
+  });
+
+  it('returns regions and periods sorted alphabetically by tag', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: 'iran', period: 'safavid' }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'china', period: 'tang dynasty' }));
+    cache.upsertObject(makeArtwork('met:3', { region: 'japan', period: 'edo' }));
+
+    const { regions, periods } = cache.listTraditions();
+    expect(regions.map((r) => r.tag)).toEqual(['china', 'iran', 'japan']);
+    expect(periods.map((p) => p.tag)).toEqual(['edo', 'safavid', 'tang dynasty']);
+  });
+
+  it('case-folds tags so duplicate-by-case rows aggregate under one entry', () => {
+    // Defense in depth: every adapter today lowercases tags before insertion,
+    // but a future fetcher that forgets should not silently fragment counts.
+    cache.upsertObject(makeArtwork('met:1', { region: 'china' }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'CHINA' }));
+    cache.upsertObject(makeArtwork('met:3', { region: 'China' }));
+
+    const { regions } = cache.listTraditions();
+    expect(regions).toHaveLength(1);
+    expect(regions[0].tag).toBe('china');
+    expect(regions[0].coverage.met).toBe(3);
+  });
+
+  it('excludes records whose region or period is the empty string', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: '', period: 'baroque' }));
+    cache.upsertObject(makeArtwork('met:2', { region: 'france', period: '' }));
+    cache.upsertObject(makeArtwork('met:3', { region: 'france', period: 'baroque' }));
+
+    const { regions, periods } = cache.listTraditions();
+    expect(regions.map((r) => r.tag)).toEqual(['france']);
+    expect(periods.map((p) => p.tag)).toEqual(['baroque']);
+    // Both 'france' rows aggregate into one entry; the '' row is dropped.
+    expect(regions[0].coverage.met).toBe(2);
+  });
+
+  it('title-cases multi-word period tags for the label', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: null, period: 'early renaissance' }));
+    cache.upsertObject(makeArtwork('met:2', { region: null, period: 'qajar' }));
+
+    const { periods } = cache.listTraditions();
+    const labels = Object.fromEntries(periods.map((p) => [p.tag, p.label]));
+    expect(labels['early renaissance']).toBe('Early Renaissance');
+    expect(labels['qajar']).toBe('Qajar');
+  });
+
+  it('skips expired rows', () => {
+    cache.upsertObject(makeArtwork('met:1', { region: 'china', period: 'tang dynasty' }));
+    cache.close();
+    const db = new Database(path);
+    const longAgo = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
+    db.prepare('UPDATE objects SET cached_at = ?').run(longAgo);
+    db.close();
+    cache = new Cache({ path });
+    expect(cache.listTraditions()).toEqual({ regions: [], periods: [] });
   });
 });
