@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { cite, type CiteStyle } from './cite.js';
 import { Cache } from './db.js';
+import { dedupeWikimediaUploads } from './dedupe.js';
 import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
 import { metFetcher } from './fetchers/met.js';
@@ -256,7 +257,8 @@ async function handleSearch(args: unknown) {
     .filter((r): r is { ok: true; artwork: Artwork } => r.ok)
     .map((r) => r.artwork);
   const filtered = accepted.filter((a) => !input.has_image || Boolean(a.imageUrls.full));
-  const results = filtered.slice(0, input.limit);
+  const deduped = dedupeWikimediaUploads(filtered);
+  const results = deduped.slice(0, input.limit);
 
   return {
     content: [
