@@ -209,7 +209,15 @@ function trySingleYear(s: string): DateRange | null {
     return { yearStart: y - 5, yearEnd: y + 5 };
   }
 
-  const exact = s.match(/(?<![\d-])(\d{3,4})(?![\d-])/);
+  // Block catalogue-number context on both sides:
+  //   `(?<![\d.-])` — not preceded by digit, dash, OR period (so "0.533"
+  //                   doesn't surface 533 as a year, but "(1916)" still
+  //                   matches because "(" passes).
+  //   `(?![\d-]|\.\d)` — not followed by digit/dash, and not followed by
+  //                     period+digit (so "1906.1220" doesn't surface 1906,
+  //                     but end-of-sentence "1906." still matches because
+  //                     the period isn't followed by a digit).
+  const exact = s.match(/(?<![\d.-])(\d{3,4})(?![\d-]|\.\d)/);
   if (exact) {
     const y = parseInt(exact[1], 10);
     return { yearStart: y, yearEnd: y };
