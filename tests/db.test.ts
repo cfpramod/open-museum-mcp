@@ -276,4 +276,15 @@ describe('Cache.getRandomObject', () => {
     });
     expect(result).toBe(null);
   });
+
+  it('treats an empty notArtist array as no exclusion', () => {
+    // Locks down the `notArtist.length > 0` guard. With an empty list and no
+    // other filters, every cached record remains a candidate.
+    const seen = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      const result = cache.getRandomObject({ notArtist: [] });
+      if (result) seen.add(result.id);
+    }
+    expect(seen.size).toBeGreaterThan(1);
+  });
 });

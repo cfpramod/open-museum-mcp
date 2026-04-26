@@ -73,10 +73,10 @@ const CiteInput = z.object({
 });
 
 const DiscoverInput = z.object({
-  region: z.string().optional(),
-  period: z.string().optional(),
-  not_artist: z.array(z.string()).optional(),
-  museum: z.string().optional(),
+  region: z.string().min(1).optional(),
+  period: z.string().min(1).optional(),
+  not_artist: z.array(z.string().min(1)).optional(),
+  museum: z.string().min(1).optional(),
 });
 
 async function fetchAndCache(id: string): Promise<{ ok: true; artwork: Artwork } | { ok: false; reason: string }> {
