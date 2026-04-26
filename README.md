@@ -13,7 +13,7 @@ If anyone else is exploring open-access art, I hope this helps. The plan is to k
 
 ## What you get
 
-- **One interface, registered museums.** The Met, Cleveland Museum of Art, and the Art Institute of Chicago are live. Smithsonian and Rijksmuseum are next.
+- **One interface, registered museums.** The Met, Cleveland Museum of Art, the Art Institute of Chicago, and Wikimedia Commons are live. Smithsonian and Rijksmuseum are next.
 - **Strict deny on ambiguity.** Records are validated against per-museum rights rules in code. Missing or unclear indicators drop the record; nothing is defaulted to "open".
 - **Catalog-grade metadata.** A dynasty-aware date parser handles Tang, Edo, Safavid, Mughal and the rest. Regions normalize across museums. Attribution separates named artists from anonymous, workshop, "after", and attributed works.
 - **Listable resources and deterministic citations.** `museum://{code}/{id}` resources, three citation styles, structured JSON search results.
@@ -155,12 +155,13 @@ This is the heart of the project. Each museum exposes rights information in its 
 | The Met | `isPublicDomain` (boolean) | `=== true` |
 | Cleveland Museum of Art | `share_license_status` (string) | `=== "CC0"` (case-insensitive) |
 | Art Institute of Chicago | `is_public_domain` (boolean) | `=== true` |
+| Wikimedia Commons | `imageinfo[0].extmetadata.License.value` (string) | `=== "cc0"` OR `=== "pd"` OR matches `pd-*` |
 
 Each accepted record carries:
 
 - `imageOpenAccess`: the artwork's image may be reused under the recorded license.
 - `metadataOpenAccess`: the artwork's catalog metadata may be reused (often broader than image rights).
-- `license.type`: normalized license tier (`CC0`, `PD`, `CC-BY`, …; currently only emits `CC0`).
+- `license.type`: normalized license tier (`CC0`, `PD`, `CC-BY`, …; currently emits `CC0` or `PD`).
 - `license.rawValue`: the museum's own field value, preserved.
 - `license.verificationSource`: the exact museum field that was checked (e.g. `met.isPublicDomain`).
 - `license.confidence`: `high` for unambiguous accepts (the only level emitted today).
@@ -175,8 +176,11 @@ This is what "rights-verified" means here: validated against published museum me
 | The Metropolitan Museum of Art | `met` | none | ✅ v0.1 |
 | Cleveland Museum of Art | `cleveland` | none | ✅ v0.2 |
 | Art Institute of Chicago | `aic` | none | ✅ v0.2 |
+| Wikimedia Commons | `wikimedia` | none | ✅ v0.3 |
 | Smithsonian Open Access | `si` | API key (free) | 📋 v2 |
 | Rijksmuseum | `rijks` | API key (free) | 📋 v2 |
+
+**On Wikimedia Commons:** Commons is a federation, not a single museum. Rights are per-file. The adapter accepts only `cc0` and `pd*` licence templates; CC-BY, CC-BY-SA, and other attribution-or-restriction licences are rejected even though they're "free", because the per-museum gate model doesn't carry the obligations they impose. Adding Commons unlocks works whose home museums don't have public APIs (Bruegel at the Royal Museums of Fine Arts of Belgium, the National Gallery in London pre-API, regional museums worldwide) — at the cost of a thinner metadata layer than the structured-API museums provide. Region and period are not surfaced for Wikimedia records until v0.7 adds Wikidata enrichment.
 
 ## Suggest a museum
 
@@ -207,10 +211,12 @@ Highlights:
 ## Roadmap
 
 - v0.1: Met adapter, dynasty-aware date parser, license gate, `cite` tool, MCP resources.
-- v0.2: Cleveland and AIC adapters (shipped); `discover_random` with constraints (`region`, `period`, `not_artist`), `list_traditions` next. **(here)**
-- v0.5: Dominant-color extraction across museums (`color: "#3a5f7d"` discovery via `sharp`).
+- v0.2: Cleveland and AIC adapters, `discover_random` with constraints, `list_traditions`.
+- v0.3: Wikimedia Commons adapter (per-record rights model; unlocks works whose home museums lack public APIs). **(here)**
+- v0.7: Wikidata enrichment (artist QIDs, movement, country, dedup across cache).
+- v0.8: Dominant-colour extraction across museums (`color: "#3a5f7d"` discovery via `sharp`).
 - v1.0: Artist-obscurity scoring (`object_count_total`, `museum_count`) for deliberate exploration of less-canonical work.
-- v2.0: Smithsonian, Rijksmuseum, Wikimedia Commons (long-tail).
+- v2.0: Smithsonian, Rijksmuseum, Walters Art Museum, more European institutions.
 
 ## Contributing a museum adapter
 

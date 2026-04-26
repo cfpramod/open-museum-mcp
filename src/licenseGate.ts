@@ -116,10 +116,75 @@ export const validateAicLicense: LicenseValidator = (raw) => {
   return reject(`aic: is_public_domain=${isPD} (strict default reject)`);
 };
 
+// Wikimedia Commons is a federation, not a single museum: rights are per-file,
+// not per-source. The MediaWiki API surfaces a machine-readable License token
+// in `imageinfo[0].extmetadata.License.value`. We accept the strict open-access
+// subset only:
+//   - 'cc0'      → CC0 dedication
+//   - 'pd'       → Public Domain
+//   - 'pd-*'     → PD subtypes (PD-Art, PD-old, PD-US, PD-self, etc.)
+// Everything else (CC-BY, CC-BY-SA, CC-BY-NC, GFDL, fair-use, etc.) is rejected.
+// Even though CC-BY is "free", it imposes attribution that the project's
+// per-museum gate model is not designed to verify or carry.
+//
+// Note on "PD-Art": Wikimedia Commons applies this template to faithful
+// photographs of 2D public-domain works (per Bridgeman v. Corel). The license
+// gate trusts Commons' editorial decision to apply that template; we do not
+// independently re-evaluate the underlying work's status.
+export const validateWikimediaLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('wikimedia: object missing or not an object');
+  }
+  const obj = raw as Record<string, unknown>;
+  const ext = obj.extmetadata;
+  if (!ext || typeof ext !== 'object') {
+    return reject('wikimedia: extmetadata missing (strict default reject)');
+  }
+  const licenseField = (ext as Record<string, unknown>).License;
+  const licenseValue =
+    licenseField && typeof licenseField === 'object'
+      ? (licenseField as { value?: unknown }).value
+      : undefined;
+  const license = typeof licenseValue === 'string' ? licenseValue.toLowerCase() : '';
+
+  if (license === 'cc0') {
+    return {
+      accepted: true,
+      license: {
+        type: 'CC0',
+        rawValue: license,
+        verificationSource: 'wikimedia.extmetadata.License',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      reason: 'wikimedia: License=cc0',
+    };
+  }
+  if (license === 'pd' || license.startsWith('pd-')) {
+    return {
+      accepted: true,
+      license: {
+        type: 'PD',
+        rawValue: license,
+        verificationSource: 'wikimedia.extmetadata.License',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      reason: `wikimedia: License=${license}`,
+    };
+  }
+  return reject(`wikimedia: License=${license || 'missing'} (strict default reject)`);
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
   aic: validateAicLicense,
+  wikimedia: validateWikimediaLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {

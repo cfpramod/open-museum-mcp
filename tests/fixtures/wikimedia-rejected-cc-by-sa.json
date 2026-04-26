@@ -1,0 +1,41 @@
+{
+  "batchcomplete": "",
+  "query": {
+    "pages": [
+      {
+        "pageid": 99000002,
+        "ns": 6,
+        "title": "File:CC BY-SA Photograph.jpg",
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 234567,
+            "width": 1920,
+            "height": 1280,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/9/99/CC_BY-SA_Photograph.jpg",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:CC_BY-SA_Photograph.jpg",
+            "extmetadata": {
+              "ObjectName": {
+                "value": "CC BY-SA Photograph",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "A. Photographer",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "CC BY-SA 4.0",
+                "source": "commons-desc-page"
+              },
+              "License": {
+                "value": "cc-by-sa-4.0",
+                "source": "commons-templates"
+              }
+            },
+            "mime": "image/jpeg"
+          }
+        ]
+      }
+    ]
+  }
+}

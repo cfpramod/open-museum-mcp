@@ -1,0 +1,33 @@
+{
+  "batchcomplete": "",
+  "query": {
+    "pages": [
+      {
+        "pageid": 99000003,
+        "ns": 6,
+        "title": "File:Ambiguous Rights File.jpg",
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 100000,
+            "width": 800,
+            "height": 600,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/0/00/Ambiguous_Rights_File.jpg",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Ambiguous_Rights_File.jpg",
+            "extmetadata": {
+              "ObjectName": {
+                "value": "Ambiguous Rights File",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "Unknown",
+                "source": "commons-desc-page"
+              }
+            },
+            "mime": "image/jpeg"
+          }
+        ]
+      }
+    ]
+  }
+}

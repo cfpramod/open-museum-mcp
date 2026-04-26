@@ -1,0 +1,56 @@
+{
+  "batchcomplete": "",
+  "query": {
+    "pages": [
+      {
+        "pageid": 15493856,
+        "ns": 6,
+        "title": "File:Pieter Bruegel the Elder - Landscape with the Fall of Icarus - WGA03321.jpg",
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 152771,
+            "width": 1246,
+            "height": 800,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Pieter_Bruegel_the_Elder_-_Landscape_with_the_Fall_of_Icarus_-_WGA03321.jpg",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Pieter_Bruegel_the_Elder_-_Landscape_with_the_Fall_of_Icarus_-_WGA03321.jpg",
+            "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=15493856",
+            "extmetadata": {
+              "ObjectName": {
+                "value": "Landscape with the Fall of Icarus",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "<bdi>Pieter Brueghel the Elder (1526–1569)</bdi>",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "Web Gallery of Art",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "Public domain",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Public domain",
+                "source": "commons-desc-page"
+              },
+              "License": {
+                "value": "pd",
+                "source": "commons-templates",
+                "hidden": ""
+              },
+              "ImageDescription": {
+                "value": "Landscape with the Fall of Icarus, c. 1560s. Oil on canvas mounted on wood panel. Royal Museums of Fine Arts of Belgium, Brussels.",
+                "source": "commons-desc-page"
+              }
+            },
+            "mime": "image/jpeg"
+          }
+        ]
+      }
+    ]
+  }
+}
