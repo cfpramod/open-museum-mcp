@@ -172,6 +172,40 @@ describe('parseDisplayDate', () => {
       expect(parseDisplayDate('')).toEqual({ yearStart: null, yearEnd: null });
     });
 
+    it('rejects implausible "month-year" strings as numeric ranges (4-2017 etc.)', () => {
+      // "April 2017" sometimes renders as "4-2017" in upstream metadata. The
+      // first number being 1–2 digits means it can't be a year, so the range
+      // strategy must skip it. trySingleYear can't recover "2017" because the
+      // hyphen blocks its negative lookbehind, so the honest answer is null.
+      // Better than the previous {yearStart: 4, yearEnd: 2017} mis-parse.
+      expect(parseDisplayDate('4-2017')).toEqual({ yearStart: null, yearEnd: null });
+      expect(parseDisplayDate('12-2017')).toEqual({ yearStart: null, yearEnd: null });
+    });
+
+    it('rejects inventory-number patterns ("P.2017-0004", "No.1820-30")', () => {
+      // Museum catalogue prose contains accession or inventory numbers that
+      // look range-shaped: "Collection Number : P.2017-0004". `parseInt` of
+      // "0004" strips leading zeros to 4, which used to surface as
+      // {yearStart: 4, yearEnd: 2017} — a real bug seen on a Wikimedia
+      // record (Monet, NMWA Tokyo). The trailing dash on "2017" also blocks
+      // trySingleYear's exact match, so the whole fragment honestly fails.
+      expect(parseDisplayDate('Collection Number : P.2017-0004')).toEqual({
+        yearStart: null,
+        yearEnd: null,
+      });
+      expect(parseDisplayDate('No.1820-30')).toEqual({ yearStart: null, yearEnd: null });
+    });
+
+    it('still recovers a real year from prose containing an inventory number', () => {
+      // The full smoke-test scenario: "(1916) by Claude Monet ... Collection
+      // Number : P.2017-0004". Range regex skips the inventory; trySingleYear
+      // catches "(1916)".
+      const r = parseDisplayDate(
+        '"Le Bassin aux nymphéas" (1916) by Claude Monet. Collection Number : P.2017-0004',
+      );
+      expect(r).toEqual({ yearStart: 1916, yearEnd: 1916 });
+    });
+
     it('returns null/null for unparseable strings', () => {
       expect(parseDisplayDate('Some unintelligible date')).toEqual({
         yearStart: null,

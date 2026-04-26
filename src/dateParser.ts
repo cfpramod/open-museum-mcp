@@ -99,15 +99,32 @@ function tryCrossEraRange(s: string): DateRange | null {
 // digits — the "th" between "14" and "-" breaks the match. Don't relax the
 // regex without locking down that invariant in tests; tryCenturyRange owns
 // ordinal-century parsing.
+// Plausible-year bounds for the standard range path. BCE ranges go through
+// tryCrossEraRange first; modern ranges (year 100 to year 2200 inclusive)
+// cover all realistic museum domain values without admitting inventory
+// numbers like "P.2017-0004" → {a: 17, b: 4} or "April 2017" → {a: 4, b: 2017}.
+const YEAR_PLAUSIBLE_MIN = 100;
+const YEAR_PLAUSIBLE_MAX = 2200;
+
 function tryRangeRegex(s: string): DateRange | null {
   if (hasMixedEras(s)) return null;
 
-  const m = s.match(/(-?\d{1,5})\s*[-–]\s*(-?\d{1,5})\s*(b\.?c\.?e?\.?|bc)?/i);
+  // Negative lookbehind for `.` blocks inventory-number false matches like
+  // "P.2017-0004" cleanly when the regex starts at "2017". Belt-and-
+  // suspenders: the year-plausibility check below also rejects the case
+  // where the regex backtracks and matches "017-0004" (preceded by a digit
+  // that the lookbehind permits).
+  const m = s.match(/(?<!\.)(-?\d{1,5})\s*[-–]\s*(-?\d{1,5})\s*(b\.?c\.?e?\.?|bc)?/i);
   if (m) {
     const firstStr = m[1];
     const secondStr = m[2];
     let a = parseInt(firstStr, 10);
     let b = parseInt(secondStr, 10);
+
+    // Year-plausibility guard on the literal first token. A one- or
+    // two-digit first number is almost never a year. "4-2017" (from
+    // "April 2017") used to surface as {yearStart: 4, yearEnd: 2017}.
+    if (!firstStr.startsWith('-') && firstStr.length < 3) return null;
 
     const firstIsCleanFourDigit = !firstStr.startsWith('-') && firstStr.length === 4;
     const secondIsShortSuffix = !secondStr.startsWith('-') && (secondStr.length === 1 || secondStr.length === 2);
@@ -133,6 +150,16 @@ function tryRangeRegex(s: string): DateRange | null {
     if (m[3]) {
       a = -Math.abs(a);
       b = -Math.abs(b);
+    } else if (
+      a < YEAR_PLAUSIBLE_MIN ||
+      a > YEAR_PLAUSIBLE_MAX ||
+      b < YEAR_PLAUSIBLE_MIN ||
+      b > YEAR_PLAUSIBLE_MAX
+    ) {
+      // Both numbers must read as plausible CE years on the standard path.
+      // Catches "017-0004" (parsed a=17, b=4) which the lookbehind misses
+      // when the regex backtracks past the inventory-number prefix.
+      return null;
     }
     return { yearStart: Math.min(a, b), yearEnd: Math.max(a, b) };
   }

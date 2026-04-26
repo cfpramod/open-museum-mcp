@@ -41,6 +41,19 @@ const HTML_ENTITIES: Record<string, string> = {
   nbsp: ' ',
 };
 
+// Wikidata Quick Statements markers that Commons concatenates into
+// ObjectName / ImageDescription for structured-data fields. These never
+// belong in user-facing text. Examples seen on real records:
+//   "Landscape with the Fall of Icarus title QS:P1476,en:..."
+//   "Water Liliestitle QS:P1476,de:..."  (no leading space)
+//   "Water-Lily Pond and Weeping Willow label QS:Lfr,..."
+// Strip everything from the first `(title|label) QS:` marker onward.
+const QS_TRAILING_RE = /\s*(?:title|label)\s*QS:.*$/s;
+
+function stripQsMetadata(s: string): string {
+  return s.replace(QS_TRAILING_RE, '').trim();
+}
+
 function decodeEntities(s: string): string {
   return s
     .replace(/&([a-z]+);/gi, (match, name: string) => HTML_ENTITIES[name.toLowerCase()] ?? match)
@@ -176,7 +189,7 @@ export const wikimediaFetcher: Fetcher = {
         ? (info.extmetadata as Record<string, unknown>)
         : undefined;
 
-    const objectName = stripHtml(getExtField(ext, 'ObjectName'));
+    const objectName = stripQsMetadata(stripHtml(getExtField(ext, 'ObjectName')));
     const fileTitle = asString(page.title)
       .replace(/^File:/, '')
       .replace(/\.[^.]+$/, '');
@@ -186,13 +199,17 @@ export const wikimediaFetcher: Fetcher = {
     const attributionType = detectAttributionType(artistRaw);
     const cleanName = cleanArtistName(artistRaw);
 
-    const description = stripHtml(getExtField(ext, 'ImageDescription'));
+    const description = stripQsMetadata(stripHtml(getExtField(ext, 'ImageDescription')));
     // Commons does not surface a structured creation-date field. The DateTime
-    // extmetadata is the upload timestamp, not the artwork's date. Parse the
-    // ImageDescription only — the Artist field often carries the artist's
-    // lifespan ("(1526–1569)"), which is NOT the artwork's date and would
-    // mislead readers if surfaced as `yearStart`/`yearEnd`.
-    const dateRange = parseDisplayDate(description);
+    // extmetadata is the upload timestamp, not the artwork's date. Parse from
+    // the description first, then the title (titles often read "Water Lilies
+    // (1916)"). The Artist field is NOT used as a fallback because it carries
+    // the artist's lifespan ("(1526–1569)"), which is NOT the artwork's date.
+    const fromDesc = parseDisplayDate(description);
+    const dateRange =
+      fromDesc.yearStart !== null || fromDesc.yearEnd !== null
+        ? fromDesc
+        : parseDisplayDate(title);
 
     const fullImage = asString(info.url);
     const pageUrl = asString(info.descriptionurl) || `${COMMONS_PAGE}/?curid=${pageId}`;
