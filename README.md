@@ -7,6 +7,8 @@
 
 The Met, Cleveland Museum of Art, the Art Institute of Chicago, Wikimedia Commons, and Europeana — searched together, returned in one normalized shape, with the rights gate enforced per museum so you never receive a record whose open-access status is missing or ambiguous.
 
+**See it in action first → [pramod.ch/open-museum-mcp](https://pramod.ch/open-museum-mcp)** — three worked examples (cross-tradition pairing, date-windowed scan, counterpoint discovery), real records, real citations, no install required.
+
 ## Who this is for
 
 - **Art-history students and researchers** who need cited references and rights-cleared images for papers, slides, and theses — across institutions, in one query.
@@ -80,6 +82,8 @@ A search call returns license-verified results in one normalized shape:
 ```
 
 ## Install
+
+> **Want to see it work before installing?** [pramod.ch/open-museum-mcp](https://pramod.ch/open-museum-mcp) walks through the three core workflows with real records and citations.
 
 The package is on npm. The simplest setup is to add it directly to your MCP client config; `npx` will fetch and run it on first launch:
 
