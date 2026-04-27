@@ -251,7 +251,15 @@ async function handleSearch(args: unknown) {
     return errorResult(`unknown museum: ${input.museum}`);
   }
 
-  const overFetch = input.has_image ? input.limit * 2 : input.limit;
+  // Overfetch budget: absorbs rights-gate rejections, image-less records,
+  // Wikimedia dedupe collapse, and (when set) year-range exclusions. Each
+  // post-fetch filter eats from the same pool, so when a year window is
+  // active we widen the pool — a tight researcher query like "Edo paintings
+  // 1600–1620" can otherwise return underfilled even when matching records
+  // exist further down the upstream relevance ranking.
+  const hasYearBound = input.year_min !== undefined || input.year_max !== undefined;
+  const overFetchMultiplier = input.has_image ? (hasYearBound ? 4 : 2) : 1;
+  const overFetch = input.limit * overFetchMultiplier;
   const cacheKey = searchCacheKey(input.query, input.museum, input.has_image, overFetch);
 
   let allIds = cache.getQuery(cacheKey);
