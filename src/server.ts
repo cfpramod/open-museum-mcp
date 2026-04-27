@@ -19,6 +19,7 @@ import { metFetcher } from './fetchers/met.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import type { Fetcher } from './fetchers/types.js';
 import type { Artwork } from './types.js';
+import { filterByYearRange } from './yearFilter.js';
 
 const FETCHERS: Record<string, Fetcher> = {
   [metFetcher.code]: metFetcher,
@@ -64,6 +65,13 @@ const SearchInput = z.object({
   museum: z.string().optional(),
   has_image: z.boolean().default(true),
   limit: z.number().int().min(1).max(50).default(10),
+  // Optional date-range constraint. Either bound may be omitted. BCE is
+  // expressed as a negative integer (e.g. year_min: -500 for 500 BCE).
+  // The bounds gate the *result set*, not the upstream search call —
+  // each museum's free-text search runs unchanged, and we drop accepted
+  // records whose [yearStart, yearEnd] falls outside the window.
+  year_min: z.number().int().optional(),
+  year_max: z.number().int().optional(),
 });
 
 const GetInput = z.object({
@@ -124,7 +132,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'search_artworks',
       description:
-        'Search across registered open-access museum collections. Returns artwork records that pass source-specific rights verification (ambiguous records excluded by default).',
+        'Search across registered open-access museum collections. Returns artwork records that pass source-specific rights verification (ambiguous records excluded by default). Supports an optional date-range filter for researcher queries like "Dutch genre painting 1640–1680".',
       inputSchema: {
         type: 'object',
         properties: {
@@ -140,6 +148,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             description: 'Restrict to records with an image URL. Defaults to true. Note: some museums (e.g. The Met) only expose images-only search server-side.',
           },
           limit: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
+          year_min: {
+            type: 'integer',
+            description:
+              'Optional inclusive lower bound on artwork creation year. Negative for BCE (e.g. -500 = 500 BCE). Records with no parseable date are excluded when any year bound is set.',
+          },
+          year_max: {
+            type: 'integer',
+            description:
+              'Optional inclusive upper bound on artwork creation year. Negative for BCE. Records with no parseable date are excluded when any year bound is set.',
+          },
         },
         required: ['query'],
       },
@@ -258,7 +276,8 @@ async function handleSearch(args: unknown) {
     .map((r) => r.artwork);
   const filtered = accepted.filter((a) => !input.has_image || Boolean(a.imageUrls.full));
   const deduped = dedupeWikimediaUploads(filtered);
-  const results = deduped.slice(0, input.limit);
+  const dated = filterByYearRange(deduped, input.year_min, input.year_max);
+  const results = dated.slice(0, input.limit);
 
   return {
     content: [
