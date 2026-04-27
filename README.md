@@ -13,7 +13,7 @@ If anyone else is exploring open-access art, I hope this helps. The plan is to k
 
 ## What you get
 
-- **One interface, registered museums.** The Met, Cleveland Museum of Art, the Art Institute of Chicago, and Wikimedia Commons are live. Smithsonian and Rijksmuseum are next.
+- **One interface, registered museums.** The Met, Cleveland Museum of Art, the Art Institute of Chicago, Wikimedia Commons, and Europeana (federated European institutions, opt-in via API key) are live. Smithsonian and Rijksmuseum direct integrations are next.
 - **Strict deny on ambiguity.** Records are validated against per-museum rights rules in code. Missing or unclear indicators drop the record; nothing is defaulted to "open".
 - **Catalog-grade metadata.** A dynasty-aware date parser handles Tang, Edo, Safavid, Mughal and the rest. Regions normalize across museums. Attribution separates named artists from anonymous, workshop, "after", and attributed works.
 - **Listable resources and deterministic citations.** `museum://{code}/{id}` resources, three citation styles, structured JSON search results.
@@ -156,6 +156,7 @@ This is the heart of the project. Each museum exposes rights information in its 
 | Cleveland Museum of Art | `share_license_status` (string) | `=== "CC0"` (case-insensitive) |
 | Art Institute of Chicago | `is_public_domain` (boolean) | `=== true` |
 | Wikimedia Commons | `imageinfo[0].extmetadata.License.value` (string) | `=== "cc0"` OR `=== "pd"` OR matches `pd-*` |
+| Europeana | `rights[0]` (URI) | exact match on the CC0 or Public Domain Mark URI; everything else (CC-BY, CC-BY-SA, NoC, InC) is rejected |
 
 Each accepted record carries:
 
@@ -177,10 +178,13 @@ This is what "rights-verified" means here: validated against published museum me
 | Cleveland Museum of Art | `cleveland` | none | ✅ v0.2 |
 | Art Institute of Chicago | `aic` | none | ✅ v0.2 |
 | Wikimedia Commons | `wikimedia` | none | ✅ v0.3 |
+| Europeana | `europeana` | API key (free, per-user) | ✅ v0.4 |
 | Smithsonian Open Access | `si` | API key (free) | 📋 v2 |
 | Rijksmuseum | `rijks` | API key (free) | 📋 v2 |
 
 **On Wikimedia Commons:** Commons is a federation, not a single museum. Rights are per-file. The adapter accepts only `cc0` and `pd*` licence templates; CC-BY, CC-BY-SA, and other attribution-or-restriction licences are rejected even though they're "free", because the per-museum gate model doesn't carry the obligations they impose. Adding Commons unlocks works whose home museums don't have public APIs (Bruegel at the Royal Museums of Fine Arts of Belgium, the National Gallery in London pre-API, regional museums worldwide) — at the cost of a thinner metadata layer than the structured-API museums provide. Region and period are not surfaced for Wikimedia records until v0.7 adds Wikidata enrichment.
+
+**On Europeana:** Europeana aggregates tens of millions of records from European cultural-heritage institutions, with rights expressed as a URI from a fixed vocabulary (Europeana Rights Statements). The adapter accepts only the unambiguous public-domain URIs — CC0 (`creativecommons.org/publicdomain/zero/1.0/`) and the Public Domain Mark (`creativecommons.org/publicdomain/mark/1.0/`). Everything else (CC-BY, CC-BY-SA, CC-BY-NC, NoC-*, InC) is rejected on the same strict-default-deny grounds as the Wikimedia gate. Europeana requires a free per-user API key — register at [pro.europeana.eu/get-api](https://pro.europeana.eu/get-api) and set `EUROPEANA_API_KEY` either in your shell, in a project-root `.env`, or in `~/.open-museum-mcp/.env`. The fetcher silently disables itself when the key is missing (the rest of the federation continues to work).
 
 ## Suggest a museum
 

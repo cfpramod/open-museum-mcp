@@ -1,0 +1,25 @@
+{
+  "apikey": "FAKEKEY",
+  "success": true,
+  "itemsCount": 1,
+  "totalResults": 1,
+  "items": [
+    {
+      "id": "/2058616/object_KMSKB_2729",
+      "completeness": 9,
+      "country": ["Belgium"],
+      "dataProvider": ["Royal Museums of Fine Arts of Belgium"],
+      "year": ["c. 1560"],
+      "edmIsShownAt": ["https://example.org/object/2729"],
+      "edmIsShownBy": ["https://example.org/img/2729.jpg"],
+      "edmPreview": ["https://api.europeana.eu/thumb/2729.jpg"],
+      "rights": ["https://creativecommons.org/publicdomain/mark/1.0/"],
+      "dcTitleLangAware": {
+        "en": ["Landscape with the Fall of Icarus"]
+      },
+      "dcCreatorLangAware": {
+        "en": ["Pieter Bruegel the Elder"]
+      }
+    }
+  ]
+}

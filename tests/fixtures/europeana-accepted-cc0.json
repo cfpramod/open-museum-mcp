@@ -1,0 +1,30 @@
+{
+  "apikey": "FAKEKEY",
+  "success": true,
+  "requestNumber": 1,
+  "itemsCount": 1,
+  "totalResults": 1,
+  "items": [
+    {
+      "id": "/90402/SK_C_5",
+      "completeness": 10,
+      "country": ["Netherlands"],
+      "dataProvider": ["Rijksmuseum"],
+      "year": ["1642"],
+      "edmIsShownAt": ["https://www.rijksmuseum.nl/nl/collectie/SK-C-5"],
+      "edmIsShownBy": ["https://upload.wikimedia.org/example/Night_Watch.jpg"],
+      "edmPreview": ["https://api.europeana.eu/thumbnail/example.jpg"],
+      "rights": ["http://creativecommons.org/publicdomain/zero/1.0/"],
+      "dcTitleLangAware": {
+        "en": ["The Night Watch"],
+        "nl": ["De Nachtwacht"]
+      },
+      "dcCreatorLangAware": {
+        "en": ["Rembrandt van Rijn"]
+      },
+      "dcDescriptionLangAware": {
+        "en": ["Group portrait of the militia company of district II under the command of Captain Frans Banninck Cocq."]
+      }
+    }
+  ]
+}

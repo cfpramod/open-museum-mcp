@@ -183,11 +183,76 @@ export const validateWikimediaLicense: LicenseValidator = (raw) => {
   return reject(`wikimedia: License=${license || 'missing'} (strict default reject)`);
 };
 
+// Europeana is a federation aggregating tens of millions of records from
+// European institutions. Rights are per-record, expressed as a URI from a
+// fixed vocabulary (Europeana Rights Statements). Live spike confirmed:
+//   - 7.9M records under CC0 globally
+//   - Switzerland: 11K CC0 / 81K CC-BY-SA / 25K InC / etc.
+// We accept ONLY the unambiguous public-domain URIs:
+//   - http://creativecommons.org/publicdomain/zero/1.0/   (CC0)
+//   - http://creativecommons.org/publicdomain/mark/1.0/   (Public Domain Mark)
+// Everything else (CC-BY, CC-BY-SA, CC-BY-NC, NoC-*, InC) is rejected on the
+// same strict-default-deny grounds as the Wikimedia gate. The two protocols
+// (http / https) are treated equivalently — the URI is a vocabulary key,
+// not a fetchable resource.
+const EUROPEANA_CC0_URI = 'creativecommons.org/publicdomain/zero/1.0/';
+const EUROPEANA_PDM_URI = 'creativecommons.org/publicdomain/mark/1.0/';
+
+function stripUriProtocol(s: string): string {
+  return s.replace(/^https?:\/\//, '').toLowerCase();
+}
+
+export const validateEuropeanaLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('europeana: object missing or not an object');
+  }
+  const obj = raw as Record<string, unknown>;
+  // Europeana returns `rights` as an array of URI strings on each item.
+  const rightsArr = Array.isArray(obj.rights) ? obj.rights : [];
+  const first = rightsArr.find((v) => typeof v === 'string') as string | undefined;
+  if (!first) {
+    return reject('europeana: rights field missing or non-string (strict default reject)');
+  }
+  const normalized = stripUriProtocol(first);
+  if (normalized === EUROPEANA_CC0_URI) {
+    return {
+      accepted: true,
+      license: {
+        type: 'CC0',
+        rawValue: first,
+        verificationSource: 'europeana.rights',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      reason: 'europeana: rights=CC0',
+    };
+  }
+  if (normalized === EUROPEANA_PDM_URI) {
+    return {
+      accepted: true,
+      license: {
+        type: 'PD',
+        rawValue: first,
+        verificationSource: 'europeana.rights',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      reason: 'europeana: rights=PDM',
+    };
+  }
+  return reject(`europeana: rights=${first} (strict default reject)`);
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
   aic: validateAicLicense,
   wikimedia: validateWikimediaLicense,
+  europeana: validateEuropeanaLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {
