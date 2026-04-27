@@ -7,6 +7,7 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import dotenv from 'dotenv';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -15,11 +16,18 @@ import { Cache } from './db.js';
 import { dedupeWikimediaUploads } from './dedupe.js';
 import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
+import { europeanaFetcher } from './fetchers/europeana.js';
 import { metFetcher } from './fetchers/met.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import type { Fetcher } from './fetchers/types.js';
 import type { Artwork } from './types.js';
 import { filterByYearRange } from './yearFilter.js';
+
+// Load env vars before reading any keys. Cwd `.env` (developer flow) wins
+// over `~/.open-museum-mcp/.env` (production / MCP-client-launched flow);
+// dotenv ignores files that don't exist, so missing-file is not an error.
+dotenv.config();
+dotenv.config({ path: join(homedir(), '.open-museum-mcp', '.env') });
 
 const FETCHERS: Record<string, Fetcher> = {
   [metFetcher.code]: metFetcher,
@@ -28,13 +36,27 @@ const FETCHERS: Record<string, Fetcher> = {
   [wikimediaFetcher.code]: wikimediaFetcher,
 };
 
+// Europeana requires a per-user API key (free tier, 10K req/day). Only
+// register the fetcher when the key is present — otherwise leave it out
+// of the federation rather than crashing on every search call.
+if (process.env.EUROPEANA_API_KEY) {
+  FETCHERS[europeanaFetcher.code] = europeanaFetcher;
+} else {
+  console.error(
+    '[open-museum-mcp] EUROPEANA_API_KEY not set; Europeana fetcher disabled. Set it in ~/.open-museum-mcp/.env or your shell to enable.',
+  );
+}
+
 const CACHE_PATH = process.env.OMM_CACHE_PATH ?? join(homedir(), '.open-museum-mcp', 'cache.db');
 const cache = new Cache({ path: CACHE_PATH });
 
-// Museum IDs are positive integers (no leading zeros). Tightening the regex
-// here makes `met:000123` and `met:0` user errors rather than valid IDs that
-// produce duplicate cache rows.
-const ID_REGEX = /^[a-z]+:[1-9]\d*$/;
+// Museum IDs follow `<code>:<segment>(/<segment>)*`. Each segment is
+// alphanumeric, underscore, or hyphen. The four numeric-ID museums (Met,
+// Cleveland, AIC, Wikimedia) match a single all-digit segment; Europeana's
+// hierarchical IDs (`9200338/BibliographicResource_3000093834108`) match
+// multiple slash-separated segments. The negative lookahead blocks `..`
+// path-traversal attempts cleanly.
+const ID_REGEX = /^[a-z]+:(?!.*\.\.)[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/;
 
 // Cap concurrent fetches to one museum's API. The Met has no batch endpoint,
 // so a search of limit 50 fans out into up to 50 object fetches; without a
@@ -140,7 +162,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           museum: {
             type: 'string',
             description:
-              'Optional museum code. Currently registered: met, cleveland, aic, wikimedia (Commons).',
+              'Optional museum code. Currently registered: met, cleveland, aic, wikimedia (Commons), europeana (federated European institutions; requires EUROPEANA_API_KEY env var).',
           },
           has_image: {
             type: 'boolean',

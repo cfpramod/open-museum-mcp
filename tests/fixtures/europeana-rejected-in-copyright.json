@@ -1,0 +1,15 @@
+{
+  "apikey": "FAKEKEY",
+  "success": true,
+  "itemsCount": 1,
+  "totalResults": 1,
+  "items": [
+    {
+      "id": "/456/inc_record",
+      "country": ["Switzerland"],
+      "dataProvider": ["Some Museum"],
+      "rights": ["http://rightsstatements.org/vocab/InC/1.0/"],
+      "dcTitleLangAware": { "en": ["Some Work"] }
+    }
+  ]
+}

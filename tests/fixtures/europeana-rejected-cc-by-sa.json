@@ -1,0 +1,23 @@
+{
+  "apikey": "FAKEKEY",
+  "success": true,
+  "itemsCount": 1,
+  "totalResults": 1,
+  "items": [
+    {
+      "id": "/123/aargauer_hodler_1",
+      "country": ["Switzerland"],
+      "dataProvider": ["Aargauer Kunsthaus"],
+      "year": ["1908"],
+      "edmIsShownAt": ["https://aargauerkunsthaus.ch/example/hodler"],
+      "edmPreview": ["https://api.europeana.eu/thumb/hodler.jpg"],
+      "rights": ["http://creativecommons.org/licenses/by-sa/4.0/"],
+      "dcTitleLangAware": {
+        "de": ["Der Tag"]
+      },
+      "dcCreatorLangAware": {
+        "de": ["Ferdinand Hodler"]
+      }
+    }
+  ]
+}

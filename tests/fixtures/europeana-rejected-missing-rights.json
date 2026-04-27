@@ -1,0 +1,14 @@
+{
+  "apikey": "FAKEKEY",
+  "success": true,
+  "itemsCount": 1,
+  "totalResults": 1,
+  "items": [
+    {
+      "id": "/789/missing_rights",
+      "country": ["Germany"],
+      "dataProvider": ["Some Provider"],
+      "dcTitleLangAware": { "en": ["Untitled Record"] }
+    }
+  ]
+}

@@ -183,11 +183,94 @@ export const validateWikimediaLicense: LicenseValidator = (raw) => {
   return reject(`wikimedia: License=${license || 'missing'} (strict default reject)`);
 };
 
+// Europeana is a federation aggregating tens of millions of records from
+// European institutions. Rights are per-record, expressed as a URI from a
+// fixed vocabulary (Europeana Rights Statements). Live spike confirmed:
+//   - 7.9M records under CC0 globally
+//   - Switzerland: 11K CC0 / 81K CC-BY-SA / 25K InC / etc.
+// We accept ONLY the unambiguous public-domain URIs:
+//   - http://creativecommons.org/publicdomain/zero/1.0/   (CC0)
+//   - http://creativecommons.org/publicdomain/mark/1.0/   (Public Domain Mark)
+// Everything else (CC-BY, CC-BY-SA, CC-BY-NC, NoC-*, InC) is rejected on the
+// same strict-default-deny grounds as the Wikimedia gate. The two protocols
+// (http / https) are treated equivalently — the URI is a vocabulary key,
+// not a fetchable resource.
+const EUROPEANA_CC0_URI = 'creativecommons.org/publicdomain/zero/1.0/';
+const EUROPEANA_PDM_URI = 'creativecommons.org/publicdomain/mark/1.0/';
+
+function stripUriProtocol(s: string): string {
+  return s.replace(/^https?:\/\//, '').toLowerCase();
+}
+
+export const validateEuropeanaLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('europeana: object missing or not an object');
+  }
+  const obj = raw as Record<string, unknown>;
+  // Europeana's `rights` is conventionally a one-element array of URI strings,
+  // but EDM consumers occasionally serialize a single value as a bare string.
+  // Coerce both shapes into a uniform array before checking.
+  const rightsRaw = obj.rights;
+  const rightsArr = Array.isArray(rightsRaw)
+    ? rightsRaw
+    : typeof rightsRaw === 'string'
+      ? [rightsRaw]
+      : [];
+  const rightsStrs = rightsArr.filter((v): v is string => typeof v === 'string');
+  if (rightsStrs.length === 0) {
+    return reject('europeana: rights field missing or non-string (strict default reject)');
+  }
+  // Strict-default-deny: every URI on the record must be in the accept set.
+  // A "first match wins" check would leak hybrid records that carry one
+  // permissive URI plus one restrictive URI — exactly the failure mode
+  // strict-default-deny exists to prevent.
+  const normalizedAll = rightsStrs.map(stripUriProtocol);
+  const allAccepted = normalizedAll.every(
+    (u) => u === EUROPEANA_CC0_URI || u === EUROPEANA_PDM_URI,
+  );
+  if (!allAccepted) {
+    return reject(`europeana: rights=${rightsStrs[0]} (strict default reject)`);
+  }
+  // Both CC0 and PDM are in the accept set; classify by the first URI for
+  // the license tier. A record dual-marked CC0+PDM is genuinely public
+  // domain and gets the CC0 tier (the more specific dedication).
+  const isCc0 = normalizedAll[0] === EUROPEANA_CC0_URI;
+  if (isCc0) {
+    return {
+      accepted: true,
+      license: {
+        type: 'CC0',
+        rawValue: rightsStrs[0],
+        verificationSource: 'europeana.rights',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      reason: 'europeana: rights=CC0',
+    };
+  }
+  return {
+    accepted: true,
+    license: {
+      type: 'PD',
+      rawValue: rightsStrs[0],
+      verificationSource: 'europeana.rights',
+      verifiedAt: nowIso(),
+      confidence: 'high',
+    },
+    imageOpenAccess: true,
+    metadataOpenAccess: true,
+    reason: 'europeana: rights=PDM',
+  };
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
   aic: validateAicLicense,
   wikimedia: validateWikimediaLicense,
+  europeana: validateEuropeanaLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {
