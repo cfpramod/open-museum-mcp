@@ -26,6 +26,14 @@ const FLAT_DYNASTY_KEYS_LONGEST_FIRST = Object.keys(flatDynasties).sort(
   (a, b) => b.length - a.length,
 );
 
+// Parallel array of word-boundary regexes — one per dynasty key. Pre-compiled
+// at module load so tryDynasty doesn't pay regex-construction cost per call.
+// Word-boundary anchoring (`\b`) prevents false-positives like "Hanka" hitting
+// the "han" key, "Tangerine" hitting "tang", etc. (#21).
+const FLAT_DYNASTY_REGEXES_LONGEST_FIRST = FLAT_DYNASTY_KEYS_LONGEST_FIRST.map(
+  (key) => new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),
+);
+
 const QUALIFIER_RE = /\b(early|mid|middle|late)\b/;
 
 const ROMAN: Record<string, number> = {
@@ -253,8 +261,9 @@ function tryCentury(s: string): DateRange | null {
 function tryDynasty(s: string): DateRange | null {
   const lower = s.toLowerCase();
   const qualifier = lower.match(QUALIFIER_RE)?.[1];
-  for (const period of FLAT_DYNASTY_KEYS_LONGEST_FIRST) {
-    if (!lower.includes(period)) continue;
+  for (let i = 0; i < FLAT_DYNASTY_KEYS_LONGEST_FIRST.length; i++) {
+    if (!FLAT_DYNASTY_REGEXES_LONGEST_FIRST[i].test(lower)) continue;
+    const period = FLAT_DYNASTY_KEYS_LONGEST_FIRST[i];
     const [start, end] = flatDynasties[period];
     const span = end - start;
     if (qualifier === 'early') {
