@@ -2,7 +2,13 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateAicLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asOptionalString, asString } from './helpers.js';
+import {
+  asFiniteNumber,
+  asOptionalString,
+  asString,
+  isValidPositiveInt,
+  rejectFor,
+} from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const AIC_API = 'https://api.artic.edu/api/v1';
@@ -27,12 +33,8 @@ const AIC_FIELDS = [
   'image_id',
 ].join(',');
 
-function reject(id: string, reason: string, rawSnapshot: unknown): ValidationResult {
-  return {
-    status: 'rejected',
-    rejection: { id, museumCode: 'aic', reason, rawSnapshot },
-  };
-}
+const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
+  rejectFor('aic', id, reason, rawSnapshot);
 
 // AIC's `artist_display` format mirrors Cleveland's: "Name (Nationality,
 // birthYear–deathYear)". The structured `artist_title` field gives us the
@@ -106,8 +108,7 @@ export const aicFetcher: Fetcher = {
     const r = inner as Record<string, unknown>;
 
     const objectId = r.id;
-    const validId =
-      typeof objectId === 'number' && Number.isInteger(objectId) && objectId > 0;
+    const validId = isValidPositiveInt(objectId);
     const id = validId ? `aic:${objectId}` : 'aic:unknown';
 
     const decision = validateAicLicense(inner);

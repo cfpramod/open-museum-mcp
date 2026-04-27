@@ -2,17 +2,19 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateClevelandLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asOptionalString, asString } from './helpers.js';
+import {
+  asFiniteNumber,
+  asOptionalString,
+  asString,
+  isValidPositiveInt,
+  rejectFor,
+} from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const CLEVELAND_API = 'https://openaccess-api.clevelandart.org/api';
 
-function reject(id: string, reason: string, rawSnapshot: unknown): ValidationResult {
-  return {
-    status: 'rejected',
-    rejection: { id, museumCode: 'cleveland', reason, rawSnapshot },
-  };
-}
+const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
+  rejectFor('cleveland', id, reason, rawSnapshot);
 
 // Cleveland's creator description format is "Name (Nationality, birthYear–deathYear)"
 // e.g. "Vincent van Gogh (Dutch, 1853–1890)". The structured fields
@@ -77,8 +79,7 @@ export const clevelandFetcher: Fetcher = {
     const r = inner as Record<string, unknown>;
 
     const objectId = r.id;
-    const validId =
-      typeof objectId === 'number' && Number.isInteger(objectId) && objectId > 0;
+    const validId = isValidPositiveInt(objectId);
     const id = validId ? `cleveland:${objectId}` : 'cleveland:unknown';
 
     const decision = validateClevelandLicense(inner);

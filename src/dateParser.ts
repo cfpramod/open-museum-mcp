@@ -19,6 +19,15 @@ const flatDynasties: Record<string, [number, number]> = (() => {
   return out;
 })();
 
+// Pre-sort once at module load: longest keys first so multi-word periods
+// ("three kingdoms", "delhi sultanate") match before any prefix overlap with
+// shorter keys. Re-sorting on every tryDynasty call was wasted work.
+const FLAT_DYNASTY_KEYS_LONGEST_FIRST = Object.keys(flatDynasties).sort(
+  (a, b) => b.length - a.length,
+);
+
+const QUALIFIER_RE = /\b(early|mid|middle|late)\b/;
+
 const ROMAN: Record<string, number> = {
   i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10,
   xi: 11, xii: 12, xiii: 13, xiv: 14, xv: 15, xvi: 16, xvii: 17, xviii: 18,
@@ -243,27 +252,24 @@ function tryCentury(s: string): DateRange | null {
 
 function tryDynasty(s: string): DateRange | null {
   const lower = s.toLowerCase();
-  const sorted = Object.keys(flatDynasties).sort((a, b) => b.length - a.length);
-  for (const period of sorted) {
-    if (lower.includes(period)) {
-      const [start, end] = flatDynasties[period];
-      const qual = lower.match(/\b(early|mid|middle|late)\b/);
-      const qualifier = qual ? qual[1] : undefined;
-      const span = end - start;
-      if (qualifier === 'early') {
-        return { yearStart: start, yearEnd: start + Math.floor(span / 3) };
-      }
-      if (qualifier === 'mid' || qualifier === 'middle') {
-        return {
-          yearStart: start + Math.floor(span / 3),
-          yearEnd: end - Math.floor(span / 3),
-        };
-      }
-      if (qualifier === 'late') {
-        return { yearStart: end - Math.floor(span / 3), yearEnd: end };
-      }
-      return { yearStart: start, yearEnd: end };
+  const qualifier = lower.match(QUALIFIER_RE)?.[1];
+  for (const period of FLAT_DYNASTY_KEYS_LONGEST_FIRST) {
+    if (!lower.includes(period)) continue;
+    const [start, end] = flatDynasties[period];
+    const span = end - start;
+    if (qualifier === 'early') {
+      return { yearStart: start, yearEnd: start + Math.floor(span / 3) };
     }
+    if (qualifier === 'mid' || qualifier === 'middle') {
+      return {
+        yearStart: start + Math.floor(span / 3),
+        yearEnd: end - Math.floor(span / 3),
+      };
+    }
+    if (qualifier === 'late') {
+      return { yearStart: end - Math.floor(span / 3), yearEnd: end };
+    }
+    return { yearStart: start, yearEnd: end };
   }
   return null;
 }
