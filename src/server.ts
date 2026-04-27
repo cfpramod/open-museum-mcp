@@ -27,8 +27,11 @@ import { filterByYearRange } from './yearFilter.js';
 // Load env vars before reading any keys. Cwd `.env` (developer flow) wins
 // over `~/.open-museum-mcp/.env` (production / MCP-client-launched flow);
 // dotenv ignores files that don't exist, so missing-file is not an error.
-dotenv.config();
-dotenv.config({ path: join(homedir(), '.open-museum-mcp', '.env') });
+// `quiet: true` suppresses dotenv's "◇ injected env" stdout chatter, which
+// otherwise corrupts the MCP stdio transport (any non-JSON-RPC stdout
+// breaks the client's parser).
+dotenv.config({ quiet: true });
+dotenv.config({ quiet: true, path: join(homedir(), '.open-museum-mcp', '.env') });
 
 const FETCHERS: Record<string, Fetcher> = {
   [metFetcher.code]: metFetcher,
