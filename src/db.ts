@@ -1,6 +1,6 @@
-import Database from 'better-sqlite3';
 import { chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import type { Artwork, Tradition } from './types.js';
 
 const OBJECT_TTL_DAYS = 90;
@@ -50,14 +50,14 @@ export interface DiscoverFilter {
  * no string-concatenated SQL paths.
  */
 export class Cache {
-  private db: Database.Database;
+  private db: DatabaseSync;
 
   constructor(config: CacheConfig) {
     if (!existsSync(dirname(config.path))) {
       mkdirSync(dirname(config.path), { recursive: true, mode: 0o700 });
     }
     const fileExisted = existsSync(config.path);
-    this.db = new Database(config.path);
+    this.db = new DatabaseSync(config.path);
     if (!fileExisted) {
       // Tighten file mode immediately on creation so the cache (which can
       // include rights metadata, snapshots of museum responses, etc.) isn't
@@ -68,7 +68,7 @@ export class Cache {
         // Best-effort; non-fatal on filesystems that don't support chmod.
       }
     }
-    this.db.pragma('journal_mode = WAL');
+    this.db.exec('PRAGMA journal_mode = WAL');
     this.init();
     this.pruneExpired();
   }
@@ -316,7 +316,10 @@ export class Cache {
   pruneExpired(): { objects: number; queries: number } {
     const objects = this.db.prepare(`DELETE FROM objects WHERE cached_at < ?`).run(this.objectsCutoff());
     const queries = this.db.prepare(`DELETE FROM query_cache WHERE cached_at < ?`).run(this.queriesCutoff());
-    return { objects: objects.changes, queries: queries.changes };
+    // node:sqlite types `RunResult.changes` as `number | bigint`; cast to
+    // number since our row counts never overflow 32-bit (the prune query
+    // is bounded by what fits in the local cache file).
+    return { objects: Number(objects.changes), queries: Number(queries.changes) };
   }
 
   private isExpired(isoTimestamp: string, ttlDays: number): boolean {

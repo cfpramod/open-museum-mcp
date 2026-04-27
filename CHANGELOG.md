@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-04-27
+
+### Changed (breaking — runtime requirement)
+
+- **Migrated cache from `better-sqlite3` to Node's built-in `node:sqlite`.** Eliminates the native compilation/prebuild dependency entirely. The cache file format is unchanged (both implementations write standard SQLite files) so existing caches continue to work.
+- **Minimum Node version is now 22.5 (was 20).** `node:sqlite` is built-in starting Node 22.5, stable on Node 24+. On Node 22.x users must launch with `--experimental-sqlite` (npm scripts handle this automatically; for `npx -y open-museum-mcp` set `NODE_OPTIONS=--experimental-sqlite`). Node 24+ users need no flag.
+
+### Added
+
+- **Desktop Extension (`.mcpb`) bundle for one-click Claude Desktop install.** `manifest.json` at repo root + `npm run build:mcpb` produces `open-museum-mcp.mcpb`. CI workflow auto-attaches the bundle to GitHub releases. Cross-platform (no native dependencies anymore).
+
+### Why this release
+
+`better-sqlite3`'s prebuilt native binary is signed with a different macOS Team ID than Claude Desktop, which made the `.mcpb` install path unusable due to macOS Library Validation rejecting the `.node` library at load time. Switching to `node:sqlite` removes the native dependency entirely and unblocks the `.mcpb` runtime. As a side benefit, the bundle is now cross-platform (Mac / Linux / Windows) instead of macOS-only, install is faster (no native compile), and there are no more upstream prebuild gaps when new Node versions ship.
+
 ## [0.4.1] — 2026-04-27
 
 ### Fixed
@@ -46,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `search_artworks`, `get_artwork`, `cite`, `discover_random`, and `list_traditions` tools.
 - `museum://{code}/{id}` MCP resources.
 
+[0.5.0]: https://github.com/cfpramod/open-museum-mcp/releases/tag/v0.5.0
 [0.4.1]: https://github.com/cfpramod/open-museum-mcp/releases/tag/v0.4.1
 [0.4.0]: https://github.com/cfpramod/open-museum-mcp/releases/tag/v0.4.0
 [0.2.0]: https://github.com/cfpramod/open-museum-mcp/releases/tag/v0.2.0

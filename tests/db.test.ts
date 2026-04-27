@@ -1,7 +1,7 @@
-import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Cache } from '../src/db.js';
 import type { Artwork } from '../src/types.js';
@@ -83,7 +83,7 @@ describe('Cache', () => {
     cache.close();
 
     // Directly age the row past the 90-day TTL.
-    const db = new Database(path);
+    const db = new DatabaseSync(path);
     const longAgo = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
     db.prepare('UPDATE objects SET cached_at = ? WHERE id = ?').run(longAgo, 'met:1');
     db.close();
@@ -100,7 +100,7 @@ describe('Cache', () => {
     expect(cache.getQuery('q:foo')).toEqual(['met:1', 'met:2']);
     cache.close();
 
-    const db = new Database(path);
+    const db = new DatabaseSync(path);
     const longAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
     db.prepare('UPDATE query_cache SET cached_at = ? WHERE cache_key = ?').run(longAgo, 'q:foo');
     db.close();
@@ -115,7 +115,7 @@ describe('Cache', () => {
     cache.upsertObject(makeArtwork('met:1'));
     cache.close();
 
-    const db = new Database(path);
+    const db = new DatabaseSync(path);
     db.prepare('UPDATE objects SET full_record = ? WHERE id = ?').run('{not json', 'met:1');
     db.close();
 
@@ -131,7 +131,7 @@ describe('Cache', () => {
     cache.putQuery('q:a', ['met:1']);
     cache.close();
 
-    const db = new Database(path);
+    const db = new DatabaseSync(path);
     const longAgo = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
     db.prepare('UPDATE objects SET cached_at = ? WHERE id = ?').run(longAgo, 'met:1');
     db.prepare('UPDATE query_cache SET cached_at = ?').run(longAgo);
@@ -250,7 +250,7 @@ describe('Cache.getRandomObject', () => {
 
   it('skips expired rows', () => {
     cache.close();
-    const db = new Database(path);
+    const db = new DatabaseSync(path);
     const longAgo = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
     db.prepare('UPDATE objects SET cached_at = ?').run(longAgo);
     db.close();
@@ -389,7 +389,7 @@ describe('Cache.listTraditions', () => {
   it('skips expired rows', () => {
     cache.upsertObject(makeArtwork('met:1', { region: 'china', period: 'tang dynasty' }));
     cache.close();
-    const db = new Database(path);
+    const db = new DatabaseSync(path);
     const longAgo = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000).toISOString();
     db.prepare('UPDATE objects SET cached_at = ?').run(longAgo);
     db.close();
