@@ -22,6 +22,7 @@
   "homepage": "https://github.com/cfpramod/open-museum-mcp#readme",
   "scripts": {
     "build": "tsc",
+    "build:mcpb": "node scripts/build-mcpb.mjs",
     "dev": "tsx src/server.ts",
     "prepare": "npm run build",
     "test": "vitest run",

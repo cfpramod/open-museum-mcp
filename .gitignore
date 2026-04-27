@@ -1,5 +1,7 @@
 node_modules/
 dist/
+mcpb-build/
+*.mcpb
 *.log
 .DS_Store
 ._*
