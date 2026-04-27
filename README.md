@@ -3,7 +3,15 @@
 [![CI](https://github.com/cfpramod/open-museum-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cfpramod/open-museum-mcp/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/open-museum-mcp.svg)](https://www.npmjs.com/package/open-museum-mcp)
 
-> Open-access museum search for MCP clients, with rights verification per museum.
+> One search across five open-access museum collections, with strict per-museum rights verification and ready-to-use citations.
+
+The Met, Cleveland Museum of Art, the Art Institute of Chicago, Wikimedia Commons, and Europeana — searched together, returned in one normalized shape, with the rights gate enforced per museum so you never receive a record whose open-access status is missing or ambiguous.
+
+## Who this is for
+
+- **Art-history students and researchers** who need cited references and rights-cleared images for papers, slides, and theses — across institutions, in one query.
+- **Writers, educators, and journalists** who want reuse-safe artwork to pair with essays, lessons, or articles, with pre-formatted attributions.
+- **MCP / agent builders** who want a small set of high-value tools (`search_artworks`, `get_artwork`, `cite`) with consistent schemas across sources, instead of installing one MCP per museum.
 
 ## Why I built this
 
@@ -11,12 +19,17 @@ I kept wanting reuse-safe artwork for my writing, and every museum's rights mode
 
 If anyone else is exploring open-access art, I hope this helps. The plan is to keep adding museums from around the world.
 
+## How this is different from single-museum MCPs
+
+There are excellent single-museum servers (`metmuseum-mcp`, `rijksmuseum-mcp`, `smithsonian-mcp`). This one is the **multi-museum entry point**: install once, query across all sources at the same time, get a single normalized schema across them, with a license gate you can audit per museum in [`src/licenseGate.ts`](src/licenseGate.ts). If you only ever need one collection, install that museum's MCP. If you want comparisons across institutions, citations across periods, or rights-verified breadth — install this.
+
 ## What you get
 
-- **One interface, registered museums.** The Met, Cleveland Museum of Art, the Art Institute of Chicago, Wikimedia Commons, and Europeana (federated European institutions, opt-in via API key) are live. Smithsonian and Rijksmuseum direct integrations are next.
+- **Five sources, one query.** The Met, Cleveland Museum of Art, the Art Institute of Chicago, Wikimedia Commons, and Europeana (federated European institutions, opt-in via API key) are live. Smithsonian and Rijksmuseum direct integrations are next.
 - **Strict deny on ambiguity.** Records are validated against per-museum rights rules in code. Missing or unclear indicators drop the record; nothing is defaulted to "open".
-- **Catalog-grade metadata.** A dynasty-aware date parser handles Tang, Edo, Safavid, Mughal and the rest. Regions normalize across museums. Attribution separates named artists from anonymous, workshop, "after", and attributed works.
-- **Listable resources and deterministic citations.** `museum://{code}/{id}` resources, three citation styles, structured JSON search results.
+- **Catalog-grade metadata.** A dynasty-aware date parser handles Tang, Edo, Safavid, Mughal and the rest. Regions normalize across museums. Attribution separates named artists from anonymous, workshop, "after", and attributed works. Date-range filter on `search_artworks` for queries like *Dutch genre painting 1640–1680*.
+- **Citation-ready output.** Three citation styles (`full`, `caption`, `short`) generated deterministically from the same record — paste straight into a paper, a slide caption, or an inline reference.
+- **Listable resources.** `museum://{code}/{id}` resources let you bookmark interesting IDs across a session.
 
 ## Quick example
 
@@ -104,6 +117,28 @@ Then point the MCP config at the built binary:
   }
 }
 ```
+
+## Recipes
+
+Once installed, paste one of these into your MCP client (Claude Desktop, ChatGPT with MCP, etc.) — the tools take care of the rest.
+
+**Cross-tradition pairing for an essay or slide deck**
+
+> Find a 17th-century Dutch genre painting and a same-period work from East Asia I can pair as a comparison. Return citations in caption form for both.
+
+The agent will call `search_artworks` with `year_min: 1600, year_max: 1700` plus your two queries, then `cite(id, "caption")` on the picks.
+
+**Date-windowed research scan**
+
+> Show me Dutch genre painting between 1640 and 1680. Six works, full citations, prefer different artists.
+
+`search_artworks({ query: "Dutch genre painting", year_min: 1640, year_max: 1680, limit: 6 })` then `cite` per result.
+
+**Counterpoint to a canonical work**
+
+> Suggest a non-canonical Edo-period work to pair with Vermeer's *Woman Holding a Balance*. Explain the contrast.
+
+`search_artworks` for Vermeer, then `discover_random({ region: "japan", period: "edo" })` for the counterpoint, then prose from the agent grounded in both records' metadata.
 
 ## Tools
 
