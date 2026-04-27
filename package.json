@@ -1,7 +1,7 @@
 {
   "name": "open-museum-mcp",
-  "version": "0.2.0",
-  "description": "MCP server for license-verified search across open-access museum collections (The Met, Cleveland, AIC and more).",
+  "version": "0.4.0",
+  "description": "MCP server for license-verified search across open-access museum collections (The Met, Cleveland, AIC, Wikimedia Commons, Europeana).",
   "type": "module",
   "main": "dist/server.js",
   "bin": {
@@ -34,9 +34,12 @@
     "museum",
     "open-access",
     "art",
+    "art-history",
     "metropolitan-museum",
     "cleveland-museum",
-    "art-institute-chicago"
+    "art-institute-chicago",
+    "wikimedia-commons",
+    "europeana"
   ],
   "author": "Pramod Prasanth",
   "license": "MIT",
