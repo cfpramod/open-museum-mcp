@@ -165,6 +165,25 @@ describe('parseDisplayDate', () => {
       expect(r.yearStart).toBe(1860);
       expect(r.yearEnd).toBe(1860);
     });
+
+    // Regression for #21: substring match against dynasty keys yielded
+    // false positives ("Hanka" → Han, "tangerine" → Tang). Word-boundary
+    // anchoring should reject these without dropping legitimate matches.
+    it('does not match "Hanka" as Han dynasty (#21)', () => {
+      expect(parseDisplayDate('Hanka')).toEqual({ yearStart: null, yearEnd: null });
+    });
+
+    it('does not match "tangerine" as Tang dynasty (#21)', () => {
+      expect(parseDisplayDate('tangerine')).toEqual({ yearStart: null, yearEnd: null });
+    });
+
+    it('does not match "Edofuji" as Edo period (#21)', () => {
+      expect(parseDisplayDate('Edofuji')).toEqual({ yearStart: null, yearEnd: null });
+    });
+
+    it('still matches "Han dynasty" with word boundaries (#21)', () => {
+      expect(parseDisplayDate('Han dynasty')).toEqual({ yearStart: -206, yearEnd: 220 });
+    });
   });
 
   describe('failures', () => {
