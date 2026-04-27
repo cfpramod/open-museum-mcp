@@ -2,7 +2,7 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateMetLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asOptionalString, asString } from './helpers.js';
+import { asOptionalString, asString, isValidPositiveInt, rejectFor } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const MET_API = 'https://collectionapi.metmuseum.org/public/collection/v1';
@@ -35,47 +35,23 @@ export const metFetcher: Fetcher = {
 
   normalize(raw: unknown): ValidationResult {
     if (!raw || typeof raw !== 'object') {
-      return {
-        status: 'rejected',
-        rejection: {
-          id: 'met:unknown',
-          museumCode: 'met',
-          reason: 'response not an object',
-          rawSnapshot: raw,
-        },
-      };
+      return rejectFor('met', 'met:unknown', 'response not an object', raw);
     }
     const r = raw as Record<string, unknown>;
     const objectID = r.objectID;
     // Met IDs are always positive integers. Anything else flunks ID_REGEX
     // downstream; emit a placeholder so the rejection still carries a stable
     // (and obviously bogus) id for logs.
-    const validId = typeof objectID === 'number' && Number.isInteger(objectID) && objectID > 0;
+    const validId = isValidPositiveInt(objectID);
     const id = validId ? `met:${objectID}` : 'met:unknown';
 
     const decision = validateMetLicense(raw);
     if (!decision.accepted || !decision.license) {
-      return {
-        status: 'rejected',
-        rejection: {
-          id,
-          museumCode: 'met',
-          reason: decision.reason,
-          rawSnapshot: raw,
-        },
-      };
+      return rejectFor('met', id, decision.reason, raw);
     }
 
     if (!validId) {
-      return {
-        status: 'rejected',
-        rejection: {
-          id,
-          museumCode: 'met',
-          reason: 'met: missing or non-integer objectID',
-          rawSnapshot: raw,
-        },
-      };
+      return rejectFor('met', id, 'met: missing or non-integer objectID', raw);
     }
 
     const displayDate = asString(r.objectDate);

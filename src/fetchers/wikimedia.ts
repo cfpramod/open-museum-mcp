@@ -2,7 +2,7 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateWikimediaLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asString } from './helpers.js';
+import { asFiniteNumber, asString, isValidPositiveInt, rejectFor } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
@@ -13,12 +13,8 @@ const COMMONS_PAGE = 'https://commons.wikimedia.org/wiki';
 // `imageUrls.full` contract holds.
 const IMAGE_MIME_PREFIX = 'image/';
 
-function reject(id: string, reason: string, rawSnapshot: unknown): ValidationResult {
-  return {
-    status: 'rejected',
-    rejection: { id, museumCode: 'wikimedia', reason, rawSnapshot },
-  };
-}
+const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
+  rejectFor('wikimedia', id, reason, rawSnapshot);
 
 // extmetadata fields are wrapped: `{value, source, hidden?}`. Pull the value
 // only, default to empty string if absent or non-string.
@@ -26,8 +22,7 @@ function getExtField(ext: Record<string, unknown> | undefined, field: string): s
   if (!ext) return '';
   const wrap = ext[field];
   if (!wrap || typeof wrap !== 'object') return '';
-  const v = (wrap as { value?: unknown }).value;
-  return typeof v === 'string' ? v : '';
+  return asString((wrap as { value?: unknown }).value);
 }
 
 // Common HTML entities seen in Commons text fields. Numeric escapes
@@ -240,7 +235,7 @@ export const wikimediaFetcher: Fetcher = {
     }
 
     const pageId = page.pageid;
-    const validId = typeof pageId === 'number' && Number.isInteger(pageId) && pageId > 0;
+    const validId = isValidPositiveInt(pageId);
     const id = validId ? `wikimedia:${pageId}` : 'wikimedia:unknown';
 
     const imageinfo = Array.isArray(page.imageinfo) ? page.imageinfo : [];
