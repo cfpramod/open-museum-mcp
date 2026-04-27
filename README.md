@@ -216,11 +216,12 @@ Highlights:
 
 - v0.1: Met adapter, dynasty-aware date parser, license gate, `cite` tool, MCP resources.
 - v0.2: Cleveland and AIC adapters, `discover_random` with constraints, `list_traditions`.
-- v0.3: Wikimedia Commons adapter (per-record rights model; unlocks works whose home museums lack public APIs). **(here)**
+- v0.3: Wikimedia Commons adapter (per-record rights model; unlocks works whose home museums lack public APIs).
+- v0.4: Europeana adapter (federated European institutions, opt-in via API key); `year_min`/`year_max` date-range filter on `search_artworks`. **(here)**
 - v0.7: Wikidata enrichment (artist QIDs, movement, country, dedup across cache).
 - v0.8: Dominant-colour extraction across museums (`color: "#3a5f7d"` discovery via `sharp`).
 - v1.0: Artist-obscurity scoring (`object_count_total`, `museum_count`) for deliberate exploration of less-canonical work.
-- v2.0: Smithsonian, Rijksmuseum, Walters Art Museum, more European institutions.
+- v2.0: Smithsonian, Rijksmuseum direct integration, Walters Art Museum, more European institutions.
 
 ## Contributing a museum adapter
 
