@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/cfpramod/open-museum-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cfpramod/open-museum-mcp/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/open-museum-mcp.svg)](https://www.npmjs.com/package/open-museum-mcp)
+[![open-museum-mcp MCP server](https://glama.ai/mcp/servers/cfpramod/open-museum-mcp/badges/score.svg)](https://glama.ai/mcp/servers/cfpramod/open-museum-mcp)
 
 > One search across five open-access museum collections, with strict per-museum rights verification and ready-to-use citations.
 
