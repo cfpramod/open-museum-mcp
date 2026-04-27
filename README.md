@@ -9,7 +9,7 @@ The Met, Cleveland Museum of Art, the Art Institute of Chicago, Wikimedia Common
 
 **See it in action first → [pramod.ch/open-museum-mcp](https://pramod.ch/open-museum-mcp)** — three worked examples (cross-tradition pairing, date-windowed scan, counterpoint discovery), real records, real citations, no install required.
 
-[![Watch the 60-second walkthrough on YouTube — install, ask in plain English, citations form on screen](docs/walkthrough-thumbnail.jpg)](https://www.youtube.com/watch?v=Nmk22Nbzk40)
+[![Watch the 60-second walkthrough on YouTube — install, ask in plain English, citations form on screen](https://img.youtube.com/vi/Nmk22Nbzk40/maxresdefault.jpg)](https://www.youtube.com/watch?v=Nmk22Nbzk40)
 
 ## Who this is for
 
