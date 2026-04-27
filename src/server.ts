@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { cite, type CiteStyle } from './cite.js';
 import { Cache } from './db.js';
 import { dedupeWikimediaUploads } from './dedupe.js';
+import { buildSeedQueryFromConstraints } from './discoverSeed.js';
 import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
 import { europeanaFetcher } from './fetchers/europeana.js';
@@ -215,7 +216,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'discover_random',
       description:
-        'Pick one random artwork from the local cache that matches the given constraints. Useful for breaking out of repetitive search territory (e.g. surface a random Edo-period work to satisfy a no-back-to-back-European-pre-1900 pairing rule). Operates over what has already been searched and cached; returns an error if nothing matches, suggesting the caller seed the cache via search_artworks first.',
+        'Pick one random artwork from the local cache that matches the given constraints. Useful for breaking out of repetitive search territory (e.g. surface a random Edo-period work to satisfy a no-back-to-back-European-pre-1900 pairing rule). On a cold cache with `region` or `period` constraints provided, auto-seeds via a small search_artworks call derived from those constraints before sampling — so first-time use works without manually warming the cache. Without constraints, returns a hint to run search_artworks first.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -242,7 +243,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'list_traditions',
       description:
-        'List the regions and periods present in non-expired cached records, with per-museum record counts. Helps you see which traditions are well-represented before searching, and where holdings are sparse. Returns { regions, periods } where each entry has { tag, label, coverage: { museumCode: count } }.',
+        'List the regions and periods present in non-expired cached records, with per-museum record counts. Helps you see which traditions are well-represented before searching, and where holdings are sparse. Returns { regions, periods } where each entry has { tag, label, coverage: { museumCode: count } }. On an empty cache, returns a hint to run search_artworks first — list_traditions is a meta-tool over what you have already collected, not a search trigger.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -330,15 +331,39 @@ async function handleDiscoverRandom(args: unknown) {
   if (input.museum && !FETCHERS[input.museum]) {
     return errorResult(`unknown museum: ${input.museum}`);
   }
-  const artwork = cache.getRandomObject({
+
+  const lookup = {
     region: input.region,
     period: input.period,
     notArtist: input.not_artist,
     museumCode: input.museum,
-  });
+  };
+
+  let artwork = cache.getRandomObject(lookup);
+
+  // Cold-start path: when the cache has nothing for these constraints AND the
+  // constraints carry enough signal to build a meaningful query, auto-seed
+  // by running a small search_artworks call first. Logged to stderr so
+  // operators can see the extra fetches happening on a fresh install.
+  if (!artwork) {
+    const seedQuery = buildSeedQueryFromConstraints(input);
+    if (seedQuery) {
+      console.error(
+        `[open-museum-mcp] discover_random: cache empty for these constraints; auto-seeding via search_artworks(query="${seedQuery}", museum=${input.museum ?? 'all'})`,
+      );
+      await handleSearch({
+        query: seedQuery,
+        limit: 10,
+        has_image: true,
+        museum: input.museum,
+      });
+      artwork = cache.getRandomObject(lookup);
+    }
+  }
+
   if (!artwork) {
     return errorResult(
-      'No cached artwork matches these constraints. Seed the cache with search_artworks first; discover_random samples from records you have already pulled.',
+      'No cached artwork matches these constraints. discover_random samples from records you have already collected — try search_artworks with a topic first (e.g. search_artworks({ query: "edo painting" })), then call discover_random again.',
     );
   }
   return { content: [{ type: 'text' as const, text: JSON.stringify(artwork, null, 2) }] };
@@ -346,6 +371,12 @@ async function handleDiscoverRandom(args: unknown) {
 
 function handleListTraditions() {
   const traditions = cache.listTraditions();
+  const isEmpty = traditions.regions.length === 0 && traditions.periods.length === 0;
+  if (isEmpty) {
+    return errorResult(
+      'Cache is empty. list_traditions summarizes the regions and periods across artworks you have already collected — there is nothing to list yet. Run search_artworks for a topic first (e.g. search_artworks({ query: "renaissance painting" }) or search_artworks({ query: "edo" })), then call list_traditions to see what coverage you have.',
+    );
+  }
   return { content: [{ type: 'text' as const, text: JSON.stringify(traditions, null, 2) }] };
 }
 
