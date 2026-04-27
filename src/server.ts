@@ -144,7 +144,7 @@ async function fetchAndCache(id: string): Promise<{ ok: true; artwork: Artwork }
 }
 
 const server = new Server(
-  { name: 'open-museum-mcp', version: '0.4.0' },
+  { name: 'open-museum-mcp', version: '0.5.0' },
   {
     capabilities: {
       tools: {},

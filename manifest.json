@@ -1,0 +1,82 @@
+{
+  "manifest_version": "0.2",
+  "name": "open-museum-mcp",
+  "display_name": "Open Museum",
+  "version": "0.5.0",
+  "description": "License-verified federated search across open-access museum collections.",
+  "long_description": "Federated MCP search across major open-access museum collections — currently The Met, Cleveland Museum of Art, Art Institute of Chicago, Wikimedia Commons, and Europeana, with more being added. Records pass per-museum rights verification (strict-default-deny on ambiguous license signals) and ship with citation output in `full`, `caption`, and `short` formats — paste-ready for papers, slide decks, and inline references.",
+  "author": {
+    "name": "Pramod Prasanth",
+    "url": "https://pramod.ch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cfpramod/open-museum-mcp"
+  },
+  "homepage": "https://pramod.ch/open-museum-mcp",
+  "documentation": "https://github.com/cfpramod/open-museum-mcp#readme",
+  "support": "https://github.com/cfpramod/open-museum-mcp/issues",
+  "license": "MIT",
+  "keywords": [
+    "museum",
+    "art",
+    "art-history",
+    "open-access",
+    "cc0",
+    "public-domain",
+    "citation",
+    "metropolitan-museum",
+    "cleveland-museum",
+    "art-institute-chicago",
+    "wikimedia-commons",
+    "europeana"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/server.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/server.js"],
+      "env": {
+        "EUROPEANA_API_KEY": "${user_config.europeana_api_key}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "search_artworks",
+      "description": "Search across registered museums. Returns records that pass the rights gate. Supports date-range filter (BCE = negative integer)."
+    },
+    {
+      "name": "get_artwork",
+      "description": "Fetch a single artwork by its normalized ID (e.g. met:436535)."
+    },
+    {
+      "name": "cite",
+      "description": "Render a citation. Styles: full, caption, short."
+    },
+    {
+      "name": "discover_random",
+      "description": "Random artwork suggestion, optionally constrained by region or period."
+    },
+    {
+      "name": "list_traditions",
+      "description": "Meta-tool over already-collected results — list dynasties / regions present in the local cache."
+    }
+  ],
+  "user_config": {
+    "europeana_api_key": {
+      "type": "string",
+      "title": "Europeana API Key",
+      "description": "Optional. Free key from https://pro.europeana.eu/page/get-api enables the Europeana adapter (~30M records aggregated from European cultural-heritage institutions). Without a key, Europeana silently disables and the other adapters work normally.",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "linux", "win32"],
+    "runtimes": {
+      "node": ">=22.5"
+    }
+  }
+}
