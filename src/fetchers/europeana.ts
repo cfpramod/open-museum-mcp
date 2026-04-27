@@ -54,13 +54,16 @@ function pickLangAware(obj: unknown, langPreference: string[] = ['en', 'def']): 
 }
 
 // Europeana flat array helpers — many fields are returned as arrays even when
-// they carry exactly one value.
+// they carry exactly one value. Numeric values (e.g. `year: [1642]` instead
+// of `["1642"]`) are stringified so downstream parsers see a consistent
+// shape regardless of upstream serialization quirks.
 function firstString(v: unknown): string {
-  if (Array.isArray(v)) {
-    const f = v.find((x) => typeof x === 'string');
-    return typeof f === 'string' ? f : '';
+  const arr = Array.isArray(v) ? v : [v];
+  for (const x of arr) {
+    if (typeof x === 'string' && x.length > 0) return x;
+    if (typeof x === 'number' && Number.isFinite(x)) return String(x);
   }
-  return typeof v === 'string' ? v : '';
+  return '';
 }
 
 function parseRecord(raw: Record<string, unknown>): {
@@ -130,7 +133,10 @@ export const europeanaFetcher: Fetcher = {
       url.searchParams.append('qf', 'TYPE:IMAGE');
     }
     url.searchParams.set('rows', String(limit));
-    url.searchParams.set('profile', 'minimal');
+    // profile=standard returns the description fields (dcDescription /
+    // dcDescriptionLangAware) and other EDM properties cite needs.
+    // Bandwidth cost is small relative to the gate-rejection ratio.
+    url.searchParams.set('profile', 'standard');
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Europeana search failed: ${res.status}`);
@@ -153,7 +159,10 @@ export const europeanaFetcher: Fetcher = {
     url.searchParams.set('wskey', key);
     url.searchParams.set('query', `europeana_id:"/${path}"`);
     url.searchParams.set('rows', '1');
-    url.searchParams.set('profile', 'minimal');
+    // profile=standard returns the description fields (dcDescription /
+    // dcDescriptionLangAware) and other EDM properties cite needs.
+    // Bandwidth cost is small relative to the gate-rejection ratio.
+    url.searchParams.set('profile', 'standard');
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Europeana get failed for ${id}: ${res.status}`);
     return res.json();

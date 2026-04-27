@@ -207,19 +207,40 @@ export const validateEuropeanaLicense: LicenseValidator = (raw) => {
     return reject('europeana: object missing or not an object');
   }
   const obj = raw as Record<string, unknown>;
-  // Europeana returns `rights` as an array of URI strings on each item.
-  const rightsArr = Array.isArray(obj.rights) ? obj.rights : [];
-  const first = rightsArr.find((v) => typeof v === 'string') as string | undefined;
-  if (!first) {
+  // Europeana's `rights` is conventionally a one-element array of URI strings,
+  // but EDM consumers occasionally serialize a single value as a bare string.
+  // Coerce both shapes into a uniform array before checking.
+  const rightsRaw = obj.rights;
+  const rightsArr = Array.isArray(rightsRaw)
+    ? rightsRaw
+    : typeof rightsRaw === 'string'
+      ? [rightsRaw]
+      : [];
+  const rightsStrs = rightsArr.filter((v): v is string => typeof v === 'string');
+  if (rightsStrs.length === 0) {
     return reject('europeana: rights field missing or non-string (strict default reject)');
   }
-  const normalized = stripUriProtocol(first);
-  if (normalized === EUROPEANA_CC0_URI) {
+  // Strict-default-deny: every URI on the record must be in the accept set.
+  // A "first match wins" check would leak hybrid records that carry one
+  // permissive URI plus one restrictive URI — exactly the failure mode
+  // strict-default-deny exists to prevent.
+  const normalizedAll = rightsStrs.map(stripUriProtocol);
+  const allAccepted = normalizedAll.every(
+    (u) => u === EUROPEANA_CC0_URI || u === EUROPEANA_PDM_URI,
+  );
+  if (!allAccepted) {
+    return reject(`europeana: rights=${rightsStrs[0]} (strict default reject)`);
+  }
+  // Both CC0 and PDM are in the accept set; classify by the first URI for
+  // the license tier. A record dual-marked CC0+PDM is genuinely public
+  // domain and gets the CC0 tier (the more specific dedication).
+  const isCc0 = normalizedAll[0] === EUROPEANA_CC0_URI;
+  if (isCc0) {
     return {
       accepted: true,
       license: {
         type: 'CC0',
-        rawValue: first,
+        rawValue: rightsStrs[0],
         verificationSource: 'europeana.rights',
         verifiedAt: nowIso(),
         confidence: 'high',
@@ -229,22 +250,19 @@ export const validateEuropeanaLicense: LicenseValidator = (raw) => {
       reason: 'europeana: rights=CC0',
     };
   }
-  if (normalized === EUROPEANA_PDM_URI) {
-    return {
-      accepted: true,
-      license: {
-        type: 'PD',
-        rawValue: first,
-        verificationSource: 'europeana.rights',
-        verifiedAt: nowIso(),
-        confidence: 'high',
-      },
-      imageOpenAccess: true,
-      metadataOpenAccess: true,
-      reason: 'europeana: rights=PDM',
-    };
-  }
-  return reject(`europeana: rights=${first} (strict default reject)`);
+  return {
+    accepted: true,
+    license: {
+      type: 'PD',
+      rawValue: rightsStrs[0],
+      verificationSource: 'europeana.rights',
+      verifiedAt: nowIso(),
+      confidence: 'high',
+    },
+    imageOpenAccess: true,
+    metadataOpenAccess: true,
+    reason: 'europeana: rights=PDM',
+  };
 };
 
 const VALIDATORS: Record<string, LicenseValidator> = {

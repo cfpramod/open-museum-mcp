@@ -125,4 +125,88 @@ describe('Europeana adapter normalization', () => {
     expect(result.artwork.yearStart).toBe(1642);
     expect(result.artwork.yearEnd).toBe(1642);
   });
+
+  it('rejects multi-URI rights when ANY entry is restrictive (strict-default-deny)', () => {
+    // Hardened rights gate: a hybrid record carrying CC0 plus an InC URI
+    // would have been silently accepted under a "first match wins" check.
+    // Strict-default-deny requires every URI to be in the accept set.
+    const mixedRights = {
+      items: [
+        {
+          id: '/1/mixed_rights_record',
+          rights: [
+            'http://creativecommons.org/publicdomain/zero/1.0/',
+            'http://rightsstatements.org/vocab/InC/1.0/',
+          ],
+          dcTitleLangAware: { en: ['Hybrid record'] },
+        },
+      ],
+    };
+    const result = europeanaFetcher.normalize(mixedRights);
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.reason).toContain('strict default reject');
+  });
+
+  it('accepts multi-URI rights when ALL entries are in the accept set', () => {
+    // Records that are dual-marked CC0 + PDM are genuinely public domain.
+    // The first URI determines the license tier (CC0 takes precedence).
+    const dualMarked = {
+      items: [
+        {
+          id: '/2/dual_marked_record',
+          rights: [
+            'http://creativecommons.org/publicdomain/zero/1.0/',
+            'http://creativecommons.org/publicdomain/mark/1.0/',
+          ],
+          dcTitleLangAware: { en: ['Dual-marked record'] },
+        },
+      ],
+    };
+    const result = europeanaFetcher.normalize(dualMarked);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.license.type).toBe('CC0');
+  });
+
+  it('accepts a bare-string rights shape (some EDM serializers omit the array wrapper)', () => {
+    // Defensive: if Europeana ever returns rights as a plain string rather
+    // than a one-element array, the gate must still validate it. Otherwise
+    // we silently false-negative every record from that endpoint.
+    const bareStringRights = {
+      items: [
+        {
+          id: '/3/bare_string_rights',
+          rights: 'http://creativecommons.org/publicdomain/zero/1.0/',
+          dcTitleLangAware: { en: ['Bare-string-rights record'] },
+        },
+      ],
+    };
+    const result = europeanaFetcher.normalize(bareStringRights);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.license.type).toBe('CC0');
+  });
+
+  it('coerces numeric year values to strings for the date parser', () => {
+    // Europeana sometimes returns `year: [1642]` (number) instead of
+    // `year: ["1642"]` (string). The fetcher must treat both shapes the
+    // same way; otherwise dates silently disappear from records that
+    // serialize numeric years.
+    const numericYear = {
+      items: [
+        {
+          id: '/4/numeric_year_record',
+          year: [1642],
+          rights: ['http://creativecommons.org/publicdomain/zero/1.0/'],
+          dcTitleLangAware: { en: ['Numeric-year record'] },
+        },
+      ],
+    };
+    const result = europeanaFetcher.normalize(numericYear);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.yearStart).toBe(1642);
+    expect(result.artwork.yearEnd).toBe(1642);
+  });
 });
