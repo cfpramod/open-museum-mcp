@@ -88,7 +88,17 @@ A search call returns license-verified results in one normalized shape:
 
 > **Want to see it work before installing?** [pramod.ch/open-museum-mcp](https://pramod.ch/open-museum-mcp) walks through the three core workflows with real records and citations.
 
-The package is on npm. The simplest setup is to add it directly to your MCP client config; `npx` will fetch and run it on first launch:
+### One-click
+
+For supported clients, no JSON, no Node, no npm — pick your client:
+
+- **Claude Desktop:** [Download `open-museum-mcp.mcpb`](https://github.com/cfpramod/open-museum-mcp/releases/latest/download/open-museum-mcp.mcpb) from the latest release and double-click it. Claude Desktop opens the bundle and installs the server in one step.
+- **VS Code:** [Install in VS Code](vscode:mcp/install?%7B%22name%22%3A%22open-museum-mcp%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22open-museum-mcp%22%5D%7D) — opens VS Code with the install dialog prefilled (requires the GitHub Copilot Chat extension).
+- **Cursor:** [Install in Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=open-museum-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIm9wZW4tbXVzZXVtLW1jcCJdfQ==) — same idea, Cursor-flavoured (MCP support is built in).
+
+### JSON config (any MCP client)
+
+For ChatGPT with MCP, Cline, Goose, Continue, Zed, or anything else: paste this into your client's MCP config and restart. `npx` fetches and runs the server on first launch.
 
 ```json
 {
@@ -100,8 +110,6 @@ The package is on npm. The simplest setup is to add it directly to your MCP clie
   }
 }
 ```
-
-That's it. Restart your MCP client and the tools below become available.
 
 ### From source (for contributors)
 
