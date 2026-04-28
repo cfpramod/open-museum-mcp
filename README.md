@@ -255,6 +255,14 @@ Highlights:
 - `artist.attributionType` distinguishes `named` / `anonymous` / `workshop` / `after` / `attributed` / `circle` / `follower`.
 - `imageOpenAccess` is held distinct from `metadataOpenAccess` because museums frequently publish open metadata for objects whose images are not openly licensed.
 
+### Compatibility
+
+`Artwork` field semantics are stable. New versions may add fields or tools, but won't repurpose or remove existing ones within a major version.
+
+- **Backward-compatible.** New server versions may add fields to `Artwork`, add new tools, or add new optional arguments. A v0.5 client calling a v0.6 server will continue to work; it just ignores fields it doesn't know.
+- **Forward-compatible.** A v0.6 client calling an older v0.5 server will get records that lack v0.6-only fields, but the records it does get will validate against the older client's schema.
+- **SemVer.** While in v0.x, MINOR bumps may include backward-incompatible changes (per the [SemVer spec](https://semver.org/) for pre-1.0 versions). From v1.0 onwards, only MAJOR bumps may break compatibility.
+
 ## Non-goals
 
 - **Not a full art-history ontology.** The dynasty and region tables cover the most-encountered cases; they are not exhaustive iconographic taxonomies.
@@ -266,12 +274,21 @@ Highlights:
 
 - v0.1: Met adapter, dynasty-aware date parser, license gate, `cite` tool, MCP resources.
 - v0.2: Cleveland and AIC adapters, `discover_random` with constraints, `list_traditions`.
-- v0.3: Wikimedia Commons adapter (per-record rights model; unlocks works whose home museums lack public APIs).
-- v0.4: Europeana adapter (federated European institutions, opt-in via API key); `year_min`/`year_max` date-range filter on `search_artworks`. **(here)**
+- v0.3: Wikimedia Commons adapter (per-record rights model; covers works whose home museums lack public APIs).
+- v0.4: Europeana adapter (federated European institutions, opt-in via API key); `year_min`/`year_max` date-range filter on `search_artworks`.
+- v0.5: `.mcpb` Desktop Extension bundle (one-click Claude Desktop install); migration to Node 22+ `node:sqlite` (no native compile required). **(here)**
 - v0.7: Wikidata enrichment (artist QIDs, movement, country, dedup across cache).
 - v0.8: Dominant-colour extraction across museums (`color: "#3a5f7d"` discovery via `sharp`).
 - v1.0: Artist-obscurity scoring (`object_count_total`, `museum_count`) for deliberate exploration of less-canonical work.
 - v2.0: Smithsonian, Rijksmuseum direct integration, Walters Art Museum, more European institutions.
+
+### Release cadence
+
+This is a side project. New releases ship when one of three things happens: my own work needs a feature, a new museum is wired in, or a contributor's PR is merged. There is no fixed cadence. I do commit to reviewing and merging contributor PRs promptly.
+
+### Changelog
+
+[Releases](https://github.com/cfpramod/open-museum-mcp/releases) lists what shipped in each version, with notes.
 
 ## Contributing a museum adapter
 
