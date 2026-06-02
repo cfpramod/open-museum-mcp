@@ -116,6 +116,17 @@ npm run build
 npm run dev   # runs the MCP server via tsx
 ```
 
+## Releasing
+
+Releases follow [Semantic Versioning](https://semver.org/). The version string lives in several places, and they have to move together or the published metadata drifts apart. When cutting a release, bump the version in all of:
+
+- `package.json`
+- `manifest.json` (the `.mcpb` Desktop Extension bundle)
+- `CITATION.cff` (both `version` and `date-released`)
+- `CHANGELOG.md` (add the new version section)
+
+Then tag the release, run `npm publish`, and create the GitHub release. CI attaches the `.mcpb` bundle to the release automatically.
+
 ## Reporting issues
 
 If you find a record that the gate accepts when it shouldn't (or vice versa), open an issue with the artwork ID and the museum's raw API response. License correctness is the most important property of this project; bugs there are P0.
