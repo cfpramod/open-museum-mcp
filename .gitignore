@@ -17,3 +17,6 @@ coverage/
 # Local-only Claude Code project guidance — kept out of the OSS repo
 CLAUDE.md
 
+# Local-only session state (Claude Code handover notes) — not part of the OSS repo
+session-states/
+

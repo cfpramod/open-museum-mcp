@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: open-museum-mcp
+abstract: "An MCP server that federates open-access museum collections behind a strict-default-deny rights gate, exposing search, retrieval, and citation tools to AI clients."
+type: software
+authors:
+  - given-names: Pramod
+    family-names: Prasanth
+    orcid: "https://orcid.org/0009-0005-9402-9393"
+repository-code: "https://github.com/cfpramod/open-museum-mcp"
+url: "https://github.com/cfpramod/open-museum-mcp"
+license: MIT
+version: 0.5.0
+date-released: "2026-04-27"
+keywords:
+  - mcp
+  - model-context-protocol
+  - museums
+  - open-access
+  - public-domain
+  - cultural-heritage
