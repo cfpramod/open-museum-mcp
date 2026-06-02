@@ -1,0 +1,10 @@
+# This file controls the "Sponsor" button on the repository. It routes to the
+# maintainer (Pramod Prasanth; see MAINTAINERS.md).
+#
+# Nothing is active yet: every target line below is commented out, so no Sponsor
+# button renders until a target is confirmed. For the `github:` line to produce a
+# button, GitHub Sponsors must also be enabled on the maintainer's account.
+#
+# TODO(Pramod): confirm the funding target, then uncomment exactly one line.
+# github: cfpramod
+# custom: ["https://..."]

@@ -286,6 +286,10 @@ Highlights:
 
 This is a side project. New releases ship when one of three things happens: my own work needs a feature, a new museum is wired in, or a contributor's PR is merged. There is no fixed cadence. I do commit to reviewing and merging contributor PRs promptly.
 
+### Project status
+
+This is actively maintained as of the latest release. Because it is a side project, if active maintenance ever stops I will archive the repository and say so here, rather than leave it looking live. The published npm package, the adapters, and the `Artwork` schema remain usable either way, and the code is MIT-licensed, so anyone is free to fork and continue it. Governance and the path for new maintainers are described in [GOVERNANCE.md](GOVERNANCE.md).
+
 ### Changelog
 
 [Releases](https://github.com/cfpramod/open-museum-mcp/releases) lists what shipped in each version, with notes.

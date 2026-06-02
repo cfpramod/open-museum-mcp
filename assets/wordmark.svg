@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  open-museum-mcp wordmark (neutral, text-based) for registry listings.
+  Single-ink, transparent background, so it sits on light or dark surfaces.
+  Note: the wordmark uses a system monospace stack via <text>. For guaranteed
+  rendering everywhere (registries that rasterize without the font), a designer
+  should convert the text to vector paths. Flagged for Pramod.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="120" viewBox="0 0 560 120" role="img" aria-label="open-museum-mcp">
+  <title>open-museum-mcp</title>
+  <g fill="none" stroke="#1f2937" stroke-width="6" stroke-linecap="square">
+    <!-- a spare framed-artwork glyph -->
+    <rect x="24" y="28" width="64" height="64" rx="2"/>
+    <line x1="40" y1="76" x2="56" y2="52"/>
+    <line x1="56" y1="52" x2="72" y2="76"/>
+  </g>
+  <text x="116" y="72"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+        font-size="34" font-weight="600" letter-spacing="-0.5"
+        fill="#1f2937">open-museum<tspan fill="#6b7280">-mcp</tspan></text>
+</svg>
