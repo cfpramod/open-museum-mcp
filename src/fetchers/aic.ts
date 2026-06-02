@@ -66,14 +66,19 @@ export const aicFetcher: Fetcher = {
   async search(query: string, limit: number, options: SearchOptions = {}): Promise<string[]> {
     const url = new URL(`${AIC_API}/artworks/search`);
     url.searchParams.set('q', query);
-    // Push the rights filter to AIC server-side via Elasticsearch term
-    // query, so the gate has fewer rejections to handle. Defense in depth:
-    // validateAicLicense still re-checks each fetched record.
-    url.searchParams.set('query[term][is_public_domain]', 'true');
+    // AIC proxies the `query[...]` params straight into Elasticsearch. Multiple
+    // filter clauses must be combined under a single bool/must array; two
+    // sibling clauses in one query object (e.g. `query[term]` + `query[exists]`)
+    // is invalid ES and AIC rejects the whole request with HTTP 400 (#28).
+    //
+    // Push the rights filter to AIC server-side via the term clause, so the gate
+    // has fewer rejections to handle. Defense in depth: validateAicLicense still
+    // re-checks each fetched record.
+    url.searchParams.set('query[bool][must][0][term][is_public_domain]', 'true');
     if (options.hasImage !== false) {
-      // exists query against image_id keeps records without IIIF imagery
+      // exists clause against image_id keeps records without IIIF imagery
       // out of the candidate list.
-      url.searchParams.set('query[exists][field]', 'image_id');
+      url.searchParams.set('query[bool][must][1][exists][field]', 'image_id');
     }
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('fields', 'id');
