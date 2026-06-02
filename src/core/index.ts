@@ -1,0 +1,35 @@
+/**
+ * Public entry point for the federation engine — the shared core behind both
+ * the MCP server and any HTTP/edge front door. It carries no transport and no
+ * storage: callers inject a {@link CacheStore} and a set of {@link Fetcher}s,
+ * and get back a {@link Federation} whose every result has already passed the
+ * per-museum rights gate. Deliberately free of `node:sqlite` and the MCP SDK
+ * so it runs unchanged on a Cloudflare Workers runtime.
+ */
+export {
+  createFederation,
+  SearchParamsSchema,
+  ID_REGEX,
+  UnknownMuseumError,
+  type Federation,
+  type FederationOptions,
+  type SearchParams,
+  type SearchResult,
+  type FetchOutcome,
+  type CiteOutcome,
+} from './federation.js';
+
+export type { CacheStore, Awaitable } from './cache.js';
+
+// Pure helpers a front door commonly needs alongside the federation.
+export { cite, type CiteStyle } from '../cite.js';
+export type { Artwork, ArtworkImages, ArtworkSource, ArtworkLicense, ValidationResult } from '../types.js';
+export type { Fetcher, SearchOptions } from '../fetchers/types.js';
+
+// Built-in museum fetchers, so a host can assemble its own registry (and
+// decide which to enable based on available API keys).
+export { metFetcher } from '../fetchers/met.js';
+export { clevelandFetcher } from '../fetchers/cleveland.js';
+export { aicFetcher } from '../fetchers/aic.js';
+export { wikimediaFetcher } from '../fetchers/wikimedia.js';
+export { europeanaFetcher } from '../fetchers/europeana.js';
