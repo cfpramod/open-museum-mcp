@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-06-02
+
+### Added
+
+- **Reusable federation core, published at the `open-museum-mcp/core` subpath.** The engine (fetchers, license gate, date parser, citation, and the search/get/cite orchestration) is now a transport-agnostic `createFederation({ fetchers, cache })` factory in `src/core/`, free of `node:sqlite` and the MCP SDK so it runs on non-Node runtimes (e.g. Cloudflare Workers). The cache is injected via a small `CacheStore` interface (synchronous or async), letting the MCP server keep its `node:sqlite` cache while other front doors supply their own (KV, etc.). Rights-gate enforcement is unchanged and lives inside each fetcher's `normalize`, so no rejected record reaches the cache or a caller regardless of front door.
+
+### Changed
+
+- **`server.ts` is now a thin MCP wrapper over the core.** Behaviour is identical (same tools, same outputs, same strict-default-deny gate); the search/get/cite logic moved into `createFederation`. The previously untestable search pipeline is now unit-tested directly with a fake cache and fake fetchers.
+
 ## [0.5.0] — 2026-04-27
 
 ### Changed (breaking — runtime requirement)

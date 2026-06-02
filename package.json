@@ -1,9 +1,16 @@
 {
   "name": "open-museum-mcp",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "MCP server for license-verified search across open-access museum collections (The Met, Cleveland, AIC, Wikimedia Commons, Europeana).",
   "type": "module",
   "main": "dist/server.js",
+  "exports": {
+    ".": "./dist/server.js",
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    }
+  },
   "bin": {
     "open-museum-mcp": "dist/server.js"
   },

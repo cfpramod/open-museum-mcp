@@ -11,9 +11,14 @@ import dotenv from 'dotenv';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { cite, type CiteStyle } from './cite.js';
+import {
+  createFederation,
+  ID_REGEX,
+  SearchParamsSchema,
+  UnknownMuseumError,
+  type CiteStyle,
+} from './core/index.js';
 import { Cache } from './db.js';
-import { dedupeWikimediaUploads } from './dedupe.js';
 import { buildSeedQueryFromConstraints } from './discoverSeed.js';
 import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
@@ -21,8 +26,6 @@ import { europeanaFetcher } from './fetchers/europeana.js';
 import { metFetcher } from './fetchers/met.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import type { Fetcher } from './fetchers/types.js';
-import type { Artwork } from './types.js';
-import { filterByYearRange } from './yearFilter.js';
 
 // Load env vars before reading any keys. Cwd `.env` (developer flow) wins
 // over `~/.open-museum-mcp/.env` (production / MCP-client-launched flow);
@@ -54,50 +57,16 @@ if (process.env.EUROPEANA_API_KEY) {
 const CACHE_PATH = process.env.OMM_CACHE_PATH ?? join(homedir(), '.open-museum-mcp', 'cache.db');
 const cache = new Cache({ path: CACHE_PATH });
 
-// Museum IDs follow `<code>:<segment>(/<segment>)*`. Each segment is
-// alphanumeric, underscore, or hyphen. The four numeric-ID museums (Met,
-// Cleveland, AIC, Wikimedia) match a single all-digit segment; Europeana's
-// hierarchical IDs (`9200338/BibliographicResource_3000093834108`) match
-// multiple slash-separated segments. The negative lookahead blocks `..`
-// path-traversal attempts cleanly.
-const ID_REGEX = /^[a-z]+:(?!.*\.\.)[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/;
-
-// Cap concurrent fetches to one museum's API. The Met has no batch endpoint,
-// so a search of limit 50 fans out into up to 50 object fetches; without a
-// cap, we'd hammer the upstream and risk rate-limit errors. 8 is empirically
-// gentle and keeps wall-clock time within the same order of magnitude.
-const FETCH_CONCURRENCY = 8;
-
-async function withConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (true) {
-      const idx = next++;
-      if (idx >= items.length) return;
-      results[idx] = await fn(items[idx]);
-    }
-  });
-  await Promise.all(workers);
-  return results;
-}
-
-const SearchInput = z.object({
-  query: z.string().min(1),
-  museum: z.string().optional(),
-  has_image: z.boolean().default(true),
-  limit: z.number().int().min(1).max(50).default(10),
-  // Optional date-range constraint. Either bound may be omitted. BCE is
-  // expressed as a negative integer (e.g. year_min: -500 for 500 BCE).
-  // The bounds gate the *result set*, not the upstream search call —
-  // each museum's free-text search runs unchanged, and we drop accepted
-  // records whose [yearStart, yearEnd] falls outside the window.
-  year_min: z.number().int().optional(),
-  year_max: z.number().int().optional(),
+// The federation engine is transport-agnostic. The MCP server is one front
+// door over it (stdio JSON-RPC); the web app is another (HTTP + KV cache).
+// Rejections are logged to stderr — stdout is the MCP protocol channel — so
+// operators can diagnose "why did my search return fewer results than
+// expected?". The strict-default-deny gate lives inside each fetcher's
+// `normalize`, so no rejected record ever reaches the cache or the wire.
+const federation = createFederation({
+  fetchers: FETCHERS,
+  cache,
+  onReject: (id, reason) => console.error(`[open-museum-mcp] rejected ${id}: ${reason}`),
 });
 
 const GetInput = z.object({
@@ -116,35 +85,8 @@ const DiscoverInput = z.object({
   museum: z.string().min(1).optional(),
 });
 
-async function fetchAndCache(id: string): Promise<{ ok: true; artwork: Artwork } | { ok: false; reason: string }> {
-  if (!ID_REGEX.test(id)) {
-    return { ok: false, reason: `invalid artwork id: ${id}` };
-  }
-
-  const cached = cache.getObject(id);
-  if (cached) return { ok: true, artwork: cached };
-
-  // ID_REGEX guarantees a non-empty `[a-z]+` segment before ':'.
-  const code = id.slice(0, id.indexOf(':'));
-  const fetcher = FETCHERS[code];
-  if (!fetcher) return { ok: false, reason: `unknown museum code: ${code}` };
-
-  const raw = await fetcher.getRaw(id);
-  const result = fetcher.normalize(raw);
-  if (result.status === 'rejected') {
-    // Rejections are expected — strict-default-deny is the project's spine.
-    // Log to stderr (stdout is the MCP protocol channel) so operators can
-    // diagnose "why did my search return fewer results than expected?".
-    console.error(`[open-museum-mcp] rejected ${id}: ${result.rejection.reason}`);
-    return { ok: false, reason: result.rejection.reason };
-  }
-
-  cache.upsertObject(result.artwork);
-  return { ok: true, artwork: result.artwork };
-}
-
 const server = new Server(
-  { name: 'open-museum-mcp', version: '0.5.0' },
+  { name: 'open-museum-mcp', version: '0.6.0' },
   {
     capabilities: {
       tools: {},
@@ -259,74 +201,38 @@ function errorResult(message: string) {
   return { content: [{ type: 'text' as const, text: message }], isError: true };
 }
 
-// The cache key includes the overfetch count, not the user-facing `limit`.
-// That means limit:5 and limit:6 produce different keys (since 5*2=10 vs
-// 6*2=12). The trade-off: more cache rows, but each row is guaranteed to
-// hold enough IDs to satisfy a request at its overfetch tier even after
-// rights-gate rejections. Bucketing would need explicit refill logic.
-function searchCacheKey(query: string, museum: string | undefined, hasImage: boolean, overFetch: number): string {
-  return JSON.stringify({ q: query, m: museum ?? '*', hi: hasImage, of: overFetch });
-}
-
 async function handleSearch(args: unknown) {
-  const input = SearchInput.parse(args);
-  const fetchers = input.museum
-    ? (FETCHERS[input.museum] ? [FETCHERS[input.museum]] : [])
-    : Object.values(FETCHERS);
-  if (fetchers.length === 0) {
-    return errorResult(`unknown museum: ${input.museum}`);
+  const params = SearchParamsSchema.parse(args);
+  try {
+    const result = await federation.search(params);
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  } catch (err) {
+    if (err instanceof UnknownMuseumError) {
+      return errorResult(`unknown museum: ${err.museum}`);
+    }
+    throw err;
   }
-
-  const overFetch = input.has_image ? input.limit * 2 : input.limit;
-  const cacheKey = searchCacheKey(input.query, input.museum, input.has_image, overFetch);
-
-  let allIds = cache.getQuery(cacheKey);
-  if (!allIds) {
-    const idLists = await Promise.all(
-      fetchers.map((f) =>
-        f.search(input.query, overFetch, { hasImage: input.has_image }).catch(() => [] as string[]),
-      ),
-    );
-    allIds = idLists.flat();
-    cache.putQuery(cacheKey, allIds);
-  }
-
-  const fetched = await withConcurrency(allIds, FETCH_CONCURRENCY, (id) =>
-    fetchAndCache(id).catch((err: unknown) => ({
-      ok: false as const,
-      reason: err instanceof Error ? err.message : 'fetch failed',
-    })),
-  );
-  const accepted: Artwork[] = fetched
-    .filter((r): r is { ok: true; artwork: Artwork } => r.ok)
-    .map((r) => r.artwork);
-  const filtered = accepted.filter((a) => !input.has_image || Boolean(a.imageUrls.full));
-  const deduped = dedupeWikimediaUploads(filtered);
-  const dated = filterByYearRange(deduped, input.year_min, input.year_max);
-  const results = dated.slice(0, input.limit);
-
-  return {
-    content: [
-      {
-        type: 'text' as const,
-        text: JSON.stringify({ count: results.length, results }, null, 2),
-      },
-    ],
-  };
 }
 
 async function handleGet(args: unknown) {
   const input = GetInput.parse(args);
-  const out = await fetchAndCache(input.id);
+  const out = await federation.getArtwork(input.id);
   if (!out.ok) return errorResult(out.reason);
   return { content: [{ type: 'text' as const, text: JSON.stringify(out.artwork, null, 2) }] };
 }
 
 async function handleCite(args: unknown) {
   const input = CiteInput.parse(args);
-  const out = await fetchAndCache(input.id);
+  const out = await federation.cite(input.id, input.style as CiteStyle);
   if (!out.ok) return errorResult(out.reason);
-  return { content: [{ type: 'text' as const, text: cite(out.artwork, input.style as CiteStyle) }] };
+  return { content: [{ type: 'text' as const, text: out.citation }] };
 }
 
 async function handleDiscoverRandom(args: unknown) {
@@ -417,7 +323,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   if (!ID_REGEX.test(id)) {
     throw new Error(`invalid museum URI: ${uri} (id must match ${ID_REGEX})`);
   }
-  const out = await fetchAndCache(id);
+  const out = await federation.getArtwork(id);
   if (!out.ok) {
     throw new Error(`cannot resolve ${uri}: ${out.reason}`);
   }
