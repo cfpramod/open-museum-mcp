@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { aicFetcher } from '../src/fetchers/aic.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -162,5 +162,65 @@ describe('AIC adapter normalization', () => {
     expect(result.status).toBe('rejected');
     if (result.status !== 'rejected') return;
     expect(result.rejection.reason).toContain('strict default reject');
+  });
+});
+
+describe('AIC search query construction (#28)', () => {
+  // Capture the URL passed to fetch without making a live call. AIC proxies
+  // the `query[...]` params straight into Elasticsearch, so the exact param
+  // shape is what the bug is about: two sibling clauses in one query object
+  // (`query[term]` + `query[exists]`) is invalid ES and AIC returns HTTP 400.
+  // The clauses must be combined under a single `bool/must` array instead.
+  function stubFetchCapturingUrl(): { urls: string[] } {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        urls.push(input.toString());
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ data: [{ id: 11 }] }),
+        } as Response;
+      }),
+    );
+    return { urls };
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('combines the rights and image filters under a single bool/must array', async () => {
+    const cap = stubFetchCapturingUrl();
+    await aicFetcher.search('Hopper Nighthawks', 3, { hasImage: true });
+    const params = new URL(cap.urls[0]).searchParams;
+
+    // The bug shape: two sibling query clauses. Neither may appear.
+    expect(params.has('query[term][is_public_domain]')).toBe(false);
+    expect(params.has('query[exists][field]')).toBe(false);
+
+    // The fix shape: a bool/must array carrying both clauses.
+    expect(params.get('query[bool][must][0][term][is_public_domain]')).toBe('true');
+    expect(params.get('query[bool][must][1][exists][field]')).toBe('image_id');
+
+    // Free-text query and field projection are unchanged.
+    expect(params.get('q')).toBe('Hopper Nighthawks');
+    expect(params.get('fields')).toBe('id');
+  });
+
+  it('omits the image-exists clause when hasImage is false', async () => {
+    const cap = stubFetchCapturingUrl();
+    await aicFetcher.search('Monet', 5, { hasImage: false });
+    const params = new URL(cap.urls[0]).searchParams;
+
+    expect(params.get('query[bool][must][0][term][is_public_domain]')).toBe('true');
+    expect(params.has('query[bool][must][1][exists][field]')).toBe(false);
+  });
+
+  it('maps numeric response ids to aic:-prefixed strings', async () => {
+    stubFetchCapturingUrl();
+    const ids = await aicFetcher.search('Monet', 3, {});
+    expect(ids).toEqual(['aic:11']);
   });
 });
