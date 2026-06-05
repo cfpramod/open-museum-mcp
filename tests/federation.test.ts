@@ -86,7 +86,7 @@ function fakeFetcher(code: string, config: FakeConfig) {
 
 describe('createFederation.search', () => {
   it('overfetches, drops rights-gate rejections, and slices to limit', async () => {
-    // limit 2, has_image true -> overFetch 4. Four candidates, one rejected.
+    // limit 2, has_image true -> overFetch 6. Four candidates, one rejected.
     const t = fakeFetcher('test', {
       ids: ['test:1', 'test:2', 'test:3', 'test:4'],
       accept: new Set(['test:1', 'test:2', 'test:3']),
