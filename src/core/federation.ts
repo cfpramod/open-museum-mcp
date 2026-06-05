@@ -22,6 +22,14 @@ export const ID_REGEX = /^[a-z]+:(?!.*\.\.)[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/
 // gentle and keeps wall-clock time within the same order of magnitude.
 const DEFAULT_FETCH_CONCURRENCY = 8;
 
+// Overfetch buffer: how many candidate IDs to pull per requested result before
+// the rights gate and image filter thin them down. Bumped from 2x to 3x after
+// the Met search stopped pre-filtering to public-domain upstream — more fetched
+// records are now rejected by the gate post-fetch, so a larger candidate pool is
+// needed to still fill a page. Applied only when has_image is set (the common
+// path); the cache key carries the resolved overfetch count.
+const OVERFETCH_FACTOR = 3;
+
 /**
  * Parsed parameters for a federation search. Shared by every front door (MCP
  * tool, HTTP endpoint) so validation lives in one place. The date bounds gate
@@ -124,8 +132,8 @@ async function withConcurrency<T, R>(
 }
 
 // The cache key includes the overfetch count, not the user-facing `limit`.
-// That means limit:5 and limit:6 produce different keys (since 5*2=10 vs
-// 6*2=12). The trade-off: more cache rows, but each row is guaranteed to
+// That means limit:5 and limit:6 produce different keys (since 5*3=15 vs
+// 6*3=18). The trade-off: more cache rows, but each row is guaranteed to
 // hold enough IDs to satisfy a request at its overfetch tier even after
 // rights-gate rejections. Bucketing would need explicit refill logic.
 function searchCacheKey(
@@ -185,7 +193,7 @@ export function createFederation(opts: FederationOptions): Federation {
       throw new UnknownMuseumError(params.museum ?? '');
     }
 
-    const overFetch = params.has_image ? params.limit * 2 : params.limit;
+    const overFetch = params.has_image ? params.limit * OVERFETCH_FACTOR : params.limit;
     const cacheKey = searchCacheKey(params.query, params.museum, params.has_image, overFetch);
 
     let allIds = await cache.getQuery(cacheKey);
