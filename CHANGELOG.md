@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-06-05
+
+### Added
+
+- **`clearance_record` MCP tool — portable, fail-closed Clearance Manifests.** A new first-class tool emits a [Clearance Manifest](spec/clearance/v0.1/spec.md) for any artwork id: a machine-readable JSON-LD rights-clearance artifact carrying the work's provenance, citation, the rights determination, and an auditable trail of *how* that determination was reached, answering reuse questions ("may I print this and sell it?") as binary booleans. A non-cleared work — rejected by the rights gate, an unknown museum, or an invalid id — returns a definitive **deny** manifest, not an error: a deny is a valid answer. The payload is wrapped in a Tier-0 integrity envelope whose SHA-256 is computed over the RFC 8785 (JCS) canonicalization of the payload; the payload never holds its own hash.
+- **In-repo Clearance Manifest spec v0.1 (`spec/clearance/v0.1/`).** Authored against the permanent `openclearance.org` namespace: the normative `spec.md`, JSON Schema (Draft 2020-12), JSON-LD `context.jsonld`, the non-normative determination-rule registry (`rules.md`), the `unrecognised_rule` advisory schema, committed conformance examples, and a URL-stability `VERSIONING.md`. The schema is exercised by an ajv conformance suite over freshly-emitted accept and deny manifests.
+- **`Federation.clearanceManifest(id)` on the reusable core.** The clearance logic lives in a Workers-safe `src/core/clearance/` module (zero runtime dependencies, no `node:` imports, Web Crypto only), so non-Node front doors (e.g. the web app) can emit manifests too. The single license→clearance mapping table is the sole place determinations live, fail-closed by construction.
+
 ## [0.6.0] — 2026-06-02
 
 ### Added

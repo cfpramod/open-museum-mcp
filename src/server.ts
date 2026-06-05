@@ -59,7 +59,7 @@ const cache = new Cache({ path: CACHE_PATH });
 
 // Single source for the server version. Stamped into the MCP handshake and into
 // each Clearance Manifest's `verification.tool` provenance field.
-const VERSION = '0.6.0';
+const VERSION = '0.7.0';
 
 // The federation engine is transport-agnostic. The MCP server is one front
 // door over it (stdio JSON-RPC); the web app is another (HTTP + KV cache).
