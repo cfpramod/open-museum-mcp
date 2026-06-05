@@ -18,6 +18,7 @@ import {
   UnknownMuseumError,
   type CiteStyle,
 } from './core/index.js';
+import { handleClearanceRecord } from './clearanceTool.js';
 import { Cache } from './db.js';
 import { buildSeedQueryFromConstraints } from './discoverSeed.js';
 import { aicFetcher } from './fetchers/aic.js';
@@ -81,10 +82,6 @@ const GetInput = z.object({
 const CiteInput = z.object({
   id: z.string().regex(ID_REGEX),
   style: z.enum(['short', 'full', 'caption']).default('full'),
-});
-
-const ClearanceInput = z.object({
-  id: z.string().regex(ID_REGEX),
 });
 
 const DiscoverInput = z.object({
@@ -299,14 +296,6 @@ async function handleDiscoverRandom(args: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(artwork, null, 2) }] };
 }
 
-async function handleClearance(args: unknown) {
-  const input = ClearanceInput.parse(args);
-  // clearanceManifest never throws for a non-cleared work — a deny is a valid
-  // manifest, returned as a normal (non-error) tool result.
-  const env = await federation.clearanceManifest(input.id);
-  return { content: [{ type: 'text' as const, text: JSON.stringify(env, null, 2) }] };
-}
-
 function handleListTraditions() {
   const traditions = cache.listTraditions();
   const isEmpty = traditions.regions.length === 0 && traditions.periods.length === 0;
@@ -326,7 +315,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === 'cite') return await handleCite(args);
     if (name === 'discover_random') return await handleDiscoverRandom(args);
     if (name === 'list_traditions') return handleListTraditions();
-    if (name === 'clearance_record') return await handleClearance(args);
+    if (name === 'clearance_record') return await handleClearanceRecord(federation, args);
     return errorResult(`unknown tool: ${name}`);
   } catch (err) {
     if (err instanceof z.ZodError) {
