@@ -93,14 +93,17 @@ describe('Met adapter search (relevance)', () => {
     expect(captured?.searchParams.get('hasImages')).toBe('true');
   });
 
-  it('a gibberish query does not return the same fixed set as a real query', async () => {
-    // Emulates the Met API quirk that motivated the fix: with isPublicDomain=true
-    // present, a non-matching query falls back to a fixed public-domain set
-    // instead of an empty/relevant result, so unrelated queries collapse to the
-    // same IDs. Without the filter, results track the query — relevance restored.
-    const FIXED_PD_FALLBACK = [1, 2, 3];
+  it('does not send isPublicDomain, so the query — not a fixed fallback — drives results', async () => {
+    // This is a SIMPLIFIED MODEL of the upstream behaviour, not a fixture of it:
+    // the real Met API does not document this fallback, and we don't assert what
+    // its ranking is. The mock encodes only the one property this fix turns on —
+    // that the request omits isPublicDomain, so the response is a function of `q`
+    // rather than a query-independent constant. The branch below stands in for
+    // "filter present => query-independent set" purely to prove our request shape
+    // changed; it is not a claim about the Met's internal relevance algorithm.
+    const FIXED_FALLBACK_WHEN_FILTERED = [1, 2, 3];
     stubFetch((url) => {
-      if (url.searchParams.has('isPublicDomain')) return FIXED_PD_FALLBACK;
+      if (url.searchParams.has('isPublicDomain')) return FIXED_FALLBACK_WHEN_FILTERED;
       const q = url.searchParams.get('q') ?? '';
       return q === 'van gogh' ? [11, 22, 33] : [];
     });
