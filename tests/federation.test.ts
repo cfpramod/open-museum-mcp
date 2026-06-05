@@ -86,7 +86,7 @@ function fakeFetcher(code: string, config: FakeConfig) {
 
 describe('createFederation.search', () => {
   it('overfetches, drops rights-gate rejections, and slices to limit', async () => {
-    // limit 2, has_image true -> overFetch 4. Four candidates, one rejected.
+    // limit 2, has_image true -> overFetch 6. Four candidates, one rejected.
     const t = fakeFetcher('test', {
       ids: ['test:1', 'test:2', 'test:3', 'test:4'],
       accept: new Set(['test:1', 'test:2', 'test:3']),
@@ -146,6 +146,56 @@ describe('createFederation.search', () => {
     await expect(fed.search({ query: 'x', has_image: true, limit: 5, museum: 'nope' })).rejects.toBeInstanceOf(
       UnknownMuseumError,
     );
+  });
+
+  // The 3x overfetch buffer is load-bearing, not decorative: with the Met search
+  // no longer pre-filtering to public domain upstream, a realistic fraction of
+  // fetched records are now rejected by the gate post-fetch. This fetcher honors
+  // the overfetch count the federation actually requests (limit * 3 when
+  // has_image), so the test exercises the real headroom rather than asserting it.
+  function countHonoringFetcher(code: string, rejectFraction: number) {
+    const fetcher: Fetcher = {
+      code,
+      name: code.toUpperCase(),
+      // Return exactly as many candidate ids as the federation asks for.
+      async search(_query: string, count: number) {
+        return Array.from({ length: count }, (_, i) => `${code}:${i + 1}`);
+      },
+      async getRaw(id: string) {
+        return { id };
+      },
+      normalize(raw: unknown): ValidationResult {
+        const id = (raw as { id: string }).id;
+        const n = Number(id.slice(id.indexOf(':') + 1));
+        // Reject a deterministic ~rejectFraction of records (every Nth id).
+        const period = Math.max(2, Math.round(1 / rejectFraction));
+        if (n % period === 0) {
+          return { status: 'rejected', rejection: { id, museumCode: code, reason: `${code}: not open`, rawSnapshot: raw } };
+        }
+        return { status: 'accepted', artwork: makeArtwork(id) };
+      },
+    };
+    return fetcher;
+  }
+
+  it('fills a full page when ~half of fetched records are rejected by the gate (3x headroom)', async () => {
+    // limit 10, has_image -> overFetch 30 candidates; ~half rejected leaves ~15
+    // accepted, comfortably filling the 10-result page with margin. At the old 2x
+    // factor this would only break even (20 candidates -> ~10 accepted, zero
+    // headroom), so this asserts the buffer absorbs the higher rejection rate.
+    const fed = createFederation({
+      fetchers: { test: countHonoringFetcher('test', 0.5) },
+      cache: memoryCache().store,
+    });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 10 });
+    expect(out.count).toBe(10);
+    expect(out.results).toHaveLength(10);
+    // Every returned record is one the gate accepted (no rejected id leaked).
+    for (const r of out.results) {
+      const n = Number(r.id.slice(r.id.indexOf(':') + 1));
+      expect(n % 2).not.toBe(0);
+    }
   });
 });
 

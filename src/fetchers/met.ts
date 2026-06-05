@@ -17,7 +17,14 @@ export const metFetcher: Fetcher = {
     if (options.hasImage !== false) {
       url.searchParams.set('hasImages', 'true');
     }
-    url.searchParams.set('isPublicDomain', 'true');
+    // No `isPublicDomain=true` here. The Met search API treats that flag as a
+    // hard pre-filter that collapses non-matching queries onto a fixed
+    // public-domain fallback set, destroying relevance ranking. Rights
+    // enforcement is not the search call's job: `normalize` runs
+    // `validateMetLicense` on every fetched object (strict default deny), so a
+    // non-public-domain record is rejected post-fetch regardless. Filtering in
+    // search would only hide the engine's actual rights behaviour behind the
+    // upstream API's quirk.
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Met search failed: ${res.status}`);
