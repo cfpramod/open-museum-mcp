@@ -48,7 +48,7 @@ schema. The set of rule ids is **open, not a closed enum**:
 - **Rule ids are stable and immutable within a version.** Once published at
   `https://openclearance.org/v0.1/rules`, a rule id's meaning is frozen. A corrected or expanded
   truth table ships as a new spec version, never by editing a published rule in place. (See
-  [`../../../VERSIONING.md`](../../../VERSIONING.md) once authored.)
+  [`../VERSIONING.md`](../VERSIONING.md).)
 - **Fail-closed is the contract.** Any license signal that is missing, ambiguous, or not on this
   permissive list resolves to `default-deny`: every clearance boolean `false`, `confidence: low`,
   and the failing value carried verbatim in `inputs`.
