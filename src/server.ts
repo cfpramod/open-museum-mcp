@@ -57,6 +57,10 @@ if (process.env.EUROPEANA_API_KEY) {
 const CACHE_PATH = process.env.OMM_CACHE_PATH ?? join(homedir(), '.open-museum-mcp', 'cache.db');
 const cache = new Cache({ path: CACHE_PATH });
 
+// Single source for the server version. Stamped into the MCP handshake and into
+// each Clearance Manifest's `verification.tool` provenance field.
+const VERSION = '0.6.0';
+
 // The federation engine is transport-agnostic. The MCP server is one front
 // door over it (stdio JSON-RPC); the web app is another (HTTP + KV cache).
 // Rejections are logged to stderr — stdout is the MCP protocol channel — so
@@ -66,6 +70,7 @@ const cache = new Cache({ path: CACHE_PATH });
 const federation = createFederation({
   fetchers: FETCHERS,
   cache,
+  engineVersion: VERSION,
   onReject: (id, reason) => console.error(`[open-museum-mcp] rejected ${id}: ${reason}`),
 });
 
@@ -78,6 +83,10 @@ const CiteInput = z.object({
   style: z.enum(['short', 'full', 'caption']).default('full'),
 });
 
+const ClearanceInput = z.object({
+  id: z.string().regex(ID_REGEX),
+});
+
 const DiscoverInput = z.object({
   region: z.string().min(1).optional(),
   period: z.string().min(1).optional(),
@@ -86,7 +95,7 @@ const DiscoverInput = z.object({
 });
 
 const server = new Server(
-  { name: 'open-museum-mcp', version: '0.6.0' },
+  { name: 'open-museum-mcp', version: VERSION },
   {
     capabilities: {
       tools: {},
@@ -194,6 +203,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {},
       },
     },
+    {
+      name: 'clearance_record',
+      description:
+        'Emit a portable, fail-closed Clearance Manifest (rights-clearance + provenance + citation) for an artwork id, wrapped in a Tier-0 integrity envelope (RFC 8785 JCS sha-256). A non-cleared work — rejected by the rights gate, an unknown museum, or an invalid id — returns a definitive DENY manifest, not an error: a deny is a valid answer. Conforms to the in-repo Clearance Manifest spec at spec/clearance/v0.1 (openclearance.org/v0.1).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Normalized artwork ID, format museumcode:id (e.g. met:436535).' },
+        },
+        required: ['id'],
+      },
+    },
   ],
 }));
 
@@ -278,6 +299,14 @@ async function handleDiscoverRandom(args: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(artwork, null, 2) }] };
 }
 
+async function handleClearance(args: unknown) {
+  const input = ClearanceInput.parse(args);
+  // clearanceManifest never throws for a non-cleared work — a deny is a valid
+  // manifest, returned as a normal (non-error) tool result.
+  const env = await federation.clearanceManifest(input.id);
+  return { content: [{ type: 'text' as const, text: JSON.stringify(env, null, 2) }] };
+}
+
 function handleListTraditions() {
   const traditions = cache.listTraditions();
   const isEmpty = traditions.regions.length === 0 && traditions.periods.length === 0;
@@ -297,6 +326,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === 'cite') return await handleCite(args);
     if (name === 'discover_random') return await handleDiscoverRandom(args);
     if (name === 'list_traditions') return handleListTraditions();
+    if (name === 'clearance_record') return await handleClearance(args);
     return errorResult(`unknown tool: ${name}`);
   } catch (err) {
     if (err instanceof z.ZodError) {
