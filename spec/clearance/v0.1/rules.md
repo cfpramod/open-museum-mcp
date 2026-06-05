@@ -66,10 +66,13 @@ permitted; no attribution is legally required.
 | `cc0-grants-derivatives` | `clearance.derivatives.permitted` | `license.type = CC0` | `true` |
 | `cc0-waives-attribution` | `clearance.attributionRequired.required` | `license.type = CC0` | `false` |
 
-## Public Domain — No Copyright (`http://rightsstatements.org/vocab/NoC-US/1.0/`)
+## Public Domain — Public Domain Mark (`https://creativecommons.org/publicdomain/mark/1.0/`)
 
-The work is in the public domain in its source jurisdiction (no subsisting copyright). All
-downstream uses are permitted; no attribution is legally required.
+The work carries no known worldwide copyright (Creative Commons Public Domain Mark). The engine
+emits `license.type = PD` only for the worldwide Public Domain Mark (Europeana `rights`) and the
+Wikimedia PD/PDM templates — never a jurisdiction-scoped `rightsstatements.org` value such as
+NoC-US, which claims a narrower (US) scope the gate does not assert. All downstream uses are
+permitted; no attribution is legally required.
 
 | Rule id | Asserts | Keys on (`inputs`) | Outcome |
 |---|---|---|---|

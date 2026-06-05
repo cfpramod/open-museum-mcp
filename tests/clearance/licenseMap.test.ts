@@ -26,13 +26,16 @@ describe('clearanceForLicense', () => {
     }
   });
 
-  it('PD ⇒ commercial + derivatives permitted, no attribution, NoC-US statement + pd-* rules', () => {
+  it('PD ⇒ commercial + derivatives permitted, no attribution, Public Domain Mark statement + pd-* rules', () => {
     const c = clearanceForLicense('PD');
     expect(c.commercialReproduction.permitted).toBe(true);
     expect(c.derivatives.permitted).toBe(true);
     expect(c.attributionRequired.required).toBe(false);
     expect(c.confidence).toBe('high');
-    expect(c.statement).toBe('http://rightsstatements.org/vocab/NoC-US/1.0/');
+    // Worldwide Public Domain Mark — the gate only emits PD for the CC Public
+    // Domain Mark (Europeana) and Wikimedia PD/PDM templates, never the
+    // US-scoped NoC-US statement.
+    expect(c.statement).toBe('https://creativecommons.org/publicdomain/mark/1.0/');
     expect(c.commercialReproduction.basis.rule).toBe('pd-grants-commercial');
     expect(c.derivatives.basis.rule).toBe('pd-grants-derivatives');
     expect(c.attributionRequired.basis.rule).toBe('pd-waives-attribution');

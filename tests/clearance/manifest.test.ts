@@ -1,6 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { buildClearancePayload } from '../../src/core/clearance/manifest.js';
+import { europeanaFetcher } from '../../src/fetchers/europeana.js';
 import type { Artwork } from '../../src/types.js';
+
+const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), '../fixtures');
+const fixture = (name: string) => JSON.parse(readFileSync(join(fixturesDir, name), 'utf8'));
 
 const NOW = '2026-06-05T12:00:00.000Z';
 const OPTS = { engineVersion: '0.7.0', now: NOW };
@@ -159,5 +166,26 @@ describe('buildClearancePayload — rejected / deny', () => {
 
   it('omits citation for an unidentified rejected record', () => {
     expect(p.citation).toBeUndefined();
+  });
+});
+
+describe('buildClearancePayload — PD statement matches gate-accepted vocabulary', () => {
+  // A real Public Domain record run through the actual rights gate. The emitted
+  // rights.statement must be a URI the gate genuinely accepts for PD — the gate
+  // only ever yields type=PD for the worldwide Public Domain Mark (Europeana)
+  // and Wikimedia PD/PDM templates, never the US-scoped NoC-US statement.
+  const result = europeanaFetcher.normalize(fixture('europeana-accepted-pdm.json'));
+
+  it('emits the worldwide Public Domain Mark, aligned with the gate rawValue', () => {
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.license.type).toBe('PD');
+
+    const p = buildClearancePayload(result, OPTS);
+    expect(p.rights.statement).toBe('https://creativecommons.org/publicdomain/mark/1.0/');
+    // The clearance statement is not a hardcoded divergence from the gate: for
+    // this record the gate's own accepted rawValue is the same PDM URI.
+    expect(p.rights.statement).toBe(result.artwork.license.rawValue);
+    expect(p.rights.statement).not.toContain('rightsstatements.org');
   });
 });

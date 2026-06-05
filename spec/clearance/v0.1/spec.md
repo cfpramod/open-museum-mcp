@@ -6,8 +6,8 @@
 - **This document is normative.** Companion artifacts: the JSON-LD context
   ([`context.jsonld`](context.jsonld)), the JSON Schema
   ([`clearance-manifest.schema.json`](clearance-manifest.schema.json)), the rule
-  registry ([`rules.md`](rules.md)), the conformance suite
-  ([`conformance/`](conformance/)), and the URL-stability promise
+  registry ([`rules.md`](rules.md)), the conformance example manifests
+  ([`examples/`](examples/)), and the URL-stability promise
   ([`../VERSIONING.md`](../VERSIONING.md)).
 
 The key words MUST, MUST NOT, REQUIRED, SHOULD, SHOULD NOT, and MAY are to be
@@ -26,9 +26,11 @@ booleans. A manifest is emitted for cleared **and** non-cleared works alike: a
 ## Design principles
 
 1. **Compose, don't reinvent.** The format binds existing standards through its
-   JSON-LD `@context`: Creative Commons and rightsstatements.org URIs (rights
-   status), schema.org and Dublin Core (descriptive and provenance metadata), and
-   W3C PROV (the determination event). Its only original contribution is the thin
+   JSON-LD `@context`: Creative Commons rights URIs (rights status — v0.1 emits
+   the CC0 and Public Domain Mark URIs; the model also accommodates
+   rightsstatements.org URIs for vocabularies a future version may admit),
+   schema.org and Dublin Core (descriptive and provenance metadata), and W3C PROV
+   (the determination event). Its only original contribution is the thin
    **clearance layer** bridging descriptive metadata and reuse viability, defined
    under the `oc:` vocabulary.
 2. **Transport over adjudication.** This spec defines the *shape and transport*
@@ -200,8 +202,11 @@ critical defect; a false deny is tolerable.
 
 A document conforms to Clearance Manifest v0.1 if it validates against
 [`clearance-manifest.schema.json`](clearance-manifest.schema.json) and expands
-cleanly under [`context.jsonld`](context.jsonld). A *verifier* conforms if it
-agrees with the conformance suite ([`conformance/`](conformance/)) on every case,
-including emitting the declared advisories for structurally-valid documents with
+cleanly under [`context.jsonld`](context.jsonld). The conformance example
+manifests in [`examples/`](examples/) (one accepted, one deny) are the reference
+fixtures; the schema is exercised against freshly-emitted accept and deny
+manifests by the ajv harness in `tests/clearance/conformance.test.ts`. A
+*verifier* conforms if it agrees with that suite on every case, including
+emitting the declared advisories for structurally-valid documents with
 unrecognised rule ids. URL stability and the versioning promise are described in
 [`../VERSIONING.md`](../VERSIONING.md).

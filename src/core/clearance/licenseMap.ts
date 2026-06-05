@@ -37,10 +37,16 @@ const PERMISSIVE: Partial<
     rulePrefix: 'cc0',
     summaryNoun: 'CC0 public-domain dedication',
   },
+  // The gate only emits type=PD for the worldwide Creative Commons Public
+  // Domain Mark (Europeana `rights` = .../publicdomain/mark/1.0/) and the
+  // Wikimedia PD/PDM templates — never a jurisdiction-scoped rightsstatements.org
+  // value. The Public Domain Mark URI is therefore the accurate, gate-aligned
+  // statement; the old US-scoped NoC-US URI claimed a narrower (and incorrect)
+  // scope the gate never asserts.
   PD: {
-    statement: 'http://rightsstatements.org/vocab/NoC-US/1.0/',
+    statement: 'https://creativecommons.org/publicdomain/mark/1.0/',
     rulePrefix: 'pd',
-    summaryNoun: 'public-domain status',
+    summaryNoun: 'Public Domain Mark status',
   },
 };
 
