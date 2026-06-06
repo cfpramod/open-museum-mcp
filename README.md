@@ -3,6 +3,7 @@
 [![CI](https://github.com/cfpramod/open-museum-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cfpramod/open-museum-mcp/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/open-museum-mcp.svg)](https://www.npmjs.com/package/open-museum-mcp)
 [![open-museum-mcp MCP server](https://glama.ai/mcp/servers/cfpramod/open-museum-mcp/badges/score.svg)](https://glama.ai/mcp/servers/cfpramod/open-museum-mcp)
+[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](#help-maintain-this)
 
 > One search across five open-access museum collections, with strict per-museum rights verification and ready-to-use citations.
 
@@ -293,6 +294,15 @@ This is actively maintained as of the latest release. Because it is a side proje
 ### Changelog
 
 [Releases](https://github.com/cfpramod/open-museum-mcp/releases) lists what shipped in each version, with notes.
+
+## Help maintain this
+
+open-museum-mcp is an independently maintained side project, and it now carries two things that benefit from more hands:
+
+- **The MCP engine** — the museum adapters, the rights gate, the date parser, the federation core. New collections, rights-model corrections, and bug reports are all welcome; [CONTRIBUTING.md](CONTRIBUTING.md) is the starting point.
+- **The openclearance Clearance Manifest spec** ([`spec/clearance/`](spec/clearance/)) — a portable, fail-closed rights-clearance format emitted by the `clearance_record` tool. Schema review, conformance tests, and additional per-museum rule mappings are especially valuable while v0.1 is young and the schema can still absorb feedback.
+
+If you'd like to help — code, review, documentation, or rights expertise — open an issue or a PR. And if your organisation relies on this and would like to **fund** its ongoing maintenance, open an issue or get in touch; a sponsorship path is being set up.
 
 ## Contributing a museum adapter
 
