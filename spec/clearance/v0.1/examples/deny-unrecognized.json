@@ -1,78 +1,9 @@
 {
-  "@context": [
-    "https://schema.org/",
-    "http://purl.org/dc/terms/",
-    "https://openclearance.org/v0.1/context.jsonld"
-  ],
-  "type": "ClearanceManifest",
-  "specVersion": "0.1",
-  "work": {
-    "id": "xyz:1"
-  },
-  "source": {
-    "museum": {
-      "code": "xyz"
-    }
-  },
-  "rights": {
-    "statement": null,
-    "sourceApiValue": null,
-    "imageOpenAccess": false,
-    "metadataOpenAccess": false,
-    "confidence": "low"
-  },
-  "clearance": {
-    "commercialReproduction": {
-      "permitted": false,
-      "basis": {
-        "rule": "default-deny",
-        "inputs": [
-          {
-            "field": "rejection.reason",
-            "value": "rights_status='Educational Use Only' (strict default reject)"
-          }
-        ],
-        "summary": "rights gate rejected 'xyz:1': rights_status='Educational Use Only' (strict default reject) ⇒ default deny"
-      }
-    },
-    "derivatives": {
-      "permitted": false,
-      "basis": {
-        "rule": "default-deny",
-        "inputs": [
-          {
-            "field": "rejection.reason",
-            "value": "rights_status='Educational Use Only' (strict default reject)"
-          }
-        ],
-        "summary": "rights gate rejected 'xyz:1': rights_status='Educational Use Only' (strict default reject) ⇒ default deny"
-      }
-    },
-    "attributionRequired": {
-      "required": false,
-      "basis": {
-        "rule": "default-deny",
-        "inputs": [
-          {
-            "field": "rejection.reason",
-            "value": "rights_status='Educational Use Only' (strict default reject)"
-          }
-        ],
-        "summary": "rights gate rejected 'xyz:1': rights_status='Educational Use Only' (strict default reject) ⇒ default deny"
-      }
-    }
-  },
-  "verification": {
-    "determinedBy": {
-      "actor": "engine:open-museum-mcp",
-      "role": "rights-gate"
-    },
-    "tool": "open-museum-mcp@0.7.0 · rights-gate",
-    "determinedAt": "2026-06-05T00:00:00.000Z",
-    "ruleContext": "strict default deny: rights_status='Educational Use Only' (strict default reject)",
-    "determinationSource": {
-      "type": "rights-gate-default",
-      "retrievedAt": "2026-06-05T00:00:00.000Z"
-    }
+  "tier": 0,
+  "payloadType": "application/clearance-manifest+json",
+  "payload": "{\"@context\":[\"https://schema.org/\",\"http://purl.org/dc/terms/\",\"https://openclearance.org/v0.1/context.jsonld\"],\"type\":\"ClearanceManifest\",\"specVersion\":\"0.1\",\"work\":{\"id\":\"xyz:1\"},\"source\":{\"museum\":{\"code\":\"xyz\"}},\"rights\":{\"statement\":null,\"sourceApiValue\":null,\"imageOpenAccess\":false,\"metadataOpenAccess\":false,\"confidence\":\"low\"},\"clearance\":{\"commercialReproduction\":{\"permitted\":false,\"basis\":{\"rule\":\"default-deny\",\"inputs\":[{\"field\":\"rejection.reason\",\"value\":\"rights_status='Educational Use Only' (strict default reject)\"}],\"summary\":\"rights gate rejected 'xyz:1': rights_status='Educational Use Only' (strict default reject) ⇒ default deny\"}},\"derivatives\":{\"permitted\":false,\"basis\":{\"rule\":\"default-deny\",\"inputs\":[{\"field\":\"rejection.reason\",\"value\":\"rights_status='Educational Use Only' (strict default reject)\"}],\"summary\":\"rights gate rejected 'xyz:1': rights_status='Educational Use Only' (strict default reject) ⇒ default deny\"}},\"attributionRequired\":{\"required\":false,\"basis\":{\"rule\":\"default-deny\",\"inputs\":[{\"field\":\"rejection.reason\",\"value\":\"rights_status='Educational Use Only' (strict default reject)\"}],\"summary\":\"rights gate rejected 'xyz:1': rights_status='Educational Use Only' (strict default reject) ⇒ default deny\"}}},\"verification\":{\"determinedBy\":{\"actor\":\"engine:open-museum-mcp\",\"role\":\"rights-gate\"},\"tool\":\"open-museum-mcp@0.7.0 · rights-gate\",\"determinedAt\":\"2026-06-05T00:00:00.000Z\",\"ruleContext\":\"strict default deny: rights_status='Educational Use Only' (strict default reject)\",\"determinationSource\":{\"type\":\"rights-gate-default\",\"retrievedAt\":\"2026-06-05T00:00:00.000Z\"}}}",
+  "integrity": {
+    "alg": "sha-256",
+    "hash": "16c3c16c36d4812c9c19f997d9225bba1d2da376840b55055a2bfec30cabc726"
   }
 }

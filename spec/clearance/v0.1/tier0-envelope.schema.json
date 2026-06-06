@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclearance.org/v0.1/tier0-envelope.schema.json",
+  "title": "Clearance Manifest Tier-0 envelope v0.1",
+  "description": "The byte-exact, keyless Tier-0 integrity envelope emitted by the clearance_record tool. The manifest payload is carried as its exact UTF-8 JSON string (NOT a nested object), and the integrity hash is SHA-256 over that string's exact bytes. Consumers MUST hash the payload string verbatim, compare, and only THEN JSON.parse it to read; they MUST NOT re-serialize or re-canonicalize. The parsed payload conforms to clearance-manifest.schema.json. Tier 1/2 (C2PA signing) are a separate envelope and out of scope for this schema.",
+  "type": "object",
+  "required": ["tier", "payloadType", "payload", "integrity"],
+  "additionalProperties": false,
+  "properties": {
+    "tier": {
+      "const": 0,
+      "description": "Tier 0 = keyless integrity (no authenticity). Tiers 1/2 use a C2PA envelope, not this one."
+    },
+    "payloadType": {
+      "const": "application/clearance-manifest+json",
+      "description": "Media type of the bytes in `payload`."
+    },
+    "payload": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The exact UTF-8 JSON serialization of the manifest payload. Hash this verbatim; parse it to read. The parsed object conforms to clearance-manifest.schema.json."
+    },
+    "integrity": {
+      "type": "object",
+      "required": ["alg", "hash"],
+      "additionalProperties": false,
+      "description": "Integrity over the exact bytes of `payload`. No canonicalization is applied or permitted.",
+      "properties": {
+        "alg": { "const": "sha-256" },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Lowercase hex SHA-256 of the UTF-8 bytes of the `payload` string."
+        }
+      }
+    }
+  }
+}
