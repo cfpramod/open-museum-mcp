@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "open-museum-mcp",
   "display_name": "Open Museum",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "License-verified federated search across open-access museum collections.",
   "long_description": "Federated MCP search across major open-access museum collections — currently The Met, Cleveland Museum of Art, Art Institute of Chicago, Wikimedia Commons, and Europeana, with more being added. Records pass per-museum rights verification (strict-default-deny on ambiguous license signals) and ship with citation output in `full`, `caption`, and `short` formats — paste-ready for papers, slide decks, and inline references.",
   "author": {

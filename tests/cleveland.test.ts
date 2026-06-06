@@ -108,3 +108,22 @@ describe('Cleveland adapter normalization', () => {
     expect(result.artwork.yearEnd).toBe(907);
   });
 });
+
+describe('Cleveland adapter mediumCategory', () => {
+  it('normalizes the raw `technique` field to the controlled vocab', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    // "oil on fabric" -> painting
+    expect(result.artwork.mediumCategory).toBe('painting');
+  });
+
+  it('falls back to "other" when `technique` carries no known signal', () => {
+    const raw = structuredClone(fixture('cleveland-accepted.json')) as { data: Record<string, unknown> };
+    raw.data.technique = '';
+    const result = clevelandFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.mediumCategory).toBe('other');
+  });
+});

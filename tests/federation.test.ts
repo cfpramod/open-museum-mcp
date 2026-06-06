@@ -15,6 +15,7 @@ function makeArtwork(id: string, over: Partial<Artwork> = {}): Artwork {
     yearStart: 1700,
     yearEnd: 1700,
     medium: 'oil',
+    mediumCategory: 'painting',
     region: null,
     period: null,
     imageUrls: { full: `https://img.example/${id}.jpg` },
@@ -250,5 +251,169 @@ describe('createFederation.cite', () => {
 
     const bad = await fed.cite('test:404', 'short');
     expect(bad.ok).toBe(false);
+  });
+});
+
+describe('createFederation.search medium filter', () => {
+  it('returns only records whose mediumCategory matches the filter', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1', 'test:2', 'test:3'],
+      accept: new Set(['test:1', 'test:2', 'test:3']),
+      over: {
+        'test:1': { mediumCategory: 'painting' },
+        'test:2': { mediumCategory: 'print' },
+        'test:3': { mediumCategory: 'painting' },
+      },
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 10, medium: 'print' });
+    expect(out.results.map((r) => r.id)).toEqual(['test:2']);
+  });
+
+  it('returns all records when no medium filter is set', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1', 'test:2'],
+      accept: new Set(['test:1', 'test:2']),
+      over: { 'test:1': { mediumCategory: 'painting' }, 'test:2': { mediumCategory: 'print' } },
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 10 });
+    expect(out.count).toBe(2);
+  });
+});
+
+describe('createFederation.facets', () => {
+  it('aggregates medium, date-bucket, and top-artist counts over the query result set', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1', 'test:2', 'test:3', 'test:4'],
+      accept: new Set(['test:1', 'test:2', 'test:3', 'test:4']),
+      over: {
+        'test:1': { mediumCategory: 'painting', yearStart: 1850, yearEnd: 1850, artist: { name: 'Monet', attributionType: 'named' } },
+        'test:2': { mediumCategory: 'painting', yearStart: 1880, yearEnd: 1880, artist: { name: 'Monet', attributionType: 'named' } },
+        'test:3': { mediumCategory: 'print', yearStart: 1700, yearEnd: 1700, artist: { name: 'Hokusai', attributionType: 'named' } },
+        'test:4': { mediumCategory: 'print', yearStart: 1755, yearEnd: 1755, artist: { name: 'Nobody', attributionType: 'anonymous' } },
+      },
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 10 });
+
+    expect(f.medium).toContainEqual({ value: 'painting', count: 2 });
+    expect(f.medium).toContainEqual({ value: 'print', count: 2 });
+
+    expect(f.dateBucket).toContainEqual({ value: '1800–1899', count: 2 });
+    expect(f.dateBucket).toContainEqual({ value: '1700–1799', count: 2 });
+
+    expect(f.artist).toContainEqual({ value: 'Monet', count: 2 });
+    expect(f.artist).toContainEqual({ value: 'Hokusai', count: 1 });
+    // anonymous works are not a useful artist facet value
+    expect(f.artist.find((a) => a.value === 'Nobody')).toBeUndefined();
+  });
+
+  it('does not pre-apply the medium filter to the medium facet (shows all available media)', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1', 'test:2'],
+      accept: new Set(['test:1', 'test:2']),
+      over: { 'test:1': { mediumCategory: 'painting' }, 'test:2': { mediumCategory: 'print' } },
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 10, medium: 'painting' });
+    expect(f.medium).toContainEqual({ value: 'painting', count: 1 });
+    expect(f.medium).toContainEqual({ value: 'print', count: 1 });
+  });
+
+  it('limits the artist facet to the top N by count', async () => {
+    const over: Record<string, { artist: { name: string; attributionType: 'named' } }> = {};
+    const ids: string[] = [];
+    for (let i = 1; i <= 15; i++) {
+      const id = `test:${i}`;
+      ids.push(id);
+      over[id] = { artist: { name: `Artist ${i}`, attributionType: 'named' } };
+    }
+    const t = fakeFetcher('test', { ids, accept: new Set(ids), over });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 50 });
+    expect(f.artist.length).toBeLessThanOrEqual(10);
+  });
+
+  it('samples a much larger candidate window than the default search page', async () => {
+    // A fetcher that honors the requested overfetch count and accepts everything.
+    // facets must NOT use the caller's small `limit` (10) for its window — it
+    // overrides to FACET_SAMPLE_SIZE so counts are trustworthy. With caller
+    // limit 10, the search window would be 10*3 = 30; facets must sample far more.
+    const fetcher: Fetcher = {
+      code: 'test',
+      name: 'TEST',
+      async search(_query: string, count: number) {
+        return Array.from({ length: count }, (_, i) => `test:${i + 1}`);
+      },
+      async getRaw(id: string) {
+        return { id };
+      },
+      normalize(raw: unknown): ValidationResult {
+        const id = (raw as { id: string }).id;
+        return { status: 'accepted', artwork: makeArtwork(id, { mediumCategory: 'painting' }) };
+      },
+    };
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 10 });
+    const painting = f.medium.find((m) => m.value === 'painting');
+    expect(painting?.count ?? 0).toBeGreaterThan(100);
+  });
+
+  it('labels BCE date buckets with the earlier year first (load-bearing branch)', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1'],
+      accept: new Set(['test:1']),
+      over: { 'test:1': { yearStart: -450, yearEnd: -440 } }, // mid-5th century BCE
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 10 });
+    expect(f.dateBucket).toContainEqual({ value: '500–401 BCE', count: 1 });
+  });
+});
+
+describe('createFederation.search medium filter — bounded under-delivery', () => {
+  it('returns fewer than limit when the target medium is sparse in the candidate window', async () => {
+    // Honor the overfetch count (limit*3) and make only 2 candidates 'print'.
+    // The medium filter is post-fetch over that bounded window, so the page
+    // legitimately under-delivers rather than fetching more — same contract as
+    // the year filter.
+    const fetcher: Fetcher = {
+      code: 'test',
+      name: 'TEST',
+      async search(_query: string, count: number) {
+        return Array.from({ length: count }, (_, i) => `test:${i + 1}`);
+      },
+      async getRaw(id: string) {
+        return { id };
+      },
+      normalize(raw: unknown): ValidationResult {
+        const id = (raw as { id: string }).id;
+        const n = Number(id.slice(id.indexOf(':') + 1));
+        const mediumCategory = n <= 2 ? 'print' : 'painting';
+        return { status: 'accepted', artwork: makeArtwork(id, { mediumCategory }) };
+      },
+    };
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 5, medium: 'print' });
+    // overFetch = 5*3 = 15 candidates, only 2 are 'print' -> under-delivers to 2.
+    expect(out.count).toBe(2);
+    expect(out.results.every((r) => r.mediumCategory === 'print')).toBe(true);
   });
 });

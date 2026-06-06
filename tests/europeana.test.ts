@@ -210,3 +210,23 @@ describe('Europeana adapter normalization', () => {
     expect(result.artwork.yearEnd).toBe(1642);
   });
 });
+
+describe('Europeana adapter mediumCategory', () => {
+  it('derives mediumCategory from dcType when present', () => {
+    const raw = structuredClone(fixture('europeana-accepted-cc0.json')) as {
+      items: Array<Record<string, unknown>>;
+    };
+    raw.items[0].dcType = ['Painting'];
+    const result = europeanaFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.mediumCategory).toBe('painting');
+  });
+
+  it('falls back to "other" when no dcType/dctermsMedium/dcFormat is present', () => {
+    const result = europeanaFetcher.normalize(fixture('europeana-accepted-cc0.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.mediumCategory).toBe('other');
+  });
+});

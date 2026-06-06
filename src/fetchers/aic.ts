@@ -1,6 +1,7 @@
 import { parseDisplayDate } from '../dateParser.js';
 import { validateAicLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
+import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import {
   asFiniteNumber,
@@ -172,6 +173,7 @@ export const aicFetcher: Fetcher = {
       yearStart: dateRange.yearStart,
       yearEnd: dateRange.yearEnd,
       medium: asString(r.medium_display),
+      mediumCategory: normalizeMedium(asString(r.medium_display)),
       region,
       period: null,
       imageUrls: {

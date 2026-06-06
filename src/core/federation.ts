@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { cite as citeArtwork, type CiteStyle } from '../cite.js';
 import { dedupeWikimediaUploads } from '../dedupe.js';
 import type { Fetcher } from '../fetchers/types.js';
+import { MEDIUM_CATEGORIES } from '../medium.js';
 import type { Artwork } from '../types.js';
 import { filterByYearRange } from '../yearFilter.js';
 import type { CacheStore } from './cache.js';
@@ -30,6 +31,13 @@ const DEFAULT_FETCH_CONCURRENCY = 8;
 // path); the cache key carries the resolved overfetch count.
 const OVERFETCH_FACTOR = 3;
 
+// Facets aggregate over a much larger candidate window than a single search page,
+// so the counts are trustworthy rather than a 10-record sample. 50 candidates ×
+// OVERFETCH_FACTOR = up to ~150 fetched records per museum; fetch concurrency is
+// capped at DEFAULT_FETCH_CONCURRENCY, so this stays gentle upstream. It is a
+// bounded window, not the whole corpus — the facets tool description says so.
+const FACET_SAMPLE_SIZE = 50;
+
 /**
  * Parsed parameters for a federation search. Shared by every front door (MCP
  * tool, HTTP endpoint) so validation lives in one place. The date bounds gate
@@ -44,6 +52,7 @@ export const SearchParamsSchema = z.object({
   limit: z.number().int().min(1).max(50).default(10),
   year_min: z.number().int().optional(),
   year_max: z.number().int().optional(),
+  medium: z.enum(MEDIUM_CATEGORIES).optional(),
 });
 export type SearchParams = z.infer<typeof SearchParamsSchema>;
 
@@ -51,6 +60,32 @@ export interface SearchResult {
   count: number;
   results: Artwork[];
 }
+
+/** One facet value and how many records in the query set carry it. */
+export interface FacetCount {
+  value: string;
+  count: number;
+}
+
+/**
+ * Available facet values + counts for a query, aggregated over a BOUNDED window
+ * of the accepted (rights-verified) candidate set — up to FACET_SAMPLE_SIZE ×
+ * OVERFETCH_FACTOR records per museum, not the whole corpus. Counts reflect the
+ * head of the result set, not exhaustive totals. Only values actually present in
+ * that window appear, so a facet UI renders no empty buckets. Pure aggregation —
+ * Workers-safe, no native deps.
+ */
+export interface FacetResult {
+  /** Medium categories present, by count (descending). */
+  medium: FacetCount[];
+  /** Century buckets (e.g. "1800–1899"), chronological. */
+  dateBucket: FacetCount[];
+  /** Top-N named artists, by count (descending). Anonymous works are excluded. */
+  artist: FacetCount[];
+}
+
+// Cap on the artist facet — a swatch/chip list, not the full long tail.
+const TOP_ARTISTS = 10;
 
 export type FetchOutcome =
   | { ok: true; artwork: Artwork }
@@ -101,6 +136,12 @@ export interface FederationOptions {
 export interface Federation {
   readonly fetchers: Record<string, Fetcher>;
   search(params: SearchParams): Promise<SearchResult>;
+  /**
+   * Available facet values + counts (medium, century date-buckets, top-N artist)
+   * for a query, aggregated over a bounded window of the rights-verified
+   * candidate set (see {@link FacetResult}). Workers-safe.
+   */
+  facets(params: SearchParams): Promise<FacetResult>;
   getArtwork(id: string): Promise<FetchOutcome>;
   cite(id: string, style: CiteStyle): Promise<CiteOutcome>;
   /**
@@ -145,6 +186,59 @@ function searchCacheKey(
   return JSON.stringify({ q: query, m: museum ?? '*', hi: hasImage, of: overFetch });
 }
 
+// --- Facet aggregation (pure, Workers-safe) ---
+
+function sortByCountThenName(a: FacetCount, b: FacetCount): number {
+  return b.count - a.count || a.value.localeCompare(b.value);
+}
+
+function countMedium(arts: Artwork[]): FacetCount[] {
+  const counts = new Map<string, number>();
+  for (const a of arts) {
+    const m = a.mediumCategory ?? 'other';
+    counts.set(m, (counts.get(m) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([value, count]) => ({ value, count })).sort(sortByCountThenName);
+}
+
+// Bucket a signed year into its century. -500 -> -500 (the 500–401 BCE century).
+function centuryStart(year: number): number {
+  return Math.floor(year / 100) * 100;
+}
+
+function centuryLabel(start: number): string {
+  const end = start + 99;
+  // CE: "1800–1899". BCE: earlier year first, e.g. start -500 -> "500–401 BCE".
+  return start >= 0 ? `${start}–${end}` : `${-start}–${-end} BCE`;
+}
+
+function countDateBuckets(arts: Artwork[]): FacetCount[] {
+  const counts = new Map<number, number>();
+  for (const a of arts) {
+    if (a.yearStart === null || a.yearStart === undefined) continue;
+    const start = centuryStart(a.yearStart);
+    counts.set(start, (counts.get(start) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((x, y) => x[0] - y[0]) // chronological
+    .map(([start, count]) => ({ value: centuryLabel(start), count }));
+}
+
+function countArtists(arts: Artwork[]): FacetCount[] {
+  const counts = new Map<string, number>();
+  for (const a of arts) {
+    // Anonymous works are not a usable artist filter value.
+    if (a.artist.attributionType === 'anonymous') continue;
+    const name = a.artist.name?.trim();
+    if (!name) continue;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([value, count]) => ({ value, count }))
+    .sort(sortByCountThenName)
+    .slice(0, TOP_ARTISTS);
+}
+
 /**
  * Build a federation over a set of museum fetchers and a cache. This is the
  * shared engine behind every front door: the MCP server wraps it for stdio
@@ -183,7 +277,11 @@ export function createFederation(opts: FederationOptions): Federation {
     return { ok: true, artwork: result.artwork };
   }
 
-  async function search(params: SearchParams): Promise<SearchResult> {
+  // Gather the accepted, image/dedup/year-filtered candidate set for a query.
+  // Shared by search() (which then medium-filters + slices) and facets() (which
+  // aggregates over it). Deliberately does NOT apply the medium filter or slice,
+  // so the medium facet reflects every medium present in the query.
+  async function gatherCandidates(params: SearchParams): Promise<Artwork[]> {
     const fetcherList = params.museum
       ? fetchers[params.museum]
         ? [fetchers[params.museum]]
@@ -218,10 +316,33 @@ export function createFederation(opts: FederationOptions): Federation {
       .map((r) => r.artwork);
     const filtered = accepted.filter((a) => !params.has_image || Boolean(a.imageUrls.full));
     const deduped = dedupeWikimediaUploads(filtered);
-    const dated = filterByYearRange(deduped, params.year_min, params.year_max);
-    const results = dated.slice(0, params.limit);
+    return filterByYearRange(deduped, params.year_min, params.year_max);
+  }
+
+  async function search(params: SearchParams): Promise<SearchResult> {
+    const dated = await gatherCandidates(params);
+    // Medium is a post-fetch filter on the normalized category (like the year
+    // filter), not an upstream search constraint. Because it runs over the
+    // bounded overfetch window, a medium that is sparse in that window can leave
+    // the page under `limit` — that is expected (we don't re-fetch to top up).
+    // `?? 'other'` defends against any pre-v0.8a cached record predating the field.
+    const byMedium = params.medium
+      ? dated.filter((a) => (a.mediumCategory ?? 'other') === params.medium)
+      : dated;
+    const results = byMedium.slice(0, params.limit);
 
     return { count: results.length, results };
+  }
+
+  async function facets(params: SearchParams): Promise<FacetResult> {
+    // Override the caller's page `limit` with the larger facet sample window so
+    // counts reflect a meaningful slice of the query, not one search page.
+    const candidates = await gatherCandidates({ ...params, limit: FACET_SAMPLE_SIZE });
+    return {
+      medium: countMedium(candidates),
+      dateBucket: countDateBuckets(candidates),
+      artist: countArtists(candidates),
+    };
   }
 
   async function cite(id: string, style: CiteStyle): Promise<CiteOutcome> {
@@ -257,5 +378,5 @@ export function createFederation(opts: FederationOptions): Federation {
     return wrapTier0(buildClearancePayload(result, buildOpts));
   }
 
-  return { fetchers, search, getArtwork, cite, clearanceManifest };
+  return { fetchers, search, facets, getArtwork, cite, clearanceManifest };
 }

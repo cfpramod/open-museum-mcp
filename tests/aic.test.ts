@@ -224,3 +224,22 @@ describe('AIC search query construction (#28)', () => {
     expect(ids).toEqual(['aic:11']);
   });
 });
+
+describe('AIC adapter mediumCategory', () => {
+  it('normalizes the raw `medium_display` field to the controlled vocab', () => {
+    const result = aicFetcher.normalize(fixture('aic-accepted.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    // "Oil on canvas" -> painting
+    expect(result.artwork.mediumCategory).toBe('painting');
+  });
+
+  it('falls back to "other" when `medium_display` carries no known signal', () => {
+    const raw = structuredClone(fixture('aic-accepted.json')) as { data: Record<string, unknown> };
+    raw.data.medium_display = 'Mixed media';
+    const result = aicFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.mediumCategory).toBe('other');
+  });
+});

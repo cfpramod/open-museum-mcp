@@ -15,6 +15,8 @@ export {
   type FederationOptions,
   type SearchParams,
   type SearchResult,
+  type FacetResult,
+  type FacetCount,
   type FetchOutcome,
   type CiteOutcome,
 } from './federation.js';
@@ -42,6 +44,10 @@ export { clearanceForLicense, type ClearanceDecision, type ClearanceBasis } from
 export { cite, type CiteStyle } from '../cite.js';
 export type { Artwork, ArtworkImages, ArtworkSource, ArtworkLicense, ValidationResult } from '../types.js';
 export type { Fetcher, SearchOptions } from '../fetchers/types.js';
+
+// Medium controlled vocabulary — front doors (MCP tool schema, web facet UI)
+// need the value set; the normalizer is exposed for any host-side reclassifying.
+export { MEDIUM_CATEGORIES, normalizeMedium, type MediumCategory } from '../medium.js';
 
 // Built-in museum fetchers, so a host can assemble its own registry (and
 // decide which to enable based on available API keys).
