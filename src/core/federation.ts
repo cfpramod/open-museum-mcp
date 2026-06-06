@@ -31,6 +31,13 @@ const DEFAULT_FETCH_CONCURRENCY = 8;
 // path); the cache key carries the resolved overfetch count.
 const OVERFETCH_FACTOR = 3;
 
+// Facets aggregate over a much larger candidate window than a single search page,
+// so the counts are trustworthy rather than a 10-record sample. 50 candidates ×
+// OVERFETCH_FACTOR = up to ~150 fetched records per museum; fetch concurrency is
+// capped at DEFAULT_FETCH_CONCURRENCY, so this stays gentle upstream. It is a
+// bounded window, not the whole corpus — the facets tool description says so.
+const FACET_SAMPLE_SIZE = 50;
+
 /**
  * Parsed parameters for a federation search. Shared by every front door (MCP
  * tool, HTTP endpoint) so validation lives in one place. The date bounds gate
@@ -61,9 +68,11 @@ export interface FacetCount {
 }
 
 /**
- * Available facet values + counts for a query, aggregated over the accepted
- * (rights-verified) candidate set. Dense by construction: only values actually
- * present appear, so a facet UI renders no empty buckets. Pure aggregation —
+ * Available facet values + counts for a query, aggregated over a BOUNDED window
+ * of the accepted (rights-verified) candidate set — up to FACET_SAMPLE_SIZE ×
+ * OVERFETCH_FACTOR records per museum, not the whole corpus. Counts reflect the
+ * head of the result set, not exhaustive totals. Only values actually present in
+ * that window appear, so a facet UI renders no empty buckets. Pure aggregation —
  * Workers-safe, no native deps.
  */
 export interface FacetResult {
@@ -129,8 +138,8 @@ export interface Federation {
   search(params: SearchParams): Promise<SearchResult>;
   /**
    * Available facet values + counts (medium, century date-buckets, top-N artist)
-   * for a query, aggregated over the rights-verified candidate set. Dense by
-   * construction. Workers-safe.
+   * for a query, aggregated over a bounded window of the rights-verified
+   * candidate set (see {@link FacetResult}). Workers-safe.
    */
   facets(params: SearchParams): Promise<FacetResult>;
   getArtwork(id: string): Promise<FetchOutcome>;
@@ -313,8 +322,10 @@ export function createFederation(opts: FederationOptions): Federation {
   async function search(params: SearchParams): Promise<SearchResult> {
     const dated = await gatherCandidates(params);
     // Medium is a post-fetch filter on the normalized category (like the year
-    // filter), not an upstream search constraint. `?? 'other'` defends against
-    // any pre-v0.8a cached record that predates the field.
+    // filter), not an upstream search constraint. Because it runs over the
+    // bounded overfetch window, a medium that is sparse in that window can leave
+    // the page under `limit` — that is expected (we don't re-fetch to top up).
+    // `?? 'other'` defends against any pre-v0.8a cached record predating the field.
     const byMedium = params.medium
       ? dated.filter((a) => (a.mediumCategory ?? 'other') === params.medium)
       : dated;
@@ -324,7 +335,9 @@ export function createFederation(opts: FederationOptions): Federation {
   }
 
   async function facets(params: SearchParams): Promise<FacetResult> {
-    const candidates = await gatherCandidates(params);
+    // Override the caller's page `limit` with the larger facet sample window so
+    // counts reflect a meaningful slice of the query, not one search page.
+    const candidates = await gatherCandidates({ ...params, limit: FACET_SAMPLE_SIZE });
     return {
       medium: countMedium(candidates),
       dateBucket: countDateBuckets(candidates),

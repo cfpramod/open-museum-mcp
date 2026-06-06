@@ -137,7 +137,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: 'string',
             enum: [...MEDIUM_CATEGORIES],
             description:
-              'Optional medium-category filter. One of the controlled values (painting, drawing, print, photograph, sculpture, textile, ceramic, metalwork, furniture, manuscript, other). Applied after rights verification. Use the facets tool to see which values are present for a query.',
+              'Optional medium-category filter. One of the controlled values (painting, drawing, print, photograph, sculpture, textile, ceramic, metalwork, furniture, manuscript, other). Like the year filter, it is applied after rights verification over a bounded candidate window — so a medium that is rare for the query may return fewer than `limit` results. Use the facets tool to see which values are present for a query.',
           },
         },
         required: ['query'],
@@ -210,7 +210,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'facets',
       description:
-        'Return available facet values and counts for a query: medium categories, century date-buckets, and the top artists, aggregated over the rights-verified result set. Dense by construction — only values actually present are returned, so a facet UI shows no empty buckets. Use the returned medium values with search_artworks({ ..., medium }) to drill down.',
+        'Return available facet values and counts for a query: medium categories, century date-buckets, and the top artists. Counts are computed over a BOUNDED candidate window of up to ~150 rights-verified records per museum (not the entire corpus), so they reflect the head of the result set, not exhaustive totals. Only values actually present in that window are returned (no empty buckets). Use the returned medium values with search_artworks({ ..., medium }) to drill down.',
       inputSchema: {
         type: 'object',
         properties: {

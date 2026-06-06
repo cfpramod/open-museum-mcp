@@ -344,4 +344,76 @@ describe('createFederation.facets', () => {
     const f = await fed.facets({ query: 'x', has_image: true, limit: 50 });
     expect(f.artist.length).toBeLessThanOrEqual(10);
   });
+
+  it('samples a much larger candidate window than the default search page', async () => {
+    // A fetcher that honors the requested overfetch count and accepts everything.
+    // facets must NOT use the caller's small `limit` (10) for its window — it
+    // overrides to FACET_SAMPLE_SIZE so counts are trustworthy. With caller
+    // limit 10, the search window would be 10*3 = 30; facets must sample far more.
+    const fetcher: Fetcher = {
+      code: 'test',
+      name: 'TEST',
+      async search(_query: string, count: number) {
+        return Array.from({ length: count }, (_, i) => `test:${i + 1}`);
+      },
+      async getRaw(id: string) {
+        return { id };
+      },
+      normalize(raw: unknown): ValidationResult {
+        const id = (raw as { id: string }).id;
+        return { status: 'accepted', artwork: makeArtwork(id, { mediumCategory: 'painting' }) };
+      },
+    };
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 10 });
+    const painting = f.medium.find((m) => m.value === 'painting');
+    expect(painting?.count ?? 0).toBeGreaterThan(100);
+  });
+
+  it('labels BCE date buckets with the earlier year first (load-bearing branch)', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1'],
+      accept: new Set(['test:1']),
+      over: { 'test:1': { yearStart: -450, yearEnd: -440 } }, // mid-5th century BCE
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 10 });
+    expect(f.dateBucket).toContainEqual({ value: '500–401 BCE', count: 1 });
+  });
+});
+
+describe('createFederation.search medium filter — bounded under-delivery', () => {
+  it('returns fewer than limit when the target medium is sparse in the candidate window', async () => {
+    // Honor the overfetch count (limit*3) and make only 2 candidates 'print'.
+    // The medium filter is post-fetch over that bounded window, so the page
+    // legitimately under-delivers rather than fetching more — same contract as
+    // the year filter.
+    const fetcher: Fetcher = {
+      code: 'test',
+      name: 'TEST',
+      async search(_query: string, count: number) {
+        return Array.from({ length: count }, (_, i) => `test:${i + 1}`);
+      },
+      async getRaw(id: string) {
+        return { id };
+      },
+      normalize(raw: unknown): ValidationResult {
+        const id = (raw as { id: string }).id;
+        const n = Number(id.slice(id.indexOf(':') + 1));
+        const mediumCategory = n <= 2 ? 'print' : 'painting';
+        return { status: 'accepted', artwork: makeArtwork(id, { mediumCategory }) };
+      },
+    };
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 5, medium: 'print' });
+    // overFetch = 5*3 = 15 candidates, only 2 are 'print' -> under-delivers to 2.
+    expect(out.count).toBe(2);
+    expect(out.results.every((r) => r.mediumCategory === 'print')).toBe(true);
+  });
 });
