@@ -21,6 +21,23 @@ export {
 
 export type { CacheStore, Awaitable } from './cache.js';
 
+// Clearance Manifest — the portable, fail-closed rights-clearance artifact and
+// its Tier-0 integrity envelope, emitted by Federation.clearanceManifest.
+export { wrapTier0, type Tier0Envelope } from './clearance/envelope.js';
+export {
+  buildClearancePayload,
+  type ClearanceManifestPayload,
+  type ClearanceWork,
+  type ClearanceSource,
+  type ClearanceMuseum,
+  type ClearanceRights,
+  type ClearanceBlock,
+  type ClearanceVerification,
+  type ClearanceCitation,
+  type BuildOptions,
+} from './clearance/manifest.js';
+export { clearanceForLicense, type ClearanceDecision, type ClearanceBasis } from './clearance/licenseMap.js';
+
 // Pure helpers a front door commonly needs alongside the federation.
 export { cite, type CiteStyle } from '../cite.js';
 export type { Artwork, ArtworkImages, ArtworkSource, ArtworkLicense, ValidationResult } from '../types.js';

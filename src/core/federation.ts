@@ -5,6 +5,8 @@ import type { Fetcher } from '../fetchers/types.js';
 import type { Artwork } from '../types.js';
 import { filterByYearRange } from '../yearFilter.js';
 import type { CacheStore } from './cache.js';
+import { wrapTier0, type Tier0Envelope } from './clearance/envelope.js';
+import { buildClearancePayload, type ClearanceManifestPayload } from './clearance/manifest.js';
 
 // Museum IDs follow `<code>:<segment>(/<segment>)*`. Each segment is
 // alphanumeric, underscore, or hyphen. The four numeric-ID museums (Met,
@@ -81,6 +83,19 @@ export interface FederationOptions {
    * diagnostic hook, not an error path. The MCP server logs to stderr here.
    */
   onReject?: (id: string, reason: string) => void;
+  /**
+   * Engine version string stamped into a Clearance Manifest's
+   * `verification.tool` provenance field. The host (MCP server) supplies its
+   * real package version; defaults to a placeholder so the core stays usable
+   * without one.
+   */
+  engineVersion?: string;
+  /**
+   * Clock for the generation timestamp used where no determination timestamp
+   * exists in the data (the clearance deny path has no `license.verifiedAt`).
+   * Injectable so emitted manifests are deterministic in tests and fixtures.
+   */
+  clock?: () => string;
 }
 
 export interface Federation {
@@ -88,6 +103,14 @@ export interface Federation {
   search(params: SearchParams): Promise<SearchResult>;
   getArtwork(id: string): Promise<FetchOutcome>;
   cite(id: string, style: CiteStyle): Promise<CiteOutcome>;
+  /**
+   * Emit a portable, fail-closed Clearance Manifest (rights-clearance +
+   * provenance + citation) for an artwork id, wrapped in a Tier-0 integrity
+   * envelope. A non-cleared work — rejected by the rights gate, an unknown
+   * museum, or an invalid id — returns a definitive *deny* manifest, never an
+   * error: a deny is a valid answer.
+   */
+  clearanceManifest(id: string): Promise<Tier0Envelope<ClearanceManifestPayload>>;
 }
 
 async function withConcurrency<T, R>(
@@ -133,6 +156,8 @@ export function createFederation(opts: FederationOptions): Federation {
   const { fetchers, cache } = opts;
   const concurrency = opts.concurrency ?? DEFAULT_FETCH_CONCURRENCY;
   const onReject = opts.onReject;
+  const engineVersion = opts.engineVersion ?? '0.0.0';
+  const clock = opts.clock ?? (() => new Date().toISOString());
 
   async function getArtwork(id: string): Promise<FetchOutcome> {
     if (!ID_REGEX.test(id)) {
@@ -205,5 +230,32 @@ export function createFederation(opts: FederationOptions): Federation {
     return { ok: true, citation: citeArtwork(out.artwork, style) };
   }
 
-  return { fetchers, search, getArtwork, cite };
+  async function clearanceManifest(
+    id: string,
+  ): Promise<Tier0Envelope<ClearanceManifestPayload>> {
+    const buildOpts = { engineVersion, now: clock() };
+    const code = id.includes(':') ? id.slice(0, id.indexOf(':')) : '';
+
+    const deny = (reason: string) =>
+      wrapTier0(
+        buildClearancePayload(
+          { status: 'rejected', rejection: { id, museumCode: code, reason, rawSnapshot: null } },
+          buildOpts,
+        ),
+      );
+
+    if (!ID_REGEX.test(id)) return deny(`invalid artwork id: ${id}`);
+
+    const fetcher = fetchers[code];
+    if (!fetcher) return deny(`unknown museum code: ${code}`);
+
+    // Determinations are cheap and version-bound, so the manifest path does not
+    // touch the object cache — it always reflects the current rights gate.
+    const raw = await fetcher.getRaw(id);
+    const result = fetcher.normalize(raw);
+    if (result.status === 'rejected') onReject?.(id, result.rejection.reason);
+    return wrapTier0(buildClearancePayload(result, buildOpts));
+  }
+
+  return { fetchers, search, getArtwork, cite, clearanceManifest };
 }

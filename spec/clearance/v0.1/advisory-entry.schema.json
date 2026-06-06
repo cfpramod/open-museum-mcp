@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclearance.org/v0.1/advisory-entry.schema.json",
+  "title": "Clearance Manifest AdvisoryEntry v0.1",
+  "description": "One element of the advisories[] array a conforming verifier emits alongside the structural pass/fail result. AdvisoryEntry objects are verifier output, not manifest fields: the ClearanceManifest schema intentionally has no advisories property. The separation encodes the design principle that structural validity (schema rejects) is independent of determination-rule recognition (verifier emits a non-fatal advisory).",
+  "type": "object",
+  "required": ["code", "severity", "message", "path"],
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "type": "string",
+      "enum": ["unrecognised_rule"],
+      "description": "Stable machine-readable advisory code. unrecognised_rule: a well-formed basis.rule id that is not in the current rule-registry baseline. The manifest is still structurally valid."
+    },
+    "severity": {
+      "type": "string",
+      "const": "advisory",
+      "description": "Always 'advisory'. Non-fatal by construction; a document that triggers an advisory still passes structural validation."
+    },
+    "message": { "type": "string", "minLength": 1 },
+    "path": {
+      "type": "string",
+      "description": "Dotted path to the field that triggered the advisory (e.g. 'clearance.commercialReproduction.basis.rule'). Empty string for a document-level advisory."
+    },
+    "rule": {
+      "type": "string",
+      "description": "The specific rule id that triggered the advisory (for unrecognised_rule)."
+    }
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openclearance.org/v0.1/clearance-manifest.schema.json",
+  "title": "Clearance Manifest v0.1",
+  "description": "A portable, fail-closed rights-clearance artifact for one creative work. The schema validates BOTH an accepted (cleared) and a rejected (deny) manifest: a deny is a valid answer, not an error, so descriptive sub-fields under work/source are optional and the deny path carries only what is recoverable from the rejection. Structural validity is independent of determination-rule recognition: an unrecognised basis.rule is structurally valid and yields a non-fatal 'unrecognised_rule' advisory at verification time, never a schema rejection. The @context URI is the sole normative authority for term expansion; specVersion is human-readable convenience only.",
+  "type": "object",
+  "required": ["@context", "type", "specVersion", "work", "source", "rights", "clearance", "verification"],
+  "additionalProperties": false,
+  "properties": {
+    "@context": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "contains": { "const": "https://openclearance.org/v0.1/context.jsonld" },
+      "description": "JSON-LD context. MUST include the openclearance v0.1 context IRI — the sole normative authority for expansion and validation."
+    },
+    "type": { "const": "ClearanceManifest" },
+    "specVersion": {
+      "const": "0.1",
+      "description": "Human-readable version convenience. Not normative — the @context IRI fixes the actual vocabulary."
+    },
+    "work": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "description": "The work being cleared. Only `id` is guaranteed; descriptive fields are present on the accept path and absent on the deny path (a rejected record is not fully identified).",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "artist": {
+          "type": "object",
+          "required": ["name", "attributionType"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "nationality": { "type": "string" },
+            "lifespan": { "type": "string", "description": "Display-form life dates (e.g. '1853–1890'); not a structured date." },
+            "attributionType": {
+              "type": "string",
+              "enum": ["named", "anonymous", "workshop", "after", "attributed", "circle", "follower"]
+            }
+          }
+        },
+        "displayDate": { "type": "string" },
+        "yearStart": { "type": ["integer", "null"], "description": "Machine-normalized start year; negative = BCE." },
+        "yearEnd": { "type": ["integer", "null"], "description": "Machine-normalized end year; negative = BCE." },
+        "medium": { "type": "string" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["museum"],
+      "additionalProperties": false,
+      "description": "Provenance source. `museum` is guaranteed (its `code` is the federation identifier); URLs and images are present on the accept path.",
+      "properties": {
+        "museum": {
+          "type": "object",
+          "required": ["code"],
+          "additionalProperties": false,
+          "properties": {
+            "code": { "type": "string", "minLength": 1 },
+            "name": { "type": "string" },
+            "url": { "type": "string", "format": "uri" }
+          }
+        },
+        "apiUrl": { "type": "string", "format": "uri" },
+        "pageUrl": { "type": "string", "format": "uri" },
+        "originalUrl": { "type": "string", "format": "uri" },
+        "imageUrls": {
+          "type": "object",
+          "required": ["full"],
+          "additionalProperties": false,
+          "properties": {
+            "full": { "type": "string" },
+            "large": { "type": "string" },
+            "thumbnail": { "type": "string" },
+            "width": { "type": "integer" },
+            "height": { "type": "integer" },
+            "byteSize": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "required": ["statement", "sourceApiValue", "imageOpenAccess", "metadataOpenAccess", "confidence"],
+      "additionalProperties": false,
+      "description": "The rights determination carried (not adjudicated) by this manifest.",
+      "properties": {
+        "statement": {
+          "type": ["string", "null"],
+          "description": "Rights-statement URI (CC / rightsstatements.org). null on a deny — no positive open-rights statement applies."
+        },
+        "sourceApiValue": {
+          "type": ["object", "null"],
+          "required": ["field", "value"],
+          "additionalProperties": false,
+          "description": "Forensic link binding the raw museum API value to its field name. null on a deny.",
+          "properties": {
+            "field": { "type": "string", "minLength": 1 },
+            "value": {}
+          }
+        },
+        "imageOpenAccess": { "type": "boolean" },
+        "metadataOpenAccess": { "type": "boolean" },
+        "confidence": { "type": "string", "enum": ["high", "medium", "low"] }
+      }
+    },
+    "clearance": {
+      "type": "object",
+      "required": ["commercialReproduction", "derivatives", "attributionRequired"],
+      "additionalProperties": false,
+      "description": "The instant, machine-actionable answer. Each facet pairs a boolean with a structured basis.",
+      "properties": {
+        "commercialReproduction": { "$ref": "#/$defs/permitFacet" },
+        "derivatives": { "$ref": "#/$defs/permitFacet" },
+        "attributionRequired": { "$ref": "#/$defs/requireFacet" }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": ["determinedBy", "tool", "determinedAt", "ruleContext", "determinationSource"],
+      "additionalProperties": false,
+      "description": "How the rights determination was reached, as an auditable event. Actor vs tool are distinct; on a deny the actor is the engine rights-gate, not the museum.",
+      "properties": {
+        "determinedBy": {
+          "type": "object",
+          "required": ["actor", "role"],
+          "additionalProperties": false,
+          "properties": {
+            "actor": { "type": "string", "minLength": 1 },
+            "role": { "type": "string", "minLength": 1 }
+          }
+        },
+        "tool": { "type": "string", "minLength": 1 },
+        "determinedAt": { "type": "string", "format": "date-time" },
+        "ruleContext": { "type": "string", "minLength": 1 },
+        "determinationSource": {
+          "type": "object",
+          "required": ["type", "retrievedAt"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["api-field", "rights-gate-default"] },
+            "field": { "type": "string" },
+            "url": { "type": "string", "format": "uri" },
+            "retrievedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "required": ["full", "caption", "short"],
+      "additionalProperties": false,
+      "description": "Rendered attribution strings. Omitted for an unidentified rejected record.",
+      "properties": {
+        "full": { "type": "string", "minLength": 1 },
+        "caption": { "type": "string", "minLength": 1 },
+        "short": { "type": "string", "minLength": 1 }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Forward-compatible vendor escape hatch. Producers MAY carry namespaced extension data here; consumers MUST ignore terms they do not recognise."
+    }
+  },
+  "$defs": {
+    "basis": {
+      "type": "object",
+      "required": ["rule", "inputs", "summary"],
+      "additionalProperties": false,
+      "description": "The structured reasoning behind one clearance boolean. Shape is normative; rule ids are an open set (see the rule registry).",
+      "properties": {
+        "rule": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Bare kebab-case determination-rule id resolving to https://openclearance.org/v0.1/rules#<rule>. NOT a closed enum — an unrecognised id is valid and yields an 'unrecognised_rule' advisory."
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["field", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "field": { "type": "string", "minLength": 1 },
+              "value": {}
+            }
+          }
+        },
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "permitFacet": {
+      "type": "object",
+      "required": ["permitted", "basis"],
+      "additionalProperties": false,
+      "properties": {
+        "permitted": { "type": "boolean" },
+        "basis": { "$ref": "#/$defs/basis" }
+      }
+    },
+    "requireFacet": {
+      "type": "object",
+      "required": ["required", "basis"],
+      "additionalProperties": false,
+      "properties": {
+        "required": { "type": "boolean" },
+        "basis": { "$ref": "#/$defs/basis" }
+      }
+    }
+  }
+}

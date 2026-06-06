@@ -1,0 +1,88 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@vocab": "https://openclearance.org/v0.1/vocab#",
+    "oc": "https://openclearance.org/v0.1/vocab#",
+    "schema": "https://schema.org/",
+    "dcterms": "http://purl.org/dc/terms/",
+    "prov": "http://www.w3.org/ns/prov#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+
+    "ClearanceManifest": "oc:ClearanceManifest",
+    "type": "@type",
+    "specVersion": "oc:specVersion",
+    "extensions": "oc:extensions",
+
+    "work": "oc:work",
+    "id": "schema:identifier",
+    "title": "schema:name",
+    "artist": "schema:creator",
+    "name": "schema:name",
+    "nationality": "schema:nationality",
+    "lifespan": "oc:lifespan",
+    "attributionType": "oc:attributionType",
+    "displayDate": "schema:dateCreated",
+    "yearStart": { "@id": "oc:yearStart", "@type": "xsd:integer" },
+    "yearEnd": { "@id": "oc:yearEnd", "@type": "xsd:integer" },
+    "medium": "dcterms:medium",
+
+    "source": "oc:source",
+    "museum": "schema:provider",
+    "code": "schema:identifier",
+    "url": { "@id": "schema:url", "@type": "@id" },
+    "apiUrl": { "@id": "oc:apiUrl", "@type": "@id" },
+    "pageUrl": { "@id": "schema:url", "@type": "@id" },
+    "originalUrl": { "@id": "dcterms:source", "@type": "@id" },
+    "imageUrls": {
+      "@id": "schema:image",
+      "@context": {
+        "full": { "@id": "schema:contentUrl", "@type": "@id" },
+        "large": { "@id": "oc:largeImage", "@type": "@id" },
+        "thumbnail": { "@id": "schema:thumbnailUrl", "@type": "@id" },
+        "width": { "@id": "schema:width", "@type": "xsd:integer" },
+        "height": { "@id": "schema:height", "@type": "xsd:integer" },
+        "byteSize": { "@id": "schema:contentSize", "@type": "xsd:integer" }
+      }
+    },
+
+    "rights": "oc:rights",
+    "statement": { "@id": "schema:license", "@type": "@id" },
+    "sourceApiValue": "oc:sourceApiValue",
+    "field": "oc:field",
+    "value": "rdf:value",
+    "imageOpenAccess": { "@id": "oc:imageOpenAccess", "@type": "xsd:boolean" },
+    "metadataOpenAccess": { "@id": "oc:metadataOpenAccess", "@type": "xsd:boolean" },
+    "confidence": "oc:confidence",
+
+    "clearance": "oc:clearance",
+    "commercialReproduction": "oc:commercialReproduction",
+    "derivatives": "oc:derivatives",
+    "attributionRequired": "oc:attributionRequired",
+    "permitted": { "@id": "oc:permitted", "@type": "xsd:boolean" },
+    "required": { "@id": "oc:required", "@type": "xsd:boolean" },
+    "basis": "oc:basis",
+    "rule": "oc:rule",
+    "inputs": "oc:inputs",
+    "summary": "oc:summary",
+
+    "verification": "oc:verification",
+    "determinedBy": "prov:wasAttributedTo",
+    "actor": "prov:agent",
+    "role": "prov:hadRole",
+    "tool": "oc:tool",
+    "determinedAt": { "@id": "prov:generatedAtTime", "@type": "xsd:dateTime" },
+    "ruleContext": "oc:ruleContext",
+    "determinationSource": "prov:wasDerivedFrom",
+    "retrievedAt": { "@id": "oc:retrievedAt", "@type": "xsd:dateTime" },
+
+    "citation": {
+      "@id": "oc:citation",
+      "@context": {
+        "full": "dcterms:bibliographicCitation",
+        "caption": "oc:caption",
+        "short": "oc:short"
+      }
+    }
+  }
+}
