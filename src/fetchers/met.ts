@@ -1,6 +1,7 @@
 import { parseDisplayDate } from '../dateParser.js';
 import { validateMetLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
+import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { asOptionalString, asString, isValidPositiveInt, rejectFor } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
@@ -100,6 +101,7 @@ export const metFetcher: Fetcher = {
       yearStart: dateRange.yearStart,
       yearEnd: dateRange.yearEnd,
       medium: asString(r.medium),
+      mediumCategory: normalizeMedium(asString(r.medium)),
       region,
       period,
       imageUrls: {

@@ -116,3 +116,22 @@ describe('Met adapter search (relevance)', () => {
     expect(gibberish).toEqual([]);
   });
 });
+
+describe('Met adapter mediumCategory', () => {
+  it('normalizes the raw `medium` field to the controlled vocab', () => {
+    const result = metFetcher.normalize(fixture('met-tang-fixture.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    // "Earthenware with sancai (three-color) glaze" -> ceramic
+    expect(result.artwork.mediumCategory).toBe('ceramic');
+  });
+
+  it('falls back to "other" when the raw `medium` carries no known signal', () => {
+    const raw = structuredClone(fixture('met-tang-fixture.json')) as Record<string, unknown>;
+    raw.medium = 'Jade'; // a material with no controlled-vocab keyword
+    const result = metFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.mediumCategory).toBe('other');
+  });
+});

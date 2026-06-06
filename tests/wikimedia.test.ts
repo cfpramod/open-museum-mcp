@@ -844,3 +844,32 @@ describe('Wikimedia Commons adapter normalization', () => {
     expect(result.rejection.reason).toContain('missing or non-integer pageid');
   });
 });
+
+describe('Wikimedia Commons adapter mediumCategory', () => {
+  // Commons has no reliable structured medium field; the curated art-medium
+  // categories ("16th-century oil paintings") are the signal. The artwork title
+  // (ObjectName) is deliberately NOT used — a work titled "The Sculptor" is not
+  // a sculpture, and guessing from a title would violate strict-other.
+  it('derives mediumCategory from an art-medium category title', () => {
+    const raw = structuredClone(fixture('wikimedia-accepted-bruegel.json')) as {
+      query: { pages: Array<Record<string, unknown>> };
+    };
+    raw.query.pages[0].categories = [
+      { ns: 14, title: 'Category:Web Gallery of Art' },
+      { ns: 14, title: 'Category:16th-century oil paintings' },
+    ];
+    const result = wikimediaFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.mediumCategory).toBe('painting');
+  });
+
+  it('falls back to "other" when no category names a medium (title is not used)', () => {
+    // The Bruegel fixture carries no categories and its ObjectName is a title
+    // ("Landscape with the Fall of Icarus") — no medium signal, so strict other.
+    const result = wikimediaFetcher.normalize(fixture('wikimedia-accepted-bruegel.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.mediumCategory).toBe('other');
+  });
+});

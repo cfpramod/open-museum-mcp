@@ -1,6 +1,7 @@
 import { parseDisplayDate } from '../dateParser.js';
 import { validateEuropeanaLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
+import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { asOptionalString, asString } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
@@ -78,6 +79,7 @@ function parseRecord(raw: Record<string, unknown>): {
   edmPreview: string;
   rights: unknown;
   description: string;
+  medium: string;
 } {
   const id = normalizeEuropeanaId(asString(raw.id));
   const title =
@@ -99,6 +101,16 @@ function parseRecord(raw: Record<string, unknown>): {
   const description =
     pickLangAware(raw.dcDescriptionLangAware) ||
     firstString(raw.dcDescription);
+  // Medium signal: EDM type/medium/format fields. dcFormat is sometimes a MIME
+  // type ("image/jpeg") — harmless, as normalizeMedium keyword-gates the text.
+  const medium = [
+    pickLangAware(raw.dcTypeLangAware),
+    firstString(raw.dcType),
+    firstString(raw.dctermsMedium),
+    firstString(raw.dcFormat),
+  ]
+    .filter((s) => s)
+    .join(' ');
   return {
     id,
     title,
@@ -111,6 +123,7 @@ function parseRecord(raw: Record<string, unknown>): {
     edmPreview,
     rights: raw.rights,
     description,
+    medium,
   };
 }
 
@@ -218,6 +231,7 @@ export const europeanaFetcher: Fetcher = {
       yearStart: dateRange.yearStart,
       yearEnd: dateRange.yearEnd,
       medium: '',
+      mediumCategory: normalizeMedium(parsed.medium),
       region,
       period: null,
       imageUrls: {

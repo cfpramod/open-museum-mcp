@@ -1,6 +1,7 @@
 import { parseDisplayDate } from '../dateParser.js';
 import { validateWikimediaLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
+import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { asFiniteNumber, asString, isValidPositiveInt, rejectFor } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
@@ -344,6 +345,17 @@ export const wikimediaFetcher: Fetcher = {
       yearStart: dateRange.yearStart,
       yearEnd: dateRange.yearEnd,
       medium: '',
+      // Commons has no reliable structured medium field. The curated art-medium
+      // categories ("16th-century oil paintings") are the only trustworthy
+      // signal — the artwork title is deliberately excluded (a work titled "The
+      // Sculptor" is not a sculpture). normalizeMedium keyword-gates the joined
+      // category titles, so non-medium categories simply don't match.
+      mediumCategory: normalizeMedium(
+        (Array.isArray(page.categories) ? page.categories : [])
+          .map((c) => (c && typeof c === 'object' ? asString((c as { title?: unknown }).title) : ''))
+          .map((t) => t.replace(/^Category:/, ''))
+          .join(' '),
+      ),
       // Region and period are not in Commons' structured metadata. Wikidata
       // enrichment (planned for v0.7) will fill these via SPARQL on the
       // file's depicted-work QID.

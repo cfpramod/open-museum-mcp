@@ -1,6 +1,7 @@
 import { parseDisplayDate } from '../dateParser.js';
 import { validateClevelandLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
+import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import {
   asFiniteNumber,
@@ -149,6 +150,7 @@ export const clevelandFetcher: Fetcher = {
       yearStart: dateRange.yearStart,
       yearEnd: dateRange.yearEnd,
       medium: asString(r.technique),
+      mediumCategory: normalizeMedium(asString(r.technique)),
       region,
       period: null,
       imageUrls: {

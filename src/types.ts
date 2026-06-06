@@ -1,3 +1,7 @@
+import type { MediumCategory } from './medium.js';
+
+export type { MediumCategory };
+
 export type LicenseType = 'CC0' | 'PD' | 'CC-BY' | 'CC-BY-SA' | 'OTHER' | 'UNKNOWN';
 
 export type AttributionType =
@@ -66,6 +70,13 @@ export interface Artwork {
   yearStart: number | null;
   yearEnd: number | null;
   medium: string;
+  /**
+   * Raw `medium` normalized to a controlled vocabulary for faceting and
+   * filtering. Always set by every adapter's `normalize` (strict `other`
+   * fallback — never guessed). Distinct from `medium`, which keeps the museum's
+   * verbatim display string (used in citations). Additive v0.8a field.
+   */
+  mediumCategory: MediumCategory;
   region: string | null;
   period: string | null;
   imageUrls: ArtworkImages;
