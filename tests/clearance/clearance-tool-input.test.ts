@@ -39,9 +39,10 @@ describe('clearance_record tool input contract', () => {
     expect(res.isError).toBeUndefined();
     const env = JSON.parse(res.content[0].text);
     expect(env.tier).toBe(0);
-    expect(env.payload.clearance.commercialReproduction.permitted).toBe(false);
-    expect(env.payload.clearance.commercialReproduction.basis.summary).toContain(
-      'invalid artwork id',
-    );
+    expect(env.payloadType).toBe('application/clearance-manifest+json');
+    // payload is a byte-exact JSON string; parse to read
+    const payload = JSON.parse(env.payload);
+    expect(payload.clearance.commercialReproduction.permitted).toBe(false);
+    expect(payload.clearance.commercialReproduction.basis.summary).toContain('invalid artwork id');
   });
 });

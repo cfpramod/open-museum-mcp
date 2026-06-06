@@ -48,12 +48,14 @@ describe('Workers-safe core has no sharp or node: imports', () => {
 
   for (const file of WORKERS_SAFE_GLOBS.flatMap(collect)) {
     const rel = file.slice(srcRoot.length + 1);
-    it(`${rel} imports neither sharp nor node: nor the Node-only extractor`, () => {
+    it(`${rel} imports neither sharp nor node: nor the Node-only extractor nor jcs`, () => {
       const specs = importSpecifiers(stripComments(readFileSync(file, 'utf8')));
       for (const spec of specs) {
         expect(spec).not.toBe('sharp');
         expect(spec.startsWith('node:')).toBe(false);
         expect(spec).not.toMatch(/color\/extract/);
+        // the JCS canonicalizer is gone; the byte-exact envelope uses Web Crypto only
+        expect(spec).not.toMatch(/clearance\/jcs/);
       }
     });
   }

@@ -13,7 +13,7 @@ import type { Artwork } from '../types.js';
 import { filterByYearRange } from '../yearFilter.js';
 import type { CacheStore } from './cache.js';
 import { wrapTier0, type Tier0Envelope } from './clearance/envelope.js';
-import { buildClearancePayload, type ClearanceManifestPayload } from './clearance/manifest.js';
+import { buildClearancePayload } from './clearance/manifest.js';
 
 // Museum IDs follow `<code>:<segment>(/<segment>)*`. Each segment is
 // alphanumeric, underscore, or hyphen. The four numeric-ID museums (Met,
@@ -176,7 +176,7 @@ export interface Federation {
    * museum, or an invalid id — returns a definitive *deny* manifest, never an
    * error: a deny is a valid answer.
    */
-  clearanceManifest(id: string): Promise<Tier0Envelope<ClearanceManifestPayload>>;
+  clearanceManifest(id: string): Promise<Tier0Envelope>;
 }
 
 async function withConcurrency<T, R>(
@@ -436,7 +436,7 @@ export function createFederation(opts: FederationOptions): Federation {
 
   async function clearanceManifest(
     id: string,
-  ): Promise<Tier0Envelope<ClearanceManifestPayload>> {
+  ): Promise<Tier0Envelope> {
     const buildOpts = { engineVersion, now: clock() };
     const code = id.includes(':') ? id.slice(0, id.indexOf(':')) : '';
 

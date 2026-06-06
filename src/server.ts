@@ -63,7 +63,7 @@ const cache = new Cache({ path: CACHE_PATH });
 
 // Single source for the server version. Stamped into the MCP handshake and into
 // each Clearance Manifest's `verification.tool` provenance field.
-const VERSION = '0.9.0';
+const VERSION = '0.10.0';
 
 // The federation engine is transport-agnostic. The MCP server is one front
 // door over it (stdio JSON-RPC); the web app is another (HTTP + KV cache).
@@ -243,7 +243,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'clearance_record',
       description:
-        'Emit a portable, fail-closed Clearance Manifest (rights-clearance + provenance + citation) for an artwork id, wrapped in a Tier-0 integrity envelope (RFC 8785 JCS sha-256). A non-cleared work — rejected by the rights gate, an unknown museum, or an invalid id — returns a definitive DENY manifest, not an error: a deny is a valid answer. Conforms to the in-repo Clearance Manifest spec at spec/clearance/v0.1 (openclearance.org/v0.1).',
+        'Emit a portable, fail-closed Clearance Manifest (rights-clearance + provenance + citation) for an artwork id, wrapped in a byte-exact Tier-0 integrity envelope: the manifest is carried as an exact UTF-8 JSON string in `payload`, with a SHA-256 over those exact bytes in `integrity.hash`. Consumers hash the payload string verbatim, then JSON.parse it to read. A non-cleared work — rejected by the rights gate, an unknown museum, or an invalid id — returns a definitive DENY manifest, not an error: a deny is a valid answer. Conforms to the in-repo Clearance Manifest spec at spec/clearance/v0.1 (openclearance.org/v0.1).',
       inputSchema: {
         type: 'object',
         properties: {
