@@ -20,6 +20,8 @@ import {
   type CiteStyle,
 } from './core/index.js';
 import { handleClearanceRecord } from './clearanceTool.js';
+import { createColorExtractor } from './color/extract.js';
+import { COLOR_FAMILY_NAMES } from './core/index.js';
 import { Cache } from './db.js';
 import { buildSeedQueryFromConstraints } from './discoverSeed.js';
 import { aicFetcher } from './fetchers/aic.js';
@@ -61,7 +63,7 @@ const cache = new Cache({ path: CACHE_PATH });
 
 // Single source for the server version. Stamped into the MCP handshake and into
 // each Clearance Manifest's `verification.tool` provenance field.
-const VERSION = '0.8.0';
+const VERSION = '0.9.0';
 
 // The federation engine is transport-agnostic. The MCP server is one front
 // door over it (stdio JSON-RPC); the web app is another (HTTP + KV cache).
@@ -74,6 +76,10 @@ const federation = createFederation({
   cache,
   engineVersion: VERSION,
   onReject: (id, reason) => console.error(`[open-museum-mcp] rejected ${id}: ${reason}`),
+  // Node-side colour enrichment. createColorExtractor lazily loads the optional
+  // `sharp` dependency; if it's absent (e.g. a sharp-less install) extraction
+  // fails open and colour fields stay unset. Workers never inject this.
+  extractColor: createColorExtractor(),
 });
 
 const GetInput = z.object({
@@ -138,6 +144,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             enum: [...MEDIUM_CATEGORIES],
             description:
               'Optional medium-category filter. One of the controlled values (painting, drawing, print, photograph, sculpture, textile, ceramic, metalwork, furniture, manuscript, other). Like the year filter, it is applied after rights verification over a bounded candidate window — so a medium that is rare for the query may return fewer than `limit` results. Use the facets tool to see which values are present for a query.',
+          },
+          color: {
+            type: 'string',
+            description:
+              'Optional hex colour (#rrggbb). Re-ranks results by perceptual (CIEDE2000) nearness to this colour, nearest first. Colour is precomputed Node-side from the thumbnail; records without colour (not yet enriched) are excluded from a colour-ranked search.',
+          },
+          color_family: {
+            type: 'string',
+            enum: [...COLOR_FAMILY_NAMES],
+            description:
+              'Optional coarse colour-family filter (red, orange, yellow, green, blue, purple, pink, brown, neutral, black, white). Post-fetch over the bounded window, so a rare family may return fewer than `limit`. Use the facets tool to see which families are present.',
           },
         },
         required: ['query'],
@@ -210,7 +227,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'facets',
       description:
-        'Return available facet values and counts for a query: medium categories, century date-buckets, and the top artists. Counts are computed over a BOUNDED candidate window of up to ~150 rights-verified records per museum (not the entire corpus), so they reflect the head of the result set, not exhaustive totals. Only values actually present in that window are returned (no empty buckets). Use the returned medium values with search_artworks({ ..., medium }) to drill down.',
+        'Return available facet values and counts for a query: medium categories, century date-buckets, top artists, and colour families. Counts are computed over a BOUNDED candidate window of up to ~150 rights-verified records per museum (not the entire corpus), so they reflect the head of the result set, not exhaustive totals. Only values actually present in that window are returned (no empty buckets). Use the returned medium/colorFamily values with search_artworks({ ..., medium, color_family }) to drill down.',
       inputSchema: {
         type: 'object',
         properties: {
