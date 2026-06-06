@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-06-06
+
+### Added
+
+- **Medium facet (v0.8a) — controlled-vocabulary medium classification.** Every adapter now normalizes its raw medium field to a dense, facet-ready vocabulary (`painting, drawing, print, photograph, sculpture, textile, ceramic, metalwork, furniture, manuscript, other`) via two-tier keyword matching — technique/object keywords beat bare material keywords, longest-match within a tier — so "oil on linen" is a painting (not textile), "bronze sculpture" is sculpture, and "gelatin silver print" is a photograph. Strict `other` fallback; never guessed. Each museum feeds its own field: Met `medium`, AIC `medium_display`, Cleveland `technique`, Europeana `dcType`/`dctermsMedium`/`dcFormat`, Wikimedia art-medium category titles. Result lands on a new additive `Artwork.mediumCategory` (distinct from the verbatim `medium` display string used in citations).
+- **`medium` filter on `search_artworks`.** Optional controlled-vocab filter, applied after rights verification (a post-fetch filter like the date-range filter, not an upstream search constraint).
+- **`facets(query)` core method + MCP `facets` tool.** Returns available facet values and counts for a query — medium categories, century date-buckets (BCE-aware), and top-N named artists — aggregated over the rights-verified result set. Dense by construction (no empty buckets). Pure aggregation, Workers-safe; `FacetResult` / `FacetCount` and `MEDIUM_CATEGORIES` are exported from the reusable core for the web app.
+
+### Note
+
+Colour search (v0.8b — dominant-colour extraction, `color` / `color_family` filters, the colour facet) is a separate follow-up build; it is intentionally **not** in this release.
+
 ## [0.7.0] — 2026-06-05
 
 ### Added
