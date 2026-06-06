@@ -38,6 +38,11 @@ export type ColorExtractor = (artwork: Artwork) => Promise<ColorData | null>;
 
 const DEFAULT_SAMPLE = 32;
 
+// Defence-in-depth byte cap on the enrichment fetch. Thumbnails are tiny; a
+// multi-MB response means a wrong/oversized URL, so we fail open past the cap
+// rather than buffer it. Checked against Content-Length and the actual bytes.
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
 async function defaultLoadSharp(): Promise<SharpLike | null> {
   try {
     // Variable specifier on purpose: sharp is an OPTIONAL native dependency, so
@@ -56,7 +61,11 @@ async function defaultFetchImage(url: string): Promise<Uint8Array | null> {
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    return new Uint8Array(await res.arrayBuffer());
+    const declared = Number(res.headers.get('content-length'));
+    if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length > MAX_IMAGE_BYTES) return null;
+    return bytes;
   } catch {
     return null;
   }

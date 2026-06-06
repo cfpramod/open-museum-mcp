@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createColorExtractor, type SharpLike } from '../../src/color/extract.js';
 import type { Artwork } from '../../src/types.js';
 
@@ -69,6 +69,25 @@ describe('createColorExtractor — fail-open', () => {
     const extract = createColorExtractor({
       loadSharp: async () => throwingSharp,
       fetchImage: async () => new Uint8Array([1, 2, 3]),
+    });
+    expect(await extract(artwork())).toBeNull();
+  });
+});
+
+describe('createColorExtractor — default fetch byte cap', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('fails open when the image exceeds the byte cap (oversized Content-Length)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { 'content-length': String(50 * 1024 * 1024) },
+      })),
+    );
+    // default fetchImage (not injected) so the cap is exercised
+    const extract = createColorExtractor({
+      loadSharp: async () => fakeSharp(new Uint8Array([255, 0, 0]), 3),
     });
     expect(await extract(artwork())).toBeNull();
   });
