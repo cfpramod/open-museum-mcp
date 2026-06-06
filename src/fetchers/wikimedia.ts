@@ -117,6 +117,20 @@ interface CategoryEntry {
   title?: unknown;
 }
 
+// Extract clean category titles (string `title`, "Category:" prefix stripped)
+// from a raw Commons categories array. Shared by the date-range and medium
+// derivations so the iterate/guard/strip logic lives in one place.
+function categoryTitles(categories: unknown[]): string[] {
+  const titles: string[] = [];
+  for (const entry of categories) {
+    if (!entry || typeof entry !== 'object') continue;
+    const title = (entry as CategoryEntry).title;
+    if (typeof title !== 'string') continue;
+    titles.push(title.replace(/^Category:/, ''));
+  }
+  return titles;
+}
+
 // Pick the most specific (narrowest) parseable year range from a list of
 // Commons category titles. Categories like "1916 paintings" yield a single
 // year (span 0); "1910s paintings" yield a decade (span 9); "16th-century
@@ -138,11 +152,7 @@ function pickBestRangeFromCategories(categories: unknown[]): {
 } | null {
   let best: { yearStart: number; yearEnd: number } | null = null;
   let bestSpan = Infinity;
-  for (const entry of categories) {
-    if (!entry || typeof entry !== 'object') continue;
-    const title = (entry as CategoryEntry).title;
-    if (typeof title !== 'string') continue;
-    const cleaned = title.replace(/^Category:/, '');
+  for (const cleaned of categoryTitles(categories)) {
     if (!ART_MEDIUM_RE.test(cleaned)) continue;
     const parsed = parseDisplayDate(cleaned);
     if (parsed.yearStart === null || parsed.yearEnd === null) continue;
@@ -351,10 +361,7 @@ export const wikimediaFetcher: Fetcher = {
       // Sculptor" is not a sculpture). normalizeMedium keyword-gates the joined
       // category titles, so non-medium categories simply don't match.
       mediumCategory: normalizeMedium(
-        (Array.isArray(page.categories) ? page.categories : [])
-          .map((c) => (c && typeof c === 'object' ? asString((c as { title?: unknown }).title) : ''))
-          .map((t) => t.replace(/^Category:/, ''))
-          .join(' '),
+        categoryTitles(Array.isArray(page.categories) ? page.categories : []).join(' '),
       ),
       // Region and period are not in Commons' structured metadata. Wikidata
       // enrichment (planned for v0.7) will fill these via SPARQL on the
