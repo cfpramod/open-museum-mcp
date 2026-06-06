@@ -285,3 +285,63 @@ describe('createFederation.search medium filter', () => {
     expect(out.count).toBe(2);
   });
 });
+
+describe('createFederation.facets', () => {
+  it('aggregates medium, date-bucket, and top-artist counts over the query result set', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1', 'test:2', 'test:3', 'test:4'],
+      accept: new Set(['test:1', 'test:2', 'test:3', 'test:4']),
+      over: {
+        'test:1': { mediumCategory: 'painting', yearStart: 1850, yearEnd: 1850, artist: { name: 'Monet', attributionType: 'named' } },
+        'test:2': { mediumCategory: 'painting', yearStart: 1880, yearEnd: 1880, artist: { name: 'Monet', attributionType: 'named' } },
+        'test:3': { mediumCategory: 'print', yearStart: 1700, yearEnd: 1700, artist: { name: 'Hokusai', attributionType: 'named' } },
+        'test:4': { mediumCategory: 'print', yearStart: 1755, yearEnd: 1755, artist: { name: 'Nobody', attributionType: 'anonymous' } },
+      },
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 10 });
+
+    expect(f.medium).toContainEqual({ value: 'painting', count: 2 });
+    expect(f.medium).toContainEqual({ value: 'print', count: 2 });
+
+    expect(f.dateBucket).toContainEqual({ value: '1800–1899', count: 2 });
+    expect(f.dateBucket).toContainEqual({ value: '1700–1799', count: 2 });
+
+    expect(f.artist).toContainEqual({ value: 'Monet', count: 2 });
+    expect(f.artist).toContainEqual({ value: 'Hokusai', count: 1 });
+    // anonymous works are not a useful artist facet value
+    expect(f.artist.find((a) => a.value === 'Nobody')).toBeUndefined();
+  });
+
+  it('does not pre-apply the medium filter to the medium facet (shows all available media)', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1', 'test:2'],
+      accept: new Set(['test:1', 'test:2']),
+      over: { 'test:1': { mediumCategory: 'painting' }, 'test:2': { mediumCategory: 'print' } },
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 10, medium: 'painting' });
+    expect(f.medium).toContainEqual({ value: 'painting', count: 1 });
+    expect(f.medium).toContainEqual({ value: 'print', count: 1 });
+  });
+
+  it('limits the artist facet to the top N by count', async () => {
+    const over: Record<string, { artist: { name: string; attributionType: 'named' } }> = {};
+    const ids: string[] = [];
+    for (let i = 1; i <= 15; i++) {
+      const id = `test:${i}`;
+      ids.push(id);
+      over[id] = { artist: { name: `Artist ${i}`, attributionType: 'named' } };
+    }
+    const t = fakeFetcher('test', { ids, accept: new Set(ids), over });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 50 });
+    expect(f.artist.length).toBeLessThanOrEqual(10);
+  });
+});

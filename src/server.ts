@@ -208,6 +208,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'facets',
+      description:
+        'Return available facet values and counts for a query: medium categories, century date-buckets, and the top artists, aggregated over the rights-verified result set. Dense by construction — only values actually present are returned, so a facet UI shows no empty buckets. Use the returned medium values with search_artworks({ ..., medium }) to drill down.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Free-text query.' },
+          museum: { type: 'string', description: 'Optional museum code to restrict to.' },
+          has_image: { type: 'boolean', default: true, description: 'Restrict to records with an image URL.' },
+          year_min: { type: 'integer', description: 'Optional inclusive lower bound on creation year (negative = BCE).' },
+          year_max: { type: 'integer', description: 'Optional inclusive upper bound on creation year (negative = BCE).' },
+        },
+        required: ['query'],
+      },
+    },
+    {
       name: 'clearance_record',
       description:
         'Emit a portable, fail-closed Clearance Manifest (rights-clearance + provenance + citation) for an artwork id, wrapped in a Tier-0 integrity envelope (RFC 8785 JCS sha-256). A non-cleared work — rejected by the rights gate, an unknown museum, or an invalid id — returns a definitive DENY manifest, not an error: a deny is a valid answer. Conforms to the in-repo Clearance Manifest spec at spec/clearance/v0.1 (openclearance.org/v0.1).',
@@ -238,6 +254,19 @@ async function handleSearch(args: unknown) {
         },
       ],
     };
+  } catch (err) {
+    if (err instanceof UnknownMuseumError) {
+      return errorResult(`unknown museum: ${err.museum}`);
+    }
+    throw err;
+  }
+}
+
+async function handleFacets(args: unknown) {
+  const params = SearchParamsSchema.parse(args);
+  try {
+    const result = await federation.facets(params);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
   } catch (err) {
     if (err instanceof UnknownMuseumError) {
       return errorResult(`unknown museum: ${err.museum}`);
@@ -318,6 +347,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   try {
     if (name === 'search_artworks') return await handleSearch(args);
+    if (name === 'facets') return await handleFacets(args);
     if (name === 'get_artwork') return await handleGet(args);
     if (name === 'cite') return await handleCite(args);
     if (name === 'discover_random') return await handleDiscoverRandom(args);

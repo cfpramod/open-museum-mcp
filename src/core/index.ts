@@ -15,6 +15,8 @@ export {
   type FederationOptions,
   type SearchParams,
   type SearchResult,
+  type FacetResult,
+  type FacetCount,
   type FetchOutcome,
   type CiteOutcome,
 } from './federation.js';

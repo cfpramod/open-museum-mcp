@@ -54,6 +54,30 @@ export interface SearchResult {
   results: Artwork[];
 }
 
+/** One facet value and how many records in the query set carry it. */
+export interface FacetCount {
+  value: string;
+  count: number;
+}
+
+/**
+ * Available facet values + counts for a query, aggregated over the accepted
+ * (rights-verified) candidate set. Dense by construction: only values actually
+ * present appear, so a facet UI renders no empty buckets. Pure aggregation —
+ * Workers-safe, no native deps.
+ */
+export interface FacetResult {
+  /** Medium categories present, by count (descending). */
+  medium: FacetCount[];
+  /** Century buckets (e.g. "1800–1899"), chronological. */
+  dateBucket: FacetCount[];
+  /** Top-N named artists, by count (descending). Anonymous works are excluded. */
+  artist: FacetCount[];
+}
+
+// Cap on the artist facet — a swatch/chip list, not the full long tail.
+const TOP_ARTISTS = 10;
+
 export type FetchOutcome =
   | { ok: true; artwork: Artwork }
   | { ok: false; reason: string };
@@ -103,6 +127,12 @@ export interface FederationOptions {
 export interface Federation {
   readonly fetchers: Record<string, Fetcher>;
   search(params: SearchParams): Promise<SearchResult>;
+  /**
+   * Available facet values + counts (medium, century date-buckets, top-N artist)
+   * for a query, aggregated over the rights-verified candidate set. Dense by
+   * construction. Workers-safe.
+   */
+  facets(params: SearchParams): Promise<FacetResult>;
   getArtwork(id: string): Promise<FetchOutcome>;
   cite(id: string, style: CiteStyle): Promise<CiteOutcome>;
   /**
@@ -147,6 +177,59 @@ function searchCacheKey(
   return JSON.stringify({ q: query, m: museum ?? '*', hi: hasImage, of: overFetch });
 }
 
+// --- Facet aggregation (pure, Workers-safe) ---
+
+function sortByCountThenName(a: FacetCount, b: FacetCount): number {
+  return b.count - a.count || a.value.localeCompare(b.value);
+}
+
+function countMedium(arts: Artwork[]): FacetCount[] {
+  const counts = new Map<string, number>();
+  for (const a of arts) {
+    const m = a.mediumCategory ?? 'other';
+    counts.set(m, (counts.get(m) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([value, count]) => ({ value, count })).sort(sortByCountThenName);
+}
+
+// Bucket a signed year into its century. -500 -> -500 (the 500–401 BCE century).
+function centuryStart(year: number): number {
+  return Math.floor(year / 100) * 100;
+}
+
+function centuryLabel(start: number): string {
+  const end = start + 99;
+  // CE: "1800–1899". BCE: earlier year first, e.g. start -500 -> "500–401 BCE".
+  return start >= 0 ? `${start}–${end}` : `${-start}–${-end} BCE`;
+}
+
+function countDateBuckets(arts: Artwork[]): FacetCount[] {
+  const counts = new Map<number, number>();
+  for (const a of arts) {
+    if (a.yearStart === null || a.yearStart === undefined) continue;
+    const start = centuryStart(a.yearStart);
+    counts.set(start, (counts.get(start) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((x, y) => x[0] - y[0]) // chronological
+    .map(([start, count]) => ({ value: centuryLabel(start), count }));
+}
+
+function countArtists(arts: Artwork[]): FacetCount[] {
+  const counts = new Map<string, number>();
+  for (const a of arts) {
+    // Anonymous works are not a usable artist filter value.
+    if (a.artist.attributionType === 'anonymous') continue;
+    const name = a.artist.name?.trim();
+    if (!name) continue;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([value, count]) => ({ value, count }))
+    .sort(sortByCountThenName)
+    .slice(0, TOP_ARTISTS);
+}
+
 /**
  * Build a federation over a set of museum fetchers and a cache. This is the
  * shared engine behind every front door: the MCP server wraps it for stdio
@@ -185,7 +268,11 @@ export function createFederation(opts: FederationOptions): Federation {
     return { ok: true, artwork: result.artwork };
   }
 
-  async function search(params: SearchParams): Promise<SearchResult> {
+  // Gather the accepted, image/dedup/year-filtered candidate set for a query.
+  // Shared by search() (which then medium-filters + slices) and facets() (which
+  // aggregates over it). Deliberately does NOT apply the medium filter or slice,
+  // so the medium facet reflects every medium present in the query.
+  async function gatherCandidates(params: SearchParams): Promise<Artwork[]> {
     const fetcherList = params.museum
       ? fetchers[params.museum]
         ? [fetchers[params.museum]]
@@ -220,7 +307,11 @@ export function createFederation(opts: FederationOptions): Federation {
       .map((r) => r.artwork);
     const filtered = accepted.filter((a) => !params.has_image || Boolean(a.imageUrls.full));
     const deduped = dedupeWikimediaUploads(filtered);
-    const dated = filterByYearRange(deduped, params.year_min, params.year_max);
+    return filterByYearRange(deduped, params.year_min, params.year_max);
+  }
+
+  async function search(params: SearchParams): Promise<SearchResult> {
+    const dated = await gatherCandidates(params);
     // Medium is a post-fetch filter on the normalized category (like the year
     // filter), not an upstream search constraint. `?? 'other'` defends against
     // any pre-v0.8a cached record that predates the field.
@@ -230,6 +321,15 @@ export function createFederation(opts: FederationOptions): Federation {
     const results = byMedium.slice(0, params.limit);
 
     return { count: results.length, results };
+  }
+
+  async function facets(params: SearchParams): Promise<FacetResult> {
+    const candidates = await gatherCandidates(params);
+    return {
+      medium: countMedium(candidates),
+      dateBucket: countDateBuckets(candidates),
+      artist: countArtists(candidates),
+    };
   }
 
   async function cite(id: string, style: CiteStyle): Promise<CiteOutcome> {
@@ -265,5 +365,5 @@ export function createFederation(opts: FederationOptions): Federation {
     return wrapTier0(buildClearancePayload(result, buildOpts));
   }
 
-  return { fetchers, search, getArtwork, cite, clearanceManifest };
+  return { fetchers, search, facets, getArtwork, cite, clearanceManifest };
 }
