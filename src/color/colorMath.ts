@@ -53,6 +53,12 @@ export interface ColorData {
 
 // --- hex <-> rgb ---
 
+/**
+ * Parse a 6-digit hex colour (with or without leading `#`) to RGB. Callers MUST
+ * pre-validate the input — a malformed string yields NaN channels rather than
+ * throwing. The server boundary already Zod-guards the `color` param against
+ * `^#?[0-9a-fA-F]{6}$`.
+ */
 export function hexToRgb(hex: string): Rgb {
   const h = hex.replace(/^#/, '');
   return {
@@ -180,39 +186,54 @@ export function ciede2000(lab1: Lab, lab2: Lab): number {
 interface FamilyRef {
   name: ColorFamily;
   hex: string;
+  /** Achromatic bins (no hue) — black/neutral/white. Gated behind a chroma floor. */
+  achromatic?: boolean;
 }
 
-// Reference anchors for the eleven bins. A colour is assigned to the family
-// whose anchor is nearest in CIEDE2000 — because CIEDE2000 weights chroma
-// strongly, low-chroma colours fall naturally to black/neutral/white by
-// lightness rather than to a saturated hue.
+// Reference anchors for the eleven bins. Binning is two-stage so that lightness
+// never overrides hue: a colour with chroma at or above CHROMA_THRESHOLD is
+// matched against the HUE anchors only (so a dark red stays red, a pale pink
+// stays pink, instead of collapsing onto black/white), while a near-grey colour
+// below the floor is matched against the achromatic anchors (black/neutral/white)
+// by lightness. Within the chosen set the nearest anchor by CIEDE2000 wins.
 const FAMILY_REFS: FamilyRef[] = [
   { name: 'red', hex: '#ff0000' },
   { name: 'orange', hex: '#ff8000' },
   { name: 'yellow', hex: '#ffff00' },
-  { name: 'green', hex: '#00a000' },
+  { name: 'green', hex: '#00cc00' },
   { name: 'blue', hex: '#0000ff' },
   { name: 'purple', hex: '#800080' },
   { name: 'pink', hex: '#ff80c0' },
   { name: 'brown', hex: '#804000' },
-  { name: 'neutral', hex: '#808080' },
-  { name: 'black', hex: '#000000' },
-  { name: 'white', hex: '#ffffff' },
+  { name: 'neutral', hex: '#808080', achromatic: true },
+  { name: 'black', hex: '#000000', achromatic: true },
+  { name: 'white', hex: '#ffffff', achromatic: true },
 ];
 
+// CIELAB chroma (C* = hypot(a, b)) at/above which a colour is treated as having
+// a hue. Below it the colour is near-grey and binned achromatic. Tuned so pale
+// tints (e.g. #ffd0d0, C≈18) keep their hue while muted greys (C≲10) stay neutral.
+const CHROMA_THRESHOLD = 12;
+
+// A colour in the orange hue sector below this lightness is brown (= dark,
+// muted orange). Above it, it stays orange.
+const BROWN_MAX_L = 45;
+
 /** The eleven colour-family bins with their reference anchor hexes. */
-export const COLOR_FAMILIES: ReadonlyArray<{ name: ColorFamily; hex: string }> = FAMILY_REFS;
+export const COLOR_FAMILIES: ReadonlyArray<{ name: ColorFamily; hex: string }> = FAMILY_REFS.map(
+  ({ name, hex }) => ({ name, hex }),
+);
 
-const FAMILY_LABS: Array<{ name: ColorFamily; lab: Lab }> = FAMILY_REFS.map((f) => ({
-  name: f.name,
-  lab: hexToLab(f.hex),
-}));
+// Achromatic anchors (black/neutral/white) for the near-grey branch — matched by
+// CIEDE2000, which for chromaless colours reduces to a lightness comparison.
+const ACHROMATIC_LABS: Array<{ name: ColorFamily; lab: Lab }> = FAMILY_REFS.filter(
+  (f) => f.achromatic,
+).map((f) => ({ name: f.name, lab: hexToLab(f.hex) }));
 
-/** Bin a CIELAB colour to its nearest colour family by CIEDE2000. */
-export function nearestColorFamily(lab: Lab): ColorFamily {
-  let best: ColorFamily = 'neutral';
+function nearestIn(lab: Lab, candidates: Array<{ name: ColorFamily; lab: Lab }>): ColorFamily {
+  let best = candidates[0].name;
   let bestDist = Infinity;
-  for (const ref of FAMILY_LABS) {
+  for (const ref of candidates) {
     const d = ciede2000(lab, ref.lab);
     if (d < bestDist) {
       bestDist = d;
@@ -220,6 +241,37 @@ export function nearestColorFamily(lab: Lab): ColorFamily {
     }
   }
   return best;
+}
+
+// Map a CIELAB hue angle (degrees) to a spectral family. Boundaries are the
+// midpoints between adjacent anchor hue angles (red 40°, orange 60°, yellow 103°,
+// green 136°, blue 306°, purple 328°, pink 349°); the wide green→blue span
+// absorbs the rarely-seen cyan/teal region. Hue angle is lightness-invariant, so
+// a dark or pale colour keeps its hue family instead of collapsing to black/white.
+function hueSector(h: number): ColorFamily {
+  if (h >= 14.5 && h < 50) return 'red';
+  if (h >= 50 && h < 81.5) return 'orange';
+  if (h >= 81.5 && h < 119.5) return 'yellow';
+  if (h >= 119.5 && h < 221) return 'green';
+  if (h >= 221 && h < 317) return 'blue';
+  if (h >= 317 && h < 338.5) return 'purple';
+  return 'pink'; // [338.5, 360) ∪ [0, 14.5)
+}
+
+/**
+ * Bin a CIELAB colour to a colour family. Near-grey colours
+ * (C* < CHROMA_THRESHOLD) go to black/neutral/white by lightness. Chromatic
+ * colours are binned by hue angle (lightness-invariant, so dark reds stay red
+ * and pale pinks stay pink), with a dark orange reclassified as brown.
+ */
+export function nearestColorFamily(lab: Lab): ColorFamily {
+  const chroma = Math.hypot(lab.a, lab.b);
+  if (chroma < CHROMA_THRESHOLD) return nearestIn(lab, ACHROMATIC_LABS);
+
+  let hue = (Math.atan2(lab.b, lab.a) * 180) / Math.PI;
+  if (hue < 0) hue += 360;
+  const family = hueSector(hue);
+  return family === 'orange' && lab.l < BROWN_MAX_L ? 'brown' : family;
 }
 
 // --- quantization ---

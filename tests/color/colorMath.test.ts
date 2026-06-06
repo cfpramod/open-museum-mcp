@@ -82,6 +82,26 @@ describe('colour families', () => {
     expect(nearestColorFamily(hexToLab('#000000'))).toBe('black');
     expect(nearestColorFamily(hexToLab('#808080'))).toBe('neutral');
   });
+
+  it('bins SATURATED bright greens to green (not yellow)', () => {
+    expect(nearestColorFamily(hexToLab('#00ff00'))).toBe('green');
+    expect(nearestColorFamily(hexToLab('#40ff40'))).toBe('green');
+  });
+
+  it('keeps chromatic colours in their hue family regardless of lightness', () => {
+    // dark chromatic must NOT collapse to black
+    expect(nearestColorFamily(hexToLab('#400000'))).toBe('red'); // dark red
+    expect(nearestColorFamily(hexToLab('#002040'))).toBe('blue'); // navy
+    expect(['green', 'yellow']).toContain(nearestColorFamily(hexToLab('#556b2f'))); // dark olive
+    // pale chromatic must NOT collapse to white
+    expect(['pink', 'red']).toContain(nearestColorFamily(hexToLab('#ffd0d0'))); // pale pink
+  });
+
+  it('still assigns near-achromatic colours to black / neutral / white by lightness', () => {
+    expect(nearestColorFamily(hexToLab('#101010'))).toBe('black');
+    expect(nearestColorFamily(hexToLab('#7a7a7a'))).toBe('neutral');
+    expect(nearestColorFamily(hexToLab('#fafafa'))).toBe('white');
+  });
 });
 
 describe('quantizeColors', () => {
