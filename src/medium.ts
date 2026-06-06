@@ -49,8 +49,11 @@ const TIER1: Array<[string, MediumCategory]> = [
   ['encaustic', 'painting'],
   ['ink and color', 'painting'],
   ['ink and colour', 'painting'],
+  ['gold leaf', 'painting'],
+  ['gold ground', 'painting'],
   ['painting', 'painting'],
   // drawing
+  ['pen and ink', 'drawing'],
   ['charcoal', 'drawing'],
   ['chalk', 'drawing'],
   ['graphite', 'drawing'],
@@ -85,6 +88,8 @@ const TIER1: Array<[string, MediumCategory]> = [
   ['photograph', 'photograph'],
   ['photo', 'photograph'],
   // sculpture
+  ['gilt-bronze', 'sculpture'],
+  ['gilt bronze', 'sculpture'],
   ['sculpture', 'sculpture'],
   ['statuette', 'sculpture'],
   ['statue', 'sculpture'],
@@ -189,10 +194,10 @@ function escapeRegExp(s: string): string {
 // within a tier. A trailing `s?` absorbs regular plurals (e.g. Wikimedia
 // category titles like "paintings", "prints"). Word boundaries prevent matches
 // inside unrelated words ("open" must not hit a "pen"-style keyword).
-function compile(tier: Array<[string, MediumCategory]>): Array<{ re: RegExp; category: MediumCategory; len: number }> {
-  return tier
-    .map(([kw, category]) => ({ re: new RegExp(`\\b${escapeRegExp(kw)}s?\\b`, 'i'), category, len: kw.length }))
-    .sort((a, b) => b.len - a.len);
+function compile(tier: Array<[string, MediumCategory]>): Array<{ re: RegExp; category: MediumCategory }> {
+  return [...tier]
+    .sort((a, b) => b[0].length - a[0].length) // longest keyword first → longest-match wins
+    .map(([kw, category]) => ({ re: new RegExp(`\\b${escapeRegExp(kw)}s?\\b`, 'i'), category }));
 }
 
 const TIER1_MATCHERS = compile(TIER1);

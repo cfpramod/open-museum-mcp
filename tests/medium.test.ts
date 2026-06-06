@@ -94,4 +94,17 @@ describe('normalizeMedium — controlled vocabulary', () => {
     // produce false matches; "open" must not match the "pen" drawing keyword.
     expect(normalizeMedium('Open-form vessel')).toBe('other');
   });
+
+  it('resolves known phrase cues correctly (multi-word tier-1 keywords)', () => {
+    expect(normalizeMedium('Pen and ink on paper')).toBe('drawing');
+    expect(normalizeMedium('Tempera and gold leaf on panel')).toBe('painting');
+    expect(normalizeMedium('Gold ground panel')).toBe('painting');
+    expect(normalizeMedium('Gilt-bronze figure')).toBe('sculpture');
+    expect(normalizeMedium('Gilt bronze mount')).toBe('sculpture');
+    // bare "gold" / "bronze" remain metalwork (no painting/sculpture phrase cue)
+    expect(normalizeMedium('Gold')).toBe('metalwork');
+    expect(normalizeMedium('Bronze')).toBe('metalwork');
+    // the manuscript codex cue still wins over an incidental "gold" token
+    expect(normalizeMedium('Ink and gold on parchment, codex')).toBe('manuscript');
+  });
 });
