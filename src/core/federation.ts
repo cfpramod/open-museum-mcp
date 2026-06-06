@@ -294,7 +294,14 @@ export function createFederation(opts: FederationOptions): Federation {
     }
 
     const cached = await cache.getObject(id);
-    if (cached) return { ok: true, artwork: cached };
+    if (cached) {
+      // Backfill colour onto a record cached before it had any — a pre-v0.8b row
+      // still within the 90-day TTL, or one written by a sharp-less/Workers
+      // process. Without this, such rows would stay colourless until natural
+      // expiry and silently under-return from colour search/facets.
+      if (await enrichColor(cached)) await cache.upsertObject(cached);
+      return { ok: true, artwork: cached };
+    }
 
     // ID_REGEX guarantees a non-empty `[a-z]+` segment before ':'.
     const code = id.slice(0, id.indexOf(':'));
@@ -308,24 +315,28 @@ export function createFederation(opts: FederationOptions): Federation {
       return { ok: false, reason: result.rejection.reason };
     }
 
-    // Node-only colour enrichment, after the rights gate, before caching. Fails
-    // open: a null result or a thrown error leaves colour unset (the record is
-    // still valid). Absent in Workers / the .mcpb bundle, which inject nothing.
-    if (extractColor) {
-      try {
-        const color = await extractColor(result.artwork);
-        if (color) {
-          result.artwork.dominantColor = color.dominantColor;
-          result.artwork.palette = color.palette;
-          result.artwork.colorFamily = color.colorFamily;
-        }
-      } catch {
-        // enrichment failure is non-fatal
-      }
-    }
-
+    await enrichColor(result.artwork);
     await cache.upsertObject(result.artwork);
     return { ok: true, artwork: result.artwork };
+  }
+
+  // Node-only colour enrichment. Runs the injected extractor on a record that has
+  // no colour yet, mutating it in place. Returns true if colour was added (so the
+  // caller can persist it). Fails open: a null result or a thrown error leaves
+  // colour unset and the record valid. A no-op in Workers / the .mcpb bundle,
+  // which inject no extractor, and for records that already carry colour.
+  async function enrichColor(artwork: Artwork): Promise<boolean> {
+    if (!extractColor || artwork.dominantColor !== undefined) return false;
+    try {
+      const color = await extractColor(artwork);
+      if (!color) return false;
+      artwork.dominantColor = color.dominantColor;
+      artwork.palette = color.palette;
+      artwork.colorFamily = color.colorFamily;
+      return true;
+    } catch {
+      return false; // enrichment failure is non-fatal
+    }
   }
 
   // Gather the accepted, image/dedup/year-filtered candidate set for a query.

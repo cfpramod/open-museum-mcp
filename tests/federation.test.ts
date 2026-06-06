@@ -539,3 +539,52 @@ describe('createFederation.facets colour', () => {
     expect(f.colorFamily).toContainEqual({ value: 'red', count: 1 });
   });
 });
+
+describe('createFederation colour backfill on cached records', () => {
+  it('backfills colour onto an already-cached colourless record when an extractor is present', async () => {
+    const t = fakeFetcher('test', { ids: ['test:1'], accept: new Set(['test:1']) });
+    const { store, objects } = memoryCache();
+    // a record cached before colour existed (pre-v0.8b row, or a sharp-less write)
+    objects.set('test:1', makeArtwork('test:1'));
+    const fed = createFederation({
+      fetchers: { test: t.fetcher },
+      cache: store,
+      extractColor: async () => ({
+        dominantColor: '#3a5f7d',
+        palette: [{ hex: '#3a5f7d', weight: 1 }],
+        colorFamily: 'blue',
+        lab: { l: 40, a: -5, b: -20 },
+      }),
+    });
+    const getRawSpy = vi.spyOn(t.fetcher, 'getRaw');
+
+    const out = await fed.getArtwork('test:1');
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.artwork.colorFamily).toBe('blue');
+    // persisted back to the cache
+    expect(objects.get('test:1')?.colorFamily).toBe('blue');
+    // served from cache, not re-fetched upstream — only enriched
+    expect(getRawSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not re-enrich a cached record that already has colour', async () => {
+    const { store, objects } = memoryCache();
+    objects.set(
+      'test:1',
+      makeArtwork('test:1', {
+        dominantColor: '#111111',
+        colorFamily: 'black',
+        palette: [{ hex: '#111111', weight: 1 }],
+      }),
+    );
+    const extractColor = vi.fn(async () => {
+      throw new Error('extractor must not be called for an already-coloured record');
+    });
+    const fed = createFederation({ fetchers: {}, cache: store, extractColor });
+
+    const out = await fed.getArtwork('test:1');
+    expect(out.ok).toBe(true);
+    expect(extractColor).not.toHaveBeenCalled();
+  });
+});
