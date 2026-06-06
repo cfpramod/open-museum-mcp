@@ -49,6 +49,27 @@ export type { Fetcher, SearchOptions } from '../fetchers/types.js';
 // need the value set; the normalizer is exposed for any host-side reclassifying.
 export { MEDIUM_CATEGORIES, normalizeMedium, type MediumCategory } from '../medium.js';
 
+// Colour — the Workers-safe READ side only (math + types). Extraction lives in
+// the Node-only color/extract.ts and is deliberately NOT exported here, so the
+// core stays free of `sharp`. The web app uses these to render swatches and to
+// run colour search/ranking over precomputed colour.
+export {
+  COLOR_FAMILIES,
+  COLOR_FAMILY_NAMES,
+  ciede2000,
+  hexToLab,
+  hexToRgb,
+  rgbToHex,
+  rgbToLab,
+  nearestColorFamily,
+  quantizeColors,
+  type ColorFamily,
+  type ColorData,
+  type PaletteEntry,
+  type Rgb,
+  type Lab,
+} from '../color/colorMath.js';
+
 // Built-in museum fetchers, so a host can assemble its own registry (and
 // decide which to enable based on available API keys).
 export { metFetcher } from '../fetchers/met.js';

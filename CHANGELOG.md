@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-06-06
+
+> Published together with the unreleased 0.8.0 medium work — this single npm publish carries **both** the medium facet (0.8.0) and the colour facet (0.9.0).
+
+### Added
+
+- **Colour facet (v0.8b) — dominant-colour extraction, colour search, colour family facet.** Node-side colour enrichment runs after the rights gate on each accepted record: it fetches the **thumbnail**, extracts a dominant colour + top-5 palette via the optional `sharp` dependency, and stores `dominantColor` (hex), `palette` (`[{hex, weight}]`), and `colorFamily` (one of 11 perceptual bins) on the cached `Artwork` (additive fields; reserved `Tradition`/`obscurityScore` untouched). CIELAB is derived from the hex on demand.
+- **`search_artworks` colour filters.** `color` (hex) re-ranks results by **CIEDE2000** perceptual nearness (nearest first; colourless records excluded from a colour-ranked search); `color_family` filters to a coarse bin. Both are post-fetch over the bounded window, like the medium/year filters.
+- **`facets()` colour-family bucket.** Adds `colorFamily` counts alongside medium/date/artist, over the same bounded sample window.
+- **Colour read API exported from the core** (`ciede2000`, `hexToLab`, `nearestColorFamily`, `quantizeColors`, `COLOR_FAMILIES`, types) — Workers-safe, so the web app can render swatches and run colour search over precomputed colour.
+
+### Architecture / constraints
+
+- **`sharp` is an OPTIONAL, lazily-loaded dependency.** Colour extraction lives in Node-only `src/color/extract.ts`, never imported by the engine core, and is **injected** into the federation as a capability. If `sharp` is absent — the `.mcpb` bundle (built native-free; its staging manifest excludes optional deps), a Cloudflare Workers runtime, or any sharp-less install — extraction **fails open**: colour fields stay unset and the record is still valid. The Workers-safe core contains zero `sharp`/`node:` imports and only ever *reads* precomputed colour.
+
+### Follow-up (not in this release)
+
+- **Reaching the web app's KV cache.** The Node MCP server's `node:sqlite` cache is not the web app's Cloudflare KV, so extracting colour in the MCP server does not by itself populate the web app. v0.8b ships the **engine capability** (extraction + storage + colour search + colour facet + Workers-safe read path). A Node-side enrichment path or scheduled job that writes precomputed colour into the web app's KV is a separate follow-up.
+
 ## [0.8.0] — 2026-06-06
 
 ### Added

@@ -3,6 +3,12 @@ import { cite as citeArtwork, type CiteStyle } from '../cite.js';
 import { dedupeWikimediaUploads } from '../dedupe.js';
 import type { Fetcher } from '../fetchers/types.js';
 import { MEDIUM_CATEGORIES } from '../medium.js';
+import {
+  COLOR_FAMILY_NAMES,
+  ciede2000,
+  hexToLab,
+  type ColorData,
+} from '../color/colorMath.js';
 import type { Artwork } from '../types.js';
 import { filterByYearRange } from '../yearFilter.js';
 import type { CacheStore } from './cache.js';
@@ -53,6 +59,13 @@ export const SearchParamsSchema = z.object({
   year_min: z.number().int().optional(),
   year_max: z.number().int().optional(),
   medium: z.enum(MEDIUM_CATEGORIES).optional(),
+  /** Hex (`#rrggbb` or `rrggbb`). Ranks results by CIEDE2000 nearest to this colour. */
+  color: z
+    .string()
+    .regex(/^#?[0-9a-fA-F]{6}$/)
+    .optional(),
+  /** Coarse colour-family filter (one of the controlled bins). */
+  color_family: z.enum(COLOR_FAMILY_NAMES).optional(),
 });
 export type SearchParams = z.infer<typeof SearchParamsSchema>;
 
@@ -82,6 +95,8 @@ export interface FacetResult {
   dateBucket: FacetCount[];
   /** Top-N named artists, by count (descending). Anonymous works are excluded. */
   artist: FacetCount[];
+  /** Colour families present, by count (descending). Records without colour are skipped. */
+  colorFamily: FacetCount[];
 }
 
 // Cap on the artist facet — a swatch/chip list, not the full long tail.
@@ -131,6 +146,16 @@ export interface FederationOptions {
    * Injectable so emitted manifests are deterministic in tests and fixtures.
    */
   clock?: () => string;
+  /**
+   * Node-only colour-extraction capability. When provided, the federation runs
+   * it on each accepted record (after the rights gate, before caching) and
+   * stores the result's colour on the artwork. INJECTED, not built-in, so the
+   * core never imports `sharp`: Workers and the `.mcpb` bundle pass nothing and
+   * read precomputed colour only. It fails OPEN — a null result or a thrown
+   * error leaves colour unset and the record valid (colour is an enrichment,
+   * not a gate). The MCP server wires in `createColorExtractor()`.
+   */
+  extractColor?: (artwork: Artwork) => Promise<ColorData | null>;
 }
 
 export interface Federation {
@@ -224,6 +249,15 @@ function countDateBuckets(arts: Artwork[]): FacetCount[] {
     .map(([start, count]) => ({ value: centuryLabel(start), count }));
 }
 
+function countColorFamily(arts: Artwork[]): FacetCount[] {
+  const counts = new Map<string, number>();
+  for (const a of arts) {
+    if (!a.colorFamily) continue; // colourless records (Workers / sharp-less) skipped
+    counts.set(a.colorFamily, (counts.get(a.colorFamily) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([value, count]) => ({ value, count })).sort(sortByCountThenName);
+}
+
 function countArtists(arts: Artwork[]): FacetCount[] {
   const counts = new Map<string, number>();
   for (const a of arts) {
@@ -252,6 +286,7 @@ export function createFederation(opts: FederationOptions): Federation {
   const onReject = opts.onReject;
   const engineVersion = opts.engineVersion ?? '0.0.0';
   const clock = opts.clock ?? (() => new Date().toISOString());
+  const extractColor = opts.extractColor;
 
   async function getArtwork(id: string): Promise<FetchOutcome> {
     if (!ID_REGEX.test(id)) {
@@ -259,7 +294,14 @@ export function createFederation(opts: FederationOptions): Federation {
     }
 
     const cached = await cache.getObject(id);
-    if (cached) return { ok: true, artwork: cached };
+    if (cached) {
+      // Backfill colour onto a record cached before it had any — a pre-v0.8b row
+      // still within the 90-day TTL, or one written by a sharp-less/Workers
+      // process. Without this, such rows would stay colourless until natural
+      // expiry and silently under-return from colour search/facets.
+      if (await enrichColor(cached)) await cache.upsertObject(cached);
+      return { ok: true, artwork: cached };
+    }
 
     // ID_REGEX guarantees a non-empty `[a-z]+` segment before ':'.
     const code = id.slice(0, id.indexOf(':'));
@@ -273,8 +315,28 @@ export function createFederation(opts: FederationOptions): Federation {
       return { ok: false, reason: result.rejection.reason };
     }
 
+    await enrichColor(result.artwork);
     await cache.upsertObject(result.artwork);
     return { ok: true, artwork: result.artwork };
+  }
+
+  // Node-only colour enrichment. Runs the injected extractor on a record that has
+  // no colour yet, mutating it in place. Returns true if colour was added (so the
+  // caller can persist it). Fails open: a null result or a thrown error leaves
+  // colour unset and the record valid. A no-op in Workers / the .mcpb bundle,
+  // which inject no extractor, and for records that already carry colour.
+  async function enrichColor(artwork: Artwork): Promise<boolean> {
+    if (!extractColor || artwork.dominantColor !== undefined) return false;
+    try {
+      const color = await extractColor(artwork);
+      if (!color) return false;
+      artwork.dominantColor = color.dominantColor;
+      artwork.palette = color.palette;
+      artwork.colorFamily = color.colorFamily;
+      return true;
+    } catch {
+      return false; // enrichment failure is non-fatal
+    }
   }
 
   // Gather the accepted, image/dedup/year-filtered candidate set for a query.
@@ -329,7 +391,27 @@ export function createFederation(opts: FederationOptions): Federation {
     const byMedium = params.medium
       ? dated.filter((a) => (a.mediumCategory ?? 'other') === params.medium)
       : dated;
-    const results = byMedium.slice(0, params.limit);
+
+    // color_family is a post-fetch filter (like medium); a record without colour
+    // (Workers / sharp-less enrichment) simply doesn't match.
+    const byFamily = params.color_family
+      ? byMedium.filter((a) => a.colorFamily === params.color_family)
+      : byMedium;
+
+    // `color` re-orders the survivors by CIEDE2000 nearness to the query colour.
+    // Colourless records can't be ranked by colour, so they're dropped from a
+    // colour-ranked search.
+    let ordered = byFamily;
+    if (params.color) {
+      const queryLab = hexToLab(params.color);
+      ordered = byFamily
+        .filter((a): a is Artwork & { dominantColor: string } => Boolean(a.dominantColor))
+        .map((a) => ({ a, d: ciede2000(queryLab, hexToLab(a.dominantColor)) }))
+        .sort((x, y) => x.d - y.d)
+        .map((x) => x.a);
+    }
+
+    const results = ordered.slice(0, params.limit);
 
     return { count: results.length, results };
   }
@@ -342,6 +424,7 @@ export function createFederation(opts: FederationOptions): Federation {
       medium: countMedium(candidates),
       dateBucket: countDateBuckets(candidates),
       artist: countArtists(candidates),
+      colorFamily: countColorFamily(candidates),
     };
   }
 

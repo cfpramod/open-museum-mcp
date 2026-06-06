@@ -417,3 +417,174 @@ describe('createFederation.search medium filter — bounded under-delivery', () 
     expect(out.results.every((r) => r.mediumCategory === 'print')).toBe(true);
   });
 });
+
+describe('createFederation colour enrichment (Node capability, fail-open)', () => {
+  it('applies an injected extractColor to accepted records before caching', async () => {
+    const t = fakeFetcher('test', { ids: ['test:1'], accept: new Set(['test:1']) });
+    const { store, objects } = memoryCache();
+    const fed = createFederation({
+      fetchers: { test: t.fetcher },
+      cache: store,
+      extractColor: async () => ({
+        dominantColor: '#3a5f7d',
+        palette: [{ hex: '#3a5f7d', weight: 1 }],
+        colorFamily: 'blue',
+        lab: { l: 40, a: -5, b: -20 },
+      }),
+    });
+
+    const out = await fed.getArtwork('test:1');
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.artwork.dominantColor).toBe('#3a5f7d');
+    expect(out.artwork.colorFamily).toBe('blue');
+    expect(out.artwork.palette).toEqual([{ hex: '#3a5f7d', weight: 1 }]);
+    // colour is persisted on the cached record
+    expect(objects.get('test:1')?.colorFamily).toBe('blue');
+  });
+
+  it('leaves colour unset when no extractor is injected (Workers / sharp-less read path)', async () => {
+    const t = fakeFetcher('test', { ids: ['test:1'], accept: new Set(['test:1']) });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const out = await fed.getArtwork('test:1');
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.artwork.dominantColor).toBeUndefined();
+    expect(out.artwork.colorFamily).toBeUndefined();
+  });
+
+  it('fails open: an extractor that returns null or throws does not fail the record', async () => {
+    const t = fakeFetcher('test', { ids: ['test:1', 'test:2'], accept: new Set(['test:1', 'test:2']) });
+    const { store } = memoryCache();
+    const fed = createFederation({
+      fetchers: { test: t.fetcher },
+      cache: store,
+      extractColor: async (a) => {
+        if (a.id === 'test:2') throw new Error('extract boom');
+        return null;
+      },
+    });
+
+    const a1 = await fed.getArtwork('test:1');
+    const a2 = await fed.getArtwork('test:2');
+    expect(a1.ok).toBe(true);
+    expect(a2.ok).toBe(true);
+    if (a1.ok) expect(a1.artwork.colorFamily).toBeUndefined();
+    if (a2.ok) expect(a2.artwork.colorFamily).toBeUndefined();
+  });
+});
+
+describe('createFederation.search colour', () => {
+  function colourFetcher() {
+    const over: Record<string, Partial<Artwork>> = {
+      'test:1': { dominantColor: '#ff0000', colorFamily: 'red' },
+      'test:2': { dominantColor: '#0000ff', colorFamily: 'blue' },
+      'test:3': { dominantColor: '#00a000', colorFamily: 'green' },
+      'test:4': {}, // no colour (enrichment failed / Workers)
+    };
+    return fakeFetcher('test', {
+      ids: ['test:1', 'test:2', 'test:3', 'test:4'],
+      accept: new Set(['test:1', 'test:2', 'test:3', 'test:4']),
+      over,
+    });
+  }
+
+  it('ranks results by CIEDE2000 nearest to the query colour', async () => {
+    const t = colourFetcher();
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 10, color: '#1010ee' });
+    // nearest to a blue query is the blue record
+    expect(out.results[0].id).toBe('test:2');
+  });
+
+  it('excludes colourless records from a colour-ranked search', async () => {
+    const t = colourFetcher();
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 10, color: '#1010ee' });
+    expect(out.results.map((r) => r.id)).not.toContain('test:4');
+  });
+
+  it('filters by color_family', async () => {
+    const t = colourFetcher();
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 10, color_family: 'red' });
+    expect(out.results.map((r) => r.id)).toEqual(['test:1']);
+  });
+});
+
+describe('createFederation.facets colour', () => {
+  it('aggregates a colorFamily bucket over the sample (skipping colourless)', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1', 'test:2', 'test:3'],
+      accept: new Set(['test:1', 'test:2', 'test:3']),
+      over: {
+        'test:1': { colorFamily: 'blue' },
+        'test:2': { colorFamily: 'blue' },
+        'test:3': { colorFamily: 'red' },
+      },
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const f = await fed.facets({ query: 'x', has_image: true, limit: 10 });
+    expect(f.colorFamily).toContainEqual({ value: 'blue', count: 2 });
+    expect(f.colorFamily).toContainEqual({ value: 'red', count: 1 });
+  });
+});
+
+describe('createFederation colour backfill on cached records', () => {
+  it('backfills colour onto an already-cached colourless record when an extractor is present', async () => {
+    const t = fakeFetcher('test', { ids: ['test:1'], accept: new Set(['test:1']) });
+    const { store, objects } = memoryCache();
+    // a record cached before colour existed (pre-v0.8b row, or a sharp-less write)
+    objects.set('test:1', makeArtwork('test:1'));
+    const fed = createFederation({
+      fetchers: { test: t.fetcher },
+      cache: store,
+      extractColor: async () => ({
+        dominantColor: '#3a5f7d',
+        palette: [{ hex: '#3a5f7d', weight: 1 }],
+        colorFamily: 'blue',
+        lab: { l: 40, a: -5, b: -20 },
+      }),
+    });
+    const getRawSpy = vi.spyOn(t.fetcher, 'getRaw');
+
+    const out = await fed.getArtwork('test:1');
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.artwork.colorFamily).toBe('blue');
+    // persisted back to the cache
+    expect(objects.get('test:1')?.colorFamily).toBe('blue');
+    // served from cache, not re-fetched upstream — only enriched
+    expect(getRawSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not re-enrich a cached record that already has colour', async () => {
+    const { store, objects } = memoryCache();
+    objects.set(
+      'test:1',
+      makeArtwork('test:1', {
+        dominantColor: '#111111',
+        colorFamily: 'black',
+        palette: [{ hex: '#111111', weight: 1 }],
+      }),
+    );
+    const extractColor = vi.fn(async () => {
+      throw new Error('extractor must not be called for an already-coloured record');
+    });
+    const fed = createFederation({ fetchers: {}, cache: store, extractColor });
+
+    const out = await fed.getArtwork('test:1');
+    expect(out.ok).toBe(true);
+    expect(extractColor).not.toHaveBeenCalled();
+  });
+});
