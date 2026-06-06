@@ -16,6 +16,7 @@
   },
   "files": [
     "dist",
+    "spec/clearance",
     "README.md",
     "LICENSE"
   ],
