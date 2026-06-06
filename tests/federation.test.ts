@@ -15,6 +15,7 @@ function makeArtwork(id: string, over: Partial<Artwork> = {}): Artwork {
     yearStart: 1700,
     yearEnd: 1700,
     medium: 'oil',
+    mediumCategory: 'painting',
     region: null,
     period: null,
     imageUrls: { full: `https://img.example/${id}.jpg` },
@@ -250,5 +251,37 @@ describe('createFederation.cite', () => {
 
     const bad = await fed.cite('test:404', 'short');
     expect(bad.ok).toBe(false);
+  });
+});
+
+describe('createFederation.search medium filter', () => {
+  it('returns only records whose mediumCategory matches the filter', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1', 'test:2', 'test:3'],
+      accept: new Set(['test:1', 'test:2', 'test:3']),
+      over: {
+        'test:1': { mediumCategory: 'painting' },
+        'test:2': { mediumCategory: 'print' },
+        'test:3': { mediumCategory: 'painting' },
+      },
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 10, medium: 'print' });
+    expect(out.results.map((r) => r.id)).toEqual(['test:2']);
+  });
+
+  it('returns all records when no medium filter is set', async () => {
+    const t = fakeFetcher('test', {
+      ids: ['test:1', 'test:2'],
+      accept: new Set(['test:1', 'test:2']),
+      over: { 'test:1': { mediumCategory: 'painting' }, 'test:2': { mediumCategory: 'print' } },
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 10 });
+    expect(out.count).toBe(2);
   });
 });

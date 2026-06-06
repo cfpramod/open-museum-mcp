@@ -14,6 +14,7 @@ import { z } from 'zod';
 import {
   createFederation,
   ID_REGEX,
+  MEDIUM_CATEGORIES,
   SearchParamsSchema,
   UnknownMuseumError,
   type CiteStyle,
@@ -131,6 +132,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: 'integer',
             description:
               'Optional inclusive upper bound on artwork creation year. Negative for BCE. Records with no parseable date are excluded when any year bound is set.',
+          },
+          medium: {
+            type: 'string',
+            enum: [...MEDIUM_CATEGORIES],
+            description:
+              'Optional medium-category filter. One of the controlled values (painting, drawing, print, photograph, sculpture, textile, ceramic, metalwork, furniture, manuscript, other). Applied after rights verification. Use the facets tool to see which values are present for a query.',
           },
         },
         required: ['query'],

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { cite as citeArtwork, type CiteStyle } from '../cite.js';
 import { dedupeWikimediaUploads } from '../dedupe.js';
 import type { Fetcher } from '../fetchers/types.js';
+import { MEDIUM_CATEGORIES } from '../medium.js';
 import type { Artwork } from '../types.js';
 import { filterByYearRange } from '../yearFilter.js';
 import type { CacheStore } from './cache.js';
@@ -44,6 +45,7 @@ export const SearchParamsSchema = z.object({
   limit: z.number().int().min(1).max(50).default(10),
   year_min: z.number().int().optional(),
   year_max: z.number().int().optional(),
+  medium: z.enum(MEDIUM_CATEGORIES).optional(),
 });
 export type SearchParams = z.infer<typeof SearchParamsSchema>;
 
@@ -219,7 +221,13 @@ export function createFederation(opts: FederationOptions): Federation {
     const filtered = accepted.filter((a) => !params.has_image || Boolean(a.imageUrls.full));
     const deduped = dedupeWikimediaUploads(filtered);
     const dated = filterByYearRange(deduped, params.year_min, params.year_max);
-    const results = dated.slice(0, params.limit);
+    // Medium is a post-fetch filter on the normalized category (like the year
+    // filter), not an upstream search constraint. `?? 'other'` defends against
+    // any pre-v0.8a cached record that predates the field.
+    const byMedium = params.medium
+      ? dated.filter((a) => (a.mediumCategory ?? 'other') === params.medium)
+      : dated;
+    const results = byMedium.slice(0, params.limit);
 
     return { count: results.length, results };
   }
