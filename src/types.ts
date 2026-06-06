@@ -1,6 +1,7 @@
+import type { ColorFamily, PaletteEntry } from './color/colorMath.js';
 import type { MediumCategory } from './medium.js';
 
-export type { MediumCategory };
+export type { ColorFamily, MediumCategory, PaletteEntry };
 
 export type LicenseType = 'CC0' | 'PD' | 'CC-BY' | 'CC-BY-SA' | 'OTHER' | 'UNKNOWN';
 
@@ -86,6 +87,16 @@ export interface Artwork {
   source: ArtworkSource;
   description?: string;
   rawTags?: string[];
+  /**
+   * Dominant colour as a `#rrggbb` hex. Set by Node-side colour enrichment when
+   * available; absent on Workers / the `.mcpb` bundle / any sharp-less run
+   * (enrichment fails open). Additive v0.8b field.
+   */
+  dominantColor?: string;
+  /** Top ~5 palette colours with weights (0..1), most-dominant first. Additive v0.8b. */
+  palette?: PaletteEntry[];
+  /** Coarse colour-family bin (one of ~11) for faceting. Additive v0.8b. */
+  colorFamily?: ColorFamily;
   /** Reserved for v1.0 artist-obscurity scoring across the federated corpus. Not yet populated by any fetcher. */
   obscurityScore?: number;
 }
