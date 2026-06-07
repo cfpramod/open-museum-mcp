@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { webcrypto } from 'node:crypto';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
@@ -14,6 +15,14 @@ const readJson = (rel: string) => JSON.parse(readFileSync(join(specDir, rel), 'u
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
 const validate = ajv.compile(readJson('clearance-manifest.schema.json'));
+const validateEnvelope = ajv.compile(readJson('tier0-envelope.schema.json'));
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 const OPTS = { engineVersion: '0.7.0', now: '2026-06-05T00:00:00.000Z' };
 
@@ -112,12 +121,31 @@ describe('Clearance Manifest conformance (ajv Draft 2020-12)', () => {
     expect(validate(p)).toBe(false);
   });
 
-  it('the committed example manifests validate', () => {
+  it('the committed example envelopes validate, parse, and verify byte-exact', async () => {
     for (const f of ['examples/cc0-accepted.json', 'examples/deny-unrecognized.json']) {
-      const ok = validate(readJson(f));
+      const env = readJson(f);
+      // 1. envelope shape
+      const envOk = validateEnvelope(env);
+      expect({ file: f, errors: validateEnvelope.errors ?? [] }).toEqual({ file: f, errors: [] });
+      expect(envOk).toBe(true);
+      // 2. byte-exact integrity: hash recomputes over the payload string verbatim
+      expect(await sha256Hex(env.payload)).toBe(env.integrity.hash);
+      // 3. the parsed payload conforms to the manifest schema
+      const payload = JSON.parse(env.payload);
+      const ok = validate(payload);
       expect({ file: f, errors: validate.errors ?? [] }).toEqual({ file: f, errors: [] });
       expect(ok).toBe(true);
     }
+  });
+
+  it('rejects an envelope whose hash does not match the payload bytes', () => {
+    const env = readJson('examples/cc0-accepted.json');
+    // tamper with one payload byte without updating the hash
+    const tampered = { ...env, payload: env.payload.replace('Wheat', 'WheaT') };
+    // structurally still a valid envelope...
+    expect(validateEnvelope(tampered)).toBe(true);
+    // ...but the integrity check (recompute over bytes) must now fail
+    return sha256Hex(tampered.payload).then((h) => expect(h).not.toBe(tampered.integrity.hash));
   });
 
   it('the advisory-entry schema accepts an unrecognised_rule advisory', () => {

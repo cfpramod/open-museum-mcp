@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-06-07
+
+### Changed (breaking — `clearance_record` output)
+
+- **Tier-0 integrity envelope switched from JCS canonicalization to BYTE-EXACT.** The keyless Tier-0 envelope emitted by `clearance_record` now carries the manifest as its exact UTF-8 JSON string and hashes those exact bytes, instead of hashing an RFC 8785 (JCS) canonicalization of the payload object. New envelope shape:
+
+  ```jsonc
+  {
+    "tier": 0,
+    "payloadType": "application/clearance-manifest+json",
+    "payload": "<exact UTF-8 JSON string of the manifest>",
+    "integrity": { "alg": "sha-256", "hash": "<sha-256 of the payload string's bytes>" }
+  }
+  ```
+
+  `payload` is now a **string** (was a nested object); `integrity` drops the `jcs: true` flag and gains a sibling `payloadType`. Consumers MUST hash the `payload` string's UTF-8 bytes verbatim, compare, and only then `JSON.parse` it to read — they MUST NOT re-serialize or re-canonicalize.
+
+  **Why:** byte-exact is the state-of-the-art envelope shape — DSSE, JWS, COSE, and C2PA all protect the payload as bytes, not a re-parseable object. Hashing a nested object is unsound (a consumer re-serializes on parse and is not guaranteed to reproduce the bytes). Byte-exact is content-addressing-correct, removes the canonicalization attack surface, drops the JCS dependency, and eliminates the array-order-determinism gap. The `canonicalize`-style `jcs.ts` module is removed.
+
+  **Tiers 1/2 stay C2PA, unchanged** — only the keyless Tier-0 envelope changed. The manifest payload schema is unchanged. Because v0.1 of the spec is pre-publication (openclearance.org is not yet served and there are no adopters), the v0.1 spec was amended in place rather than minting a new version directory; `spec/clearance/v0.1/` adds `tier0-envelope.schema.json`, re-emits the example envelopes with byte-exact hashes, and replaces the JCS section with a *Canonical form & integrity* section.
+
 ## [0.9.0] — 2026-06-06
 
 > Published together with the unreleased 0.8.0 medium work — this single npm publish carries **both** the medium facet (0.8.0) and the colour facet (0.9.0).

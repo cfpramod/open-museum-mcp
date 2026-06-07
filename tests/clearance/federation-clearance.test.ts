@@ -78,38 +78,57 @@ const rejecting: Fetcher = {
   },
 };
 
+// Byte-exact envelope: the payload is a string. Verify the hash over its exact
+// bytes, then parse to read.
+async function readVerified(env: { payload: string; integrity: { hash: string } }) {
+  const bytes = new TextEncoder().encode(env.payload);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const recomputed = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  expect(recomputed).toBe(env.integrity.hash);
+  return JSON.parse(env.payload);
+}
+
 describe('federation.clearanceManifest', () => {
-  it('emits a Tier-0 envelope; an accepted id is permitted', async () => {
+  it('emits a byte-exact Tier-0 envelope; an accepted id is permitted', async () => {
     const fed = createFederation({ fetchers: { test: accepting }, cache: memoryCache() });
     const env = await fed.clearanceManifest('test:1');
     expect(env.tier).toBe(0);
-    expect(env.payload.type).toBe('ClearanceManifest');
-    expect(env.payload.clearance.commercialReproduction.permitted).toBe(true);
+    expect(env.payloadType).toBe('application/clearance-manifest+json');
+    expect(typeof env.payload).toBe('string');
     expect(env.integrity.hash).toMatch(/^[0-9a-f]{64}$/);
-    // the hash lives in the envelope, never inside the payload
-    expect(JSON.stringify(env.payload)).not.toContain(env.integrity.hash);
+    // the hash lives in the envelope, never inside the payload string
+    expect(env.payload).not.toContain(env.integrity.hash);
+
+    const p = await readVerified(env);
+    expect(p.type).toBe('ClearanceManifest');
+    expect(p.clearance.commercialReproduction.permitted).toBe(true);
   });
 
   it('a rejected id yields a deny manifest, not an error', async () => {
     const fed = createFederation({ fetchers: { test: rejecting }, cache: memoryCache() });
     const env = await fed.clearanceManifest('test:9');
-    expect(env.payload.clearance.commercialReproduction.permitted).toBe(false);
-    expect(env.payload.clearance.commercialReproduction.basis.rule).toBe('default-deny');
-    expect(env.payload.verification.determinedBy.actor).toBe('engine:open-museum-mcp');
+    const p = await readVerified(env);
+    expect(p.clearance.commercialReproduction.permitted).toBe(false);
+    expect(p.clearance.commercialReproduction.basis.rule).toBe('default-deny');
+    expect(p.verification.determinedBy.actor).toBe('engine:open-museum-mcp');
   });
 
   it('an invalid id yields a deny manifest carrying the reason, not a throw', async () => {
     const fed = createFederation({ fetchers: { test: accepting }, cache: memoryCache() });
     const env = await fed.clearanceManifest('not a valid id');
-    expect(env.payload.clearance.commercialReproduction.permitted).toBe(false);
-    expect(env.payload.clearance.commercialReproduction.basis.summary).toContain('invalid artwork id');
+    const p = await readVerified(env);
+    expect(p.clearance.commercialReproduction.permitted).toBe(false);
+    expect(p.clearance.commercialReproduction.basis.summary).toContain('invalid artwork id');
   });
 
   it('an unknown museum code yields a deny manifest', async () => {
     const fed = createFederation({ fetchers: { test: accepting }, cache: memoryCache() });
     const env = await fed.clearanceManifest('zzz:1');
-    expect(env.payload.clearance.commercialReproduction.permitted).toBe(false);
-    expect(env.payload.clearance.commercialReproduction.basis.summary).toContain('unknown museum code');
+    const p = await readVerified(env);
+    expect(p.clearance.commercialReproduction.permitted).toBe(false);
+    expect(p.clearance.commercialReproduction.basis.summary).toContain('unknown museum code');
   });
 
   it('threads the host engine version into the manifest tool provenance', async () => {
@@ -119,6 +138,7 @@ describe('federation.clearanceManifest', () => {
       engineVersion: '9.9.9',
     });
     const env = await fed.clearanceManifest('test:1');
-    expect(env.payload.verification.tool).toContain('@9.9.9');
+    const p = await readVerified(env);
+    expect(p.verification.tool).toContain('@9.9.9');
   });
 });

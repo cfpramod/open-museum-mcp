@@ -60,15 +60,16 @@ Fields and recommended-rule ids may be deprecated but are not removed within a
 major version. Deprecations are called out in the spec prose and in JSON Schema
 `description` fields, with the version in which removal is planned.
 
-## Canonicalisation stability
+## Integrity-derivation stability
 
-The Tier-0 integrity hash is computed over the **RFC 8785 (JCS)**
-canonicalization of the payload. JCS is a fixed, deterministic canonicalization;
-v0.1 introduces no spec-specific array sorting or pre-processing on top of it. Any
-future change to how the signed/hashed bytes are derived would change the
-integrity contract, so it MUST be introduced with an explicit
-canonicalisation-version marker or deferred to a major bump — never by silently
-changing the derivation.
+The Tier-0 integrity hash is **byte-exact**: it is the SHA-256 of the exact UTF-8
+bytes of the `payload` string carried in the envelope (no canonicalization).
+There is therefore no canonicalization step to version. Any future change to how
+the hashed bytes are derived would change the integrity contract, so it MUST be
+introduced with an explicit envelope-version marker or deferred to a major bump —
+never by silently changing the derivation. (Pre-publication, v0.1 replaced an
+earlier RFC 8785 / JCS canonicalization with this byte-exact form; since v0.1 is
+not yet served and has no adopters, the change was made in place.)
 
 ## Stability commitment
 
