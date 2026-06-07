@@ -28,7 +28,7 @@ booleans. A manifest is emitted for cleared **and** non-cleared works alike: a
 ## Design principles
 
 1. **Compose, don't reinvent.** The format binds existing standards through its
-   JSON-LD `@context`: Creative Commons rights URIs (rights status — v0.1 emits
+   JSON-LD `@context`: Creative Commons rights URIs (rights status; v0.1 emits
    the CC0 and Public Domain Mark URIs; the model also accommodates
    rightsstatements.org URIs for vocabularies a future version may admit),
    schema.org and Dublin Core (descriptive and provenance metadata), and W3C PROV
@@ -50,10 +50,10 @@ booleans. A manifest is emitted for cleared **and** non-cleared works alike: a
 
 A manifest has two parts that never mix:
 
-- **The payload** — pure JSON-LD describing the work, its source, the rights
+- **The payload:** pure JSON-LD describing the work, its source, the rights
   determination, the clearance booleans, the determination event, and (when the
   work is identified) its citations.
-- **The envelope** — a thin wrapper holding integrity (and, in higher tiers,
+- **The envelope:** a thin wrapper holding integrity (and, in higher tiers,
   authenticity) over the payload. The envelope references the payload; the
   payload never references the envelope.
 
@@ -78,15 +78,15 @@ That IRI is the **sole normative authority** for term expansion and validation.
 `specVersion` (`"0.1"`) is a human-readable convenience for log-grepping and
 quick inspection; a consumer MUST NOT rely on it for vocabulary resolution.
 
-### `clearance` — the instant answer
+### `clearance`: the instant answer
 
-`clearance` exposes binary, machine-actionable facets — `commercialReproduction`
-and `derivatives` (`permitted`), and `attributionRequired` (`required`) — each
+`clearance` exposes binary, machine-actionable facets: `commercialReproduction`
+and `derivatives` (`permitted`), and `attributionRequired` (`required`), each
 paired with a structured `basis`. `attributionRequired` is explicit so reuse
 engines never parse strings to decide a credit line. The pattern extends (e.g. a
 future `shareAlikeRequired`) without breaking older consumers.
 
-### `basis` — structured, auditable reasoning
+### `basis`: structured, auditable reasoning
 
 Each clearance facet carries a `basis`:
 
@@ -98,7 +98,7 @@ Each clearance facet carries a `basis`:
 }
 ```
 
-`rule`, `inputs`, and `summary` are all REQUIRED — honesty-by-architecture. The
+`rule`, `inputs`, and `summary` are all REQUIRED: honesty-by-architecture. The
 **shape** of `basis` is normative; the set of `rule` ids is **open, not a closed
 enum**. A `rule` id is a bare kebab-case token resolving as a fragment under
 [`rules.md`](rules.md) (`https://openclearance.org/v0.1/rules#<rule>`). The
@@ -113,13 +113,13 @@ A `basis.rule` whose id is **not** in the current registry baseline is still a
 validity (schema) is independent of determination-rule recognition (advisory).
 See [`advisory-entry.schema.json`](advisory-entry.schema.json).
 
-### `verification` — the determination as an auditable event
+### `verification`: the determination as an auditable event
 
 `verification` records *how the rights determination was reached*, distinct from
 how the clearance booleans were derived (that is `basis`). `determinedBy.actor`
 names who made the call and `role` their relationship to it; on a cleared record
 the actor is the rights source (`museum:<code>`), and on a **deny** the actor is
-the engine rights-gate (`engine:<tool>`) — the museum never asserted the deny,
+the engine rights-gate (`engine:<tool>`): the museum never asserted the deny,
 the gate did. `determinationSource` points at the evidence relied upon.
 
 ## The envelope
@@ -135,7 +135,7 @@ fields inside it.
   a keyless distributor (e.g. the reference MCP server) emits by default.
 - **Tier 1/2 (C2PA):** the payload bytes are carried as a C2PA assertion and the
   manifest's claim is signed. The payload is unchanged across tiers. These tiers
-  are **defined here but not implemented in the reference engine** — no signing
+  are **defined here but not implemented in the reference engine**; no signing
   code ships in v0.1.
 
 ### Canonical form & integrity (normative)
@@ -150,7 +150,7 @@ of the UTF-8 bytes of that `payload` string, as lowercase hex.
 Consumers MUST hash the `payload` string's UTF-8 bytes **verbatim**, compare
 against `integrity.hash`, and only THEN `JSON.parse` the string to read the
 manifest. Consumers MUST NOT re-serialize or re-canonicalize the payload before
-hashing — doing so would compute a different hash and break verification.
+hashing; doing so would compute a different hash and break verification.
 
 This is the shape DSSE, JWS, COSE, and C2PA all use: integrity is defined over
 bytes, never over a re-parsed object (a consumer that re-serializes on parse is
@@ -174,13 +174,13 @@ determination; the *signer/attestor* cryptographically vouches. This lets an
 actor without PKI participate (an attestor signs; the actor is named; the
 `determinationSource` records the evidence the attestor relied on).
 
-Verification produces a standardized **`VerificationState`** — the single
+Verification produces a standardized **`VerificationState`**, the single
 variable a downstream engine checks:
 
-- `REJECTED` — hash mismatch or broken certificate chain.
-- `UNVERIFIED_SIGNAL` — Tier 0, valid hash, no attestation.
-- `ATTESTED_DELEGATE` — Tier 1, valid signature.
-- `ATTESTED_DIRECT` — Tier 2, valid domain-bound signature.
+- `REJECTED`: hash mismatch or broken certificate chain.
+- `UNVERIFIED_SIGNAL`: Tier 0, valid hash, no attestation.
+- `ATTESTED_DELEGATE`: Tier 1, valid signature.
+- `ATTESTED_DIRECT`: Tier 2, valid domain-bound signature.
 
 A Tier-0 consumer MUST recompute the SHA-256 over the exact bytes of the
 `payload` string (see *Canonical form & integrity*) and independently resolve
@@ -224,7 +224,7 @@ envelopes in [`examples/`](examples/) (one accepted, one deny) are the reference
 fixtures; the schemas, the byte-exact hash check, and freshly-emitted accept and
 deny manifests are exercised by the ajv harness in
 `tests/clearance/conformance.test.ts`. A *verifier* conforms if it agrees with
-that suite on every case — including recomputing the byte-exact hash and emitting
+that suite on every case, including recomputing the byte-exact hash and emitting
 the declared advisories for structurally-valid documents with unrecognised rule
 ids. URL stability and the versioning promise are described in
 [`../VERSIONING.md`](../VERSIONING.md).

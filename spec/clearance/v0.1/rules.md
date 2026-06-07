@@ -21,16 +21,16 @@ The spec normatively defines only the **shape** of `basis`:
 
 ```jsonc
 "basis": {
-  "rule":    "cc0-grants-commercial",          // string, required — a stable rule id
-  "inputs":  [{ "field": "license.type", "value": "CC0" }],  // array, required — the evidence
+  "rule":    "cc0-grants-commercial",          // string, required: a stable rule id
+  "inputs":  [{ "field": "license.type", "value": "CC0" }],  // array, required: the evidence
   "summary": "CC0 public-domain dedication permits all uses, including commercial."  // required
 }
 ```
 
-`rule`, `inputs`, and `summary` are all **required** — honesty-by-architecture. A determination
+`rule`, `inputs`, and `summary` are all **required**: honesty-by-architecture. A determination
 that cannot name its rule, cite its inputs, and state its reasoning is not a valid determination.
 
-This registry — the *meaning* of each rule id and its truth-table outcome — is **not** part of the
+This registry (the *meaning* of each rule id and its truth-table outcome) is **not** part of the
 schema. The set of rule ids is **open, not a closed enum**:
 
 - A `basis.rule` whose id is listed below is a recognised v0.1-baseline determination.
@@ -55,7 +55,7 @@ schema. The set of rule ids is **open, not a closed enum**:
 
 ---
 
-## CC0 — Creative Commons Zero (`https://creativecommons.org/publicdomain/zero/1.0/`)
+## CC0: Creative Commons Zero (`https://creativecommons.org/publicdomain/zero/1.0/`)
 
 The rights holder has waived all copyright and related rights worldwide. All downstream uses are
 permitted; no attribution is legally required.
@@ -66,11 +66,11 @@ permitted; no attribution is legally required.
 | `cc0-grants-derivatives` | `clearance.derivatives.permitted` | `license.type = CC0` | `true` |
 | `cc0-waives-attribution` | `clearance.attributionRequired.required` | `license.type = CC0` | `false` |
 
-## Public Domain — Public Domain Mark (`https://creativecommons.org/publicdomain/mark/1.0/`)
+## Public Domain: Public Domain Mark (`https://creativecommons.org/publicdomain/mark/1.0/`)
 
 The work carries no known worldwide copyright (Creative Commons Public Domain Mark). The engine
 emits `license.type = PD` only for the worldwide Public Domain Mark (Europeana `rights`) and the
-Wikimedia PD/PDM templates — never a jurisdiction-scoped `rightsstatements.org` value such as
+Wikimedia PD/PDM templates, never a jurisdiction-scoped `rightsstatements.org` value such as
 NoC-US, which claims a narrower (US) scope the gate does not assert. All downstream uses are
 permitted; no attribution is legally required.
 
@@ -91,7 +91,7 @@ engine could not resolve at all).
 | `default-deny` | all of `commercialReproduction.permitted`, `derivatives.permitted`, `attributionRequired.required` | the unrecognised or absent license value, carried verbatim | `false` |
 
 Under `default-deny`, `attributionRequired.required` is `false` not because attribution is waived
-but because there is no cleared use to attribute — the deny is total. `confidence` is always `low`
+but because there is no cleared use to attribute: the deny is total. `confidence` is always `low`
 and the `summary` names the exact value that failed to clear.
 
 ---
@@ -102,5 +102,5 @@ v0.1 of the reference engine only emits `CC0` and `PD` with `confidence: high`. 
 share-alike-bearing licenses (`CC-BY`, `CC-BY-SA`) require additional clearance facets
 (`attributionRequired: true` with a specific credit string, a `shareAlikeRequired` facet) that the
 v0.1 truth tables do not yet model. Until those facets and their rules are defined, such licenses
-resolve to `default-deny` — fail-closed, never a partial guess. Adding them is a future registry
+resolve to `default-deny`: fail-closed, never a partial guess. Adding them is a future registry
 PR, not a schema change.
