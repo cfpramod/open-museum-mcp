@@ -12,12 +12,12 @@
       "minItems": 1,
       "items": { "type": "string" },
       "contains": { "const": "https://openclearance.org/v0.1/context.jsonld" },
-      "description": "JSON-LD context. MUST include the openclearance v0.1 context IRI — the sole normative authority for expansion and validation."
+      "description": "JSON-LD context. MUST include the openclearance v0.1 context IRI: the sole normative authority for expansion and validation."
     },
     "type": { "const": "ClearanceManifest" },
     "specVersion": {
       "const": "0.1",
-      "description": "Human-readable version convenience. Not normative — the @context IRI fixes the actual vocabulary."
+      "description": "Human-readable version convenience. Not normative: the @context IRI fixes the actual vocabulary."
     },
     "work": {
       "type": "object",
@@ -34,7 +34,7 @@
           "properties": {
             "name": { "type": "string" },
             "nationality": { "type": "string" },
-            "lifespan": { "type": "string", "description": "Display-form life dates (e.g. '1853–1890'); not a structured date." },
+            "lifespan": { "type": "string", "description": "Display-form life dates (e.g. '1853-1890'); not a structured date." },
             "attributionType": {
               "type": "string",
               "enum": ["named", "anonymous", "workshop", "after", "attributed", "circle", "follower"]
@@ -89,7 +89,7 @@
       "properties": {
         "statement": {
           "type": ["string", "null"],
-          "description": "Rights-statement URI (CC / rightsstatements.org). null on a deny — no positive open-rights statement applies."
+          "description": "Rights-statement URI (CC / rightsstatements.org). null on a deny: no positive open-rights statement applies."
         },
         "sourceApiValue": {
           "type": ["object", "null"],
@@ -174,7 +174,7 @@
         "rule": {
           "type": "string",
           "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-          "description": "Bare kebab-case determination-rule id resolving to https://openclearance.org/v0.1/rules#<rule>. NOT a closed enum — an unrecognised id is valid and yields an 'unrecognised_rule' advisory."
+          "description": "Bare kebab-case determination-rule id resolving to https://openclearance.org/v0.1/rules#<rule>. NOT a closed enum: an unrecognised id is valid and yields an 'unrecognised_rule' advisory."
         },
         "inputs": {
           "type": "array",

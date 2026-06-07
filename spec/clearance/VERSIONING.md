@@ -12,14 +12,14 @@ Clearance Manifest versions are `MAJOR.MINOR.PATCH`:
   OPTIONAL fields, and other backward-compatible changes that no conforming
   consumer needs to react to.
 - **MINOR** (e.g. a future `v0.x`): additive, backward-compatible vocabulary or
-  field changes — new optional fields and expanded recommended-rule baselines
+  field changes: new optional fields and expanded recommended-rule baselines
   that older validators can safely ignore. Requires a real use case and a public
   review window.
 - **MAJOR** (e.g. an eventual `v1.0`): breaking changes. Requires demonstrated
   implementation experience, broad review, and a migration story.
 
 A version's schema validates documents that declare that version (`specVersion`),
-but the `@context` IRI — not `specVersion` — is the normative authority for term
+but the `@context` IRI (not `specVersion`) is the normative authority for term
 expansion.
 
 ## Permanent, immutable, stable URLs
@@ -66,7 +66,7 @@ The Tier-0 integrity hash is **byte-exact**: it is the SHA-256 of the exact UTF-
 bytes of the `payload` string carried in the envelope (no canonicalization).
 There is therefore no canonicalization step to version. Any future change to how
 the hashed bytes are derived would change the integrity contract, so it MUST be
-introduced with an explicit envelope-version marker or deferred to a major bump —
+introduced with an explicit envelope-version marker or deferred to a major bump,
 never by silently changing the derivation. (Pre-publication, v0.1 replaced an
 earlier RFC 8785 / JCS canonicalization with this byte-exact form; since v0.1 is
 not yet served and has no adopters, the change was made in place.)
