@@ -3,7 +3,7 @@ import { validateMetLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asOptionalString, asString, isValidPositiveInt, rejectFor } from './helpers.js';
+import { asOptionalString, asString, httpGet, isValidPositiveInt, rejectFor } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const MET_API = 'https://collectionapi.metmuseum.org/public/collection/v1';
@@ -27,7 +27,7 @@ export const metFetcher: Fetcher = {
     // search would only hide the engine's actual rights behaviour behind the
     // upstream API's quirk.
 
-    const res = await fetch(url);
+    const res = await httpGet(url);
     if (!res.ok) throw new Error(`Met search failed: ${res.status}`);
     const json = (await res.json()) as { objectIDs?: number[] | null; total?: number };
     const ids = json.objectIDs ?? [];
@@ -36,7 +36,7 @@ export const metFetcher: Fetcher = {
 
   async getRaw(id: string): Promise<unknown> {
     const numeric = id.replace(/^met:/, '');
-    const res = await fetch(`${MET_API}/objects/${numeric}`);
+    const res = await httpGet(`${MET_API}/objects/${numeric}`);
     if (!res.ok) throw new Error(`Met get failed for ${id}: ${res.status}`);
     return res.json();
   },

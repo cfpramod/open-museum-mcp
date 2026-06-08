@@ -3,7 +3,7 @@ import { validateEuropeanaLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asOptionalString, asString } from './helpers.js';
+import { asOptionalString, asString, httpGet } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const EUROPEANA_API = 'https://api.europeana.eu/record/v2';
@@ -151,7 +151,7 @@ export const europeanaFetcher: Fetcher = {
     // Bandwidth cost is small relative to the gate-rejection ratio.
     url.searchParams.set('profile', 'standard');
 
-    const res = await fetch(url);
+    const res = await httpGet(url);
     if (!res.ok) throw new Error(`Europeana search failed: ${res.status}`);
     const json = (await res.json()) as { items?: Array<{ id?: unknown }> };
     const items = json.items ?? [];
@@ -176,7 +176,7 @@ export const europeanaFetcher: Fetcher = {
     // dcDescriptionLangAware) and other EDM properties cite needs.
     // Bandwidth cost is small relative to the gate-rejection ratio.
     url.searchParams.set('profile', 'standard');
-    const res = await fetch(url);
+    const res = await httpGet(url);
     if (!res.ok) throw new Error(`Europeana get failed for ${id}: ${res.status}`);
     return res.json();
   },

@@ -7,6 +7,7 @@ import {
   asFiniteNumber,
   asOptionalString,
   asString,
+  httpGet,
   isValidPositiveInt,
   rejectFor,
 } from './helpers.js';
@@ -52,7 +53,7 @@ export const clevelandFetcher: Fetcher = {
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('fields', 'id');
 
-    const res = await fetch(url);
+    const res = await httpGet(url);
     if (!res.ok) throw new Error(`Cleveland search failed: ${res.status}`);
     const json = (await res.json()) as { data?: Array<{ id?: unknown }> };
     const data = json.data ?? [];
@@ -64,7 +65,7 @@ export const clevelandFetcher: Fetcher = {
 
   async getRaw(id: string): Promise<unknown> {
     const numeric = id.replace(/^cleveland:/, '');
-    const res = await fetch(`${CLEVELAND_API}/artworks/${numeric}`);
+    const res = await httpGet(`${CLEVELAND_API}/artworks/${numeric}`);
     if (!res.ok) throw new Error(`Cleveland get failed for ${id}: ${res.status}`);
     return res.json();
   },

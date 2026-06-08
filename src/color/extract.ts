@@ -9,6 +9,7 @@
  * gate, which fails closed). Image-fetch and decode failures fail open too.
  */
 
+import { httpGet } from '../fetchers/helpers.js';
 import type { Artwork } from '../types.js';
 import { quantizeColors, type ColorData, type Rgb } from './colorMath.js';
 
@@ -59,7 +60,9 @@ async function defaultLoadSharp(): Promise<SharpLike | null> {
 
 async function defaultFetchImage(url: string): Promise<Uint8Array | null> {
   try {
-    const res = await fetch(url);
+    // Museum CDNs can also 403 a UA-less request from datacenter IPs; send the
+    // descriptive UA on the enrichment image fetch too. See helpers.USER_AGENT.
+    const res = await httpGet(url);
     if (!res.ok) return null;
     const declared = Number(res.headers.get('content-length'));
     if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES) return null;
