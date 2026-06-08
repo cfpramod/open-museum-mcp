@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] — 2026-06-08
+
+### Fixed
+
+- **Fetchers now send a compliant, descriptive `User-Agent`.** All outbound museum-API requests previously sent no `User-Agent`, which Wikimedia answers with HTTP 403 (its policy mandates a descriptive UA with a contact URL), and which also caused AIC/Cleveland failures from shared datacenter IPs — e.g. a Cloudflare Worker — leaving only the Met working. A shared `httpGet` wrapper in `src/fetchers/helpers.ts` now attaches `open-museum-mcp (+https://open-museum.art; +https://github.com/cfpramod/open-museum-mcp)` to every museum-API request (Met, Cleveland, AIC, Wikimedia, Europeana) and to the colour-enrichment image fetch. Caller-supplied headers still win.
+
 ## [0.10.0] — 2026-06-07
 
 ### Changed (breaking — `clearance_record` output)

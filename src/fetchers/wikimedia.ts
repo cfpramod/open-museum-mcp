@@ -3,7 +3,7 @@ import { validateWikimediaLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asString, isValidPositiveInt, rejectFor } from './helpers.js';
+import { asFiniteNumber, asString, httpGet, isValidPositiveInt, rejectFor } from './helpers.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
@@ -202,7 +202,7 @@ export const wikimediaFetcher: Fetcher = {
     url.searchParams.set('format', 'json');
     url.searchParams.set('formatversion', '2');
 
-    const res = await fetch(url);
+    const res = await httpGet(url);
     if (!res.ok) throw new Error(`Wikimedia search failed: ${res.status}`);
     const json = (await res.json()) as { query?: { search?: Array<{ pageid?: unknown }> } };
     const results = json.query?.search ?? [];
@@ -231,7 +231,7 @@ export const wikimediaFetcher: Fetcher = {
     url.searchParams.set('format', 'json');
     url.searchParams.set('formatversion', '2');
 
-    const res = await fetch(url);
+    const res = await httpGet(url);
     if (!res.ok) throw new Error(`Wikimedia get failed for ${id}: ${res.status}`);
     return res.json();
   },

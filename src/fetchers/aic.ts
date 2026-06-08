@@ -7,6 +7,7 @@ import {
   asFiniteNumber,
   asOptionalString,
   asString,
+  httpGet,
   isValidPositiveInt,
   rejectFor,
 } from './helpers.js';
@@ -84,7 +85,7 @@ export const aicFetcher: Fetcher = {
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('fields', 'id');
 
-    const res = await fetch(url);
+    const res = await httpGet(url);
     if (!res.ok) throw new Error(`AIC search failed: ${res.status}`);
     const json = (await res.json()) as { data?: Array<{ id?: unknown }> };
     const data = json.data ?? [];
@@ -98,7 +99,7 @@ export const aicFetcher: Fetcher = {
     const numeric = id.replace(/^aic:/, '');
     const url = new URL(`${AIC_API}/artworks/${numeric}`);
     url.searchParams.set('fields', AIC_FIELDS);
-    const res = await fetch(url);
+    const res = await httpGet(url);
     if (!res.ok) throw new Error(`AIC get failed for ${id}: ${res.status}`);
     return res.json();
   },

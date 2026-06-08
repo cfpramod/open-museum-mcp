@@ -9,6 +9,35 @@
 
 import type { ValidationResult } from '../types.js';
 
+/**
+ * Descriptive User-Agent for all outbound museum-API requests.
+ *
+ * Wikimedia's User-Agent policy MANDATES a descriptive UA with a contact URL;
+ * requests without one are answered with HTTP 403 — and that block bites hardest
+ * from shared datacenter IPs (e.g. a Cloudflare Worker), where an empty/default
+ * UA looks like an anonymous bot. AIC and Cleveland are likewise unreliable from
+ * those IP ranges without a UA. Sending a stable, contactable identifier is the
+ * polite-and-required fix. See https://meta.wikimedia.org/wiki/User-Agent_policy
+ */
+export const USER_AGENT =
+  'open-museum-mcp (+https://open-museum.art; +https://github.com/cfpramod/open-museum-mcp)';
+
+/**
+ * `fetch` wrapper that attaches the descriptive {@link USER_AGENT} to every
+ * outbound museum-API request, while letting any caller-supplied header win.
+ *
+ * It deliberately calls the GLOBAL `fetch` (not a captured reference) so test
+ * suites that stub `globalThis.fetch` still intercept these requests.
+ */
+export function httpGet(url: string | URL, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  // Caller-supplied headers win: only set our UA if none was provided.
+  if (!headers.has('User-Agent')) {
+    headers.set('User-Agent', USER_AGENT);
+  }
+  return fetch(url, { ...init, headers });
+}
+
 /** Returns the string value, or "" for any non-string input. */
 export function asString(v: unknown): string {
   return typeof v === 'string' ? v : '';
