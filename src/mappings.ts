@@ -2,13 +2,27 @@ import regionsData from './data/regions.json' with { type: 'json' };
 
 const regionMap = regionsData as Record<string, string[]>;
 
+// Flatten every (canonical, alias) pair into a word-boundary regex, longest
+// alias first. Two reasons, mirroring the dynasty matcher in dateParser.ts:
+//   1. Word boundaries (`\b`) stop an alias matching a substring of an unrelated
+//      word. The old `includes()` mapped "Toledo"/"Macedonian" → japan (both
+//      contain "edo") and "Mustang" → china (contains "tang").
+//   2. Longest-first ordering stops a shorter alias shadowing a longer, more
+//      specific one it is contained in: "roman renaissance" (→ italy) must be
+//      tested before "roman" (→ rome), or every Roman-Renaissance string would
+//      resolve to rome.
+const REGION_MATCHERS: Array<{ canonical: string; re: RegExp }> = Object.entries(regionMap)
+  .flatMap(([canonical, aliases]) => aliases.map((alias) => ({ canonical, alias })))
+  .sort((a, b) => b.alias.length - a.alias.length)
+  .map(({ canonical, alias }) => ({
+    canonical,
+    re: new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),
+  }));
+
 export function normalizeRegion(input: string | null | undefined): string | null {
   if (!input) return null;
-  const lower = input.toLowerCase();
-  for (const [canonical, aliases] of Object.entries(regionMap)) {
-    if (aliases.some((alias) => lower.includes(alias))) {
-      return canonical;
-    }
+  for (const { canonical, re } of REGION_MATCHERS) {
+    if (re.test(input)) return canonical;
   }
   return null;
 }
