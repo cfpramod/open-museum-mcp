@@ -234,6 +234,36 @@ describe('Wikimedia Commons adapter normalization', () => {
     expect(pdmVersioned.status).toBe('accepted');
   });
 
+  it('rejects jurisdiction-scoped public-domain tokens (pd-us, pd-1923)', () => {
+    // An accepted record is emitted as a worldwide PD determination (the
+    // Clearance Manifest stamps the worldwide Public Domain Mark URI at
+    // confidence: high). US-only tokens assert a narrower scope, so promoting
+    // them to a worldwide claim would over-state the right. Strict-default-deny:
+    // reject — the same reason the Europeana gate rejects NoC-US.
+    const usOnly = ['pd-us', 'pd-us-no-notice', 'pd-1923', 'pd-usgov'];
+    for (const value of usOnly) {
+      const result = wikimediaFetcher.normalize({
+        query: {
+          pages: [
+            {
+              pageid: 88000005,
+              title: `File:US-only ${value}.jpg`,
+              imageinfo: [
+                {
+                  url: 'https://upload.wikimedia.org/wikipedia/commons/x/xx/USonly.jpg',
+                  descriptionurl: 'https://commons.wikimedia.org/wiki/File:USonly.jpg',
+                  mime: 'image/jpeg',
+                  extmetadata: { License: { value } },
+                },
+              ],
+            },
+          ],
+        },
+      });
+      expect(result.status, `expected ${value} to be rejected`).toBe('rejected');
+    }
+  });
+
   it('decodes HTML entities in artist and description fields', () => {
     const result = wikimediaFetcher.normalize({
       query: {

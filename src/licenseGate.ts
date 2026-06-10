@@ -120,18 +120,29 @@ export const validateAicLicense: LicenseValidator = (raw) => {
 // not per-source. The MediaWiki API surfaces a machine-readable License token
 // in `imageinfo[0].extmetadata.License.value`. We accept the strict open-access
 // subset only:
-//   - 'cc0'           → CC0 dedication
-//   - 'pd', 'pd-*'    → Public Domain (PD-Art, PD-old, PD-US, PD-self, etc.)
-//   - 'pdm', 'pdm-*'  → Creative Commons Public Domain Mark
+//   - 'cc0'                       → CC0 dedication
+//   - 'pd', 'pd-art', 'pd-old*'   → worldwide Public Domain
+//   - 'pdm', 'pdm-*'              → Creative Commons Public Domain Mark
 // Everything else (CC-BY, CC-BY-SA, CC-BY-NC, GFDL, fair-use, etc.) is rejected.
 // Even though CC-BY is "free", it imposes attribution that the project's
 // per-museum gate model is not designed to verify or carry.
 //
-// Note on "PD-Art": Wikimedia Commons applies this template to faithful
-// photographs of 2D public-domain works (per Bridgeman v. Corel). The license
-// gate trusts Commons' editorial decision to apply that template; we do not
-// independently re-evaluate the underlying work's status.
-const PD_PREFIXES = ['pd', 'pdm'];
+// On jurisdiction scope: an accepted PD record is emitted as a worldwide
+// determination (`type: 'PD'`, `confidence: 'high'`, and a Clearance Manifest
+// stamping the worldwide Public Domain Mark URI). So the gate must accept ONLY
+// PD tokens whose claim is worldwide. Jurisdiction-scoped tokens — `pd-us`,
+// `pd-1923`, `pd-usgov`, `pd-us-no-notice`, etc. — assert US-only status and are
+// rejected, exactly as the Europeana gate already rejects the US-scoped `NoC-US`
+// statement. This is strict-default-deny: an ambiguous (US-only) signal must not
+// be promoted to a worldwide claim. A faithful-repro `pd-art` (Bridgeman v.
+// Corel) and `pd-old*` (author long dead) carry worldwide force; a bare `pd` is
+// only applied by Commons when the file is PD in both the US and its source
+// country, so it clears the same bar.
+//
+// Accept set: exact worldwide tokens, plus the `pd-old`/`pdm-` worldwide
+// families. Anything else under the `pd` namespace falls through to reject.
+const PD_WORLDWIDE_EXACT = new Set(['pd', 'pd-art', 'pdm']);
+const PD_WORLDWIDE_PREFIXES = ['pd-old', 'pdm-'];
 
 export const validateWikimediaLicense: LicenseValidator = (raw) => {
   if (!raw || typeof raw !== 'object') {
@@ -164,7 +175,8 @@ export const validateWikimediaLicense: LicenseValidator = (raw) => {
       reason: 'wikimedia: License=cc0',
     };
   }
-  const isPd = PD_PREFIXES.some((p) => license === p || license.startsWith(`${p}-`));
+  const isPd =
+    PD_WORLDWIDE_EXACT.has(license) || PD_WORLDWIDE_PREFIXES.some((p) => license.startsWith(p));
   if (isPd) {
     return {
       accepted: true,
