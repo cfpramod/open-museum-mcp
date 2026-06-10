@@ -12,9 +12,26 @@ describe('normalizeRegion', () => {
     expect(normalizeRegion('Dutch')).toBe('netherlands');
   });
 
-  it('matches by substring (culture string with extra words)', () => {
+  it('matches an alias as a whole word inside a longer culture string', () => {
     expect(normalizeRegion('Tang dynasty')).toBe('china');
     expect(normalizeRegion('Edo period, Kyoto')).toBe('japan');
+    expect(normalizeRegion('Tibetan thangka')).toBe('china');
+  });
+
+  it('does not match an alias that is only a substring of another word', () => {
+    // The old includes()-based matcher mapped all of these wrongly:
+    // "Toledo"/"Macedonian" contain "edo" (japan); "Mustang" contains "tang"
+    // (china). Word-boundary matching must reject the substring hit.
+    expect(normalizeRegion('Toledo')).toBe(null);
+    expect(normalizeRegion('Macedonian')).toBe(null);
+    expect(normalizeRegion('Mustang')).toBe(null);
+  });
+
+  it('prefers the longer, more specific alias over a shorter one it contains', () => {
+    // "roman renaissance" (→ italy) contains "roman" (→ rome); longest-first
+    // ordering must resolve it to italy, while a bare "Roman" stays rome.
+    expect(normalizeRegion('Roman Renaissance')).toBe('italy');
+    expect(normalizeRegion('Roman')).toBe('rome');
   });
 
   it('returns null for null/empty/undefined input', () => {
