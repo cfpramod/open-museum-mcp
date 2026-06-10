@@ -376,13 +376,28 @@ export function createFederation(opts: FederationOptions): Federation {
 
     let allIds = await cache.getQuery(cacheKey);
     if (!allIds) {
+      // A fetcher's search can throw (museum outage, rate limit, network). We
+      // degrade gracefully — a throwing fetcher contributes no ids and the rest
+      // of the federation still answers — but we must NOT cache a partial result:
+      // `putQuery` has a 14-day TTL, so caching a list that's missing a museum's
+      // contributions (or empty, if the only fetcher failed) would serve that
+      // degraded result for two weeks. Track failures and skip the write when any
+      // search threw, so the next call retries upstream.
+      let anySearchFailed = false;
       const idLists = await Promise.all(
         fetcherList.map((f) =>
-          f.search(params.query, overFetch, { hasImage: params.has_image }).catch(() => [] as string[]),
+          f.search(params.query, overFetch, { hasImage: params.has_image }).catch(() => {
+            anySearchFailed = true;
+            return [] as string[];
+          }),
         ),
       );
       allIds = interleaveRoundRobin(idLists);
-      await cache.putQuery(cacheKey, allIds);
+      // A genuine empty result (every fetcher resolved with no matches) is still
+      // cacheable; only an actual failure suppresses the write.
+      if (!anySearchFailed) {
+        await cache.putQuery(cacheKey, allIds);
+      }
     }
 
     const fetched = await withConcurrency(allIds, concurrency, (id) =>
