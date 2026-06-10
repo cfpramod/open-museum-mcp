@@ -100,6 +100,28 @@ describe('createFederation.search', () => {
     expect(out.results.map((r) => r.id)).toEqual(['test:1', 'test:2']);
   });
 
+  it('interleaves museums round-robin so no single fetcher fills the page', async () => {
+    // Two museums each return 4 accepted candidates. With flat() concatenation,
+    // the first fetcher (met) would fill the limit-4 page entirely. Round-robin
+    // interleaving must yield an alternating mix.
+    const met = fakeFetcher('met', {
+      ids: ['met:1', 'met:2', 'met:3', 'met:4'],
+      accept: new Set(['met:1', 'met:2', 'met:3', 'met:4']),
+    });
+    const cle = fakeFetcher('cleveland', {
+      ids: ['cleveland:1', 'cleveland:2', 'cleveland:3', 'cleveland:4'],
+      accept: new Set(['cleveland:1', 'cleveland:2', 'cleveland:3', 'cleveland:4']),
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { met: met.fetcher, cleveland: cle.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 4 });
+    expect(out.results.map((r) => r.id)).toEqual(['met:1', 'cleveland:1', 'met:2', 'cleveland:2']);
+    const codes = out.results.map((r) => r.museum.code);
+    expect(codes.filter((c) => c === 'met')).toHaveLength(2);
+    expect(codes.filter((c) => c === 'cleveland')).toHaveLength(2);
+  });
+
   it('reuses the cached id list on a second identical search (no second fetcher.search)', async () => {
     const t = fakeFetcher('test', { ids: ['test:1', 'test:2'], accept: new Set(['test:1', 'test:2']) });
     const { store } = memoryCache();

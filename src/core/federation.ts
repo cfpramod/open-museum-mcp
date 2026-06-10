@@ -211,6 +211,24 @@ function searchCacheKey(
   return JSON.stringify({ q: query, m: museum ?? '*', hi: hasImage, of: overFetch });
 }
 
+// Merge per-museum ID lists round-robin (museum 0's first, museum 1's first,
+// ... then everyone's second, ...) so a federated search returns a museum MIX.
+// `flat()` would concatenate the lists in fetcher order, letting whichever
+// fetcher runs first (Met) fill the limited result page before the others are
+// ever fetched — the cause of "search is Met-only" even when every museum
+// returns matches. Each museum's own list stays in its relevance order; we just
+// interleave across museums. Empty lists contribute nothing and are skipped.
+function interleaveRoundRobin<T>(lists: T[][]): T[] {
+  const merged: T[] = [];
+  const longest = lists.reduce((max, list) => Math.max(max, list.length), 0);
+  for (let rank = 0; rank < longest; rank++) {
+    for (const list of lists) {
+      if (rank < list.length) merged.push(list[rank]);
+    }
+  }
+  return merged;
+}
+
 // --- Facet aggregation (pure, Workers-safe) ---
 
 function sortByCountThenName(a: FacetCount, b: FacetCount): number {
@@ -363,7 +381,7 @@ export function createFederation(opts: FederationOptions): Federation {
           f.search(params.query, overFetch, { hasImage: params.has_image }).catch(() => [] as string[]),
         ),
       );
-      allIds = idLists.flat();
+      allIds = interleaveRoundRobin(idLists);
       await cache.putQuery(cacheKey, allIds);
     }
 
