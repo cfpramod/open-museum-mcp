@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.2] — 2026-06-10
+
+### Fixed
+
+- **Federated search now interleaves museums round-robin instead of concatenating them.** `createFederation.search` merged the per-museum candidate ID lists with `flat()`, which concatenated them in fetcher order, so whichever fetcher ran first (the Met) filled the limited result page before the other museums' results were ever fetched. Search was effectively Met-only even though every museum returned matches. The lists are now interleaved round-robin (each museum's first result, then each museum's second, ...), preserving each museum's own relevance order while guaranteeing a multi-museum mix on the page.
+
 ## [0.10.1] — 2026-06-08
 
 ### Fixed
