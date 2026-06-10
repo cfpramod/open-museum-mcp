@@ -30,6 +30,7 @@ import { europeanaFetcher } from './fetchers/europeana.js';
 import { metFetcher } from './fetchers/met.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import type { Fetcher } from './fetchers/types.js';
+import { VERSION } from './version.js';
 
 // Load env vars before reading any keys. Cwd `.env` (developer flow) wins
 // over `~/.open-museum-mcp/.env` (production / MCP-client-launched flow);
@@ -61,9 +62,9 @@ if (process.env.EUROPEANA_API_KEY) {
 const CACHE_PATH = process.env.OMM_CACHE_PATH ?? join(homedir(), '.open-museum-mcp', 'cache.db');
 const cache = new Cache({ path: CACHE_PATH });
 
-// Single source for the server version. Stamped into the MCP handshake and into
-// each Clearance Manifest's `verification.tool` provenance field.
-const VERSION = '0.10.0';
+// Server version, read from package.json (see ./version.ts) so it can't drift
+// from the published release. Stamped into the MCP handshake and into each
+// Clearance Manifest's `verification.tool` provenance field.
 
 // The federation engine is transport-agnostic. The MCP server is one front
 // door over it (stdio JSON-RPC); the web app is another (HTTP + KV cache).
