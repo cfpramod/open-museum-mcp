@@ -132,6 +132,45 @@ describe('createFederation.search', () => {
     expect(t.searchCalls).toBe(1);
   });
 
+  it('does not cache the id list when a fetcher search throws (no 14-day poisoning)', async () => {
+    // One museum is down; the federation should degrade (return the healthy
+    // museum's results) but NOT persist the partial id list, so the next call
+    // retries the failed search instead of serving a degraded result for the
+    // full query-cache TTL.
+    const healthy = fakeFetcher('cleveland', {
+      ids: ['cleveland:1', 'cleveland:2'],
+      accept: new Set(['cleveland:1', 'cleveland:2']),
+    });
+    let metSearchCalls = 0;
+    const downMet: Fetcher = {
+      code: 'met',
+      name: 'MET',
+      async search() {
+        metSearchCalls++;
+        throw new Error('met: upstream 503');
+      },
+      async getRaw(id: string) {
+        return { id };
+      },
+      normalize(raw: unknown): ValidationResult {
+        return { status: 'accepted', artwork: makeArtwork((raw as { id: string }).id) };
+      },
+    };
+    const { store, queries } = memoryCache();
+    const fed = createFederation({ fetchers: { met: downMet, cleveland: healthy.fetcher }, cache: store });
+
+    const first = await fed.search({ query: 'x', has_image: true, limit: 4 });
+    // Degrades to the healthy museum's results.
+    expect(first.results.map((r) => r.id)).toEqual(['cleveland:1', 'cleveland:2']);
+    // The partial result was NOT cached.
+    expect(queries.size).toBe(0);
+
+    // A second identical search re-runs both searches (no poisoned cache hit).
+    await fed.search({ query: 'x', has_image: true, limit: 4 });
+    expect(metSearchCalls).toBe(2);
+    expect(healthy.searchCalls).toBe(2);
+  });
+
   it('excludes image-less records when has_image is true', async () => {
     const t = fakeFetcher('test', {
       ids: ['test:1', 'test:2'],
