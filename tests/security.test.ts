@@ -413,7 +413,7 @@ describe('decompression bomb guard — uncompressed pixel cap', () => {
       mediumCategory: 'painting',
       region: null,
       period: null,
-      imageUrls: { full: 'https://cdn.example/bomb.png' },
+      imageUrls: { full: 'https://images.metmuseum.org/bomb.png' },
       imageOpenAccess: true,
       metadataOpenAccess: true,
       license: {
@@ -468,7 +468,7 @@ describe('decompression bomb guard — uncompressed pixel cap', () => {
       mediumCategory: 'painting',
       region: null,
       period: null,
-      imageUrls: { full: 'https://cdn.example/small.jpg' },
+      imageUrls: { full: 'https://images.metmuseum.org/small.jpg' },
       imageOpenAccess: true,
       metadataOpenAccess: true,
       license: {
@@ -672,5 +672,96 @@ describe('SSRF guard — native IPv6 private/link-local ranges (F2)', () => {
 
   it('rejects the IPv6 unspecified address [::]', () => {
     expect(isSafeImageUrl('http://[::]/image.jpg')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F1 closure: CDN host allowlist — color extraction only for known museum hosts
+// ---------------------------------------------------------------------------
+
+describe('CDN host allowlist — color extraction only for known museum hosts (F1 closure)', () => {
+  // Reusable fake sharp — returns 2×2 red pixels.
+  const safeSharp = (() => {
+    const chain = {
+      metadata: async () => ({ width: 2, height: 2, channels: 3 }),
+      resize: () => chain,
+      raw: () => chain,
+      toBuffer: async () => ({
+        data: new Uint8Array([255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0]),
+        info: { width: 2, height: 2, channels: 3 },
+      }),
+    };
+    return chain;
+  }) as unknown as import('../src/color/extract.js').SharpLike;
+
+  function artworkWithImage(url: string): Artwork {
+    return {
+      id: 'test:1',
+      museum: { code: 'test', name: 'TEST', url: 'https://test.example' },
+      title: 'x',
+      artist: { name: 'A', attributionType: 'named' },
+      displayDate: '1900',
+      yearStart: 1900,
+      yearEnd: 1900,
+      medium: 'oil',
+      mediumCategory: 'painting',
+      region: null,
+      period: null,
+      imageUrls: { full: url },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      license: {
+        type: 'CC0',
+        rawValue: 'true',
+        verificationSource: 'test',
+        verifiedAt: '2026-01-01T00:00:00.000Z',
+        confidence: 'high',
+      },
+      source: { apiUrl: 'https://test.example/api', pageUrl: 'https://test.example/1' },
+    };
+  }
+
+  // (a) unknown/rebinding host → fetch refused → color null; record stays valid
+  it('returns null and never fetches for an unknown third-party host (fail open; closes F1 DNS-rebinding)', async () => {
+    const fetchImage = vi.fn(async () => new Uint8Array([1, 2, 3]));
+    const extract = createColorExtractor({ loadSharp: async () => safeSharp, fetchImage });
+    const result = await extract(artworkWithImage('https://unknown-provider.example.com/img.jpg'));
+    expect(result).toBeNull();
+    expect(fetchImage).not.toHaveBeenCalled();
+  });
+
+  it('returns null and never fetches for an arbitrary Europeana per-provider host (fail open)', async () => {
+    const fetchImage = vi.fn(async () => new Uint8Array([1, 2, 3]));
+    const extract = createColorExtractor({ loadSharp: async () => safeSharp, fetchImage });
+    // www.rijksmuseum.nl appears in Europeana fixtures as an edmIsShownBy host
+    const result = await extract(artworkWithImage('https://www.rijksmuseum.nl/mediaobject/x.jpg'));
+    expect(result).toBeNull();
+    expect(fetchImage).not.toHaveBeenCalled();
+  });
+
+  // (b) allowlisted host → proceeds to color extraction
+  it('proceeds for an allowlisted Met CDN host (images.metmuseum.org)', async () => {
+    const fetchImage = vi.fn(async () => new Uint8Array([1, 2, 3]));
+    const extract = createColorExtractor({ loadSharp: async () => safeSharp, fetchImage });
+    const result = await extract(artworkWithImage('https://images.metmuseum.org/CRDImages/as/original/x.jpg'));
+    expect(fetchImage).toHaveBeenCalled();
+    expect(result).not.toBeNull();
+    expect(result?.dominantColor).toBe('#ff0000');
+  });
+
+  it('proceeds for the Europeana thumbnail host (api.europeana.eu)', async () => {
+    const fetchImage = vi.fn(async () => new Uint8Array([1, 2, 3]));
+    const extract = createColorExtractor({ loadSharp: async () => safeSharp, fetchImage });
+    const result = await extract(artworkWithImage('https://api.europeana.eu/thumbnail/v2/url.json'));
+    expect(fetchImage).toHaveBeenCalled();
+    expect(result).not.toBeNull();
+  });
+
+  it('proceeds for Wikimedia Commons upload CDN (upload.wikimedia.org)', async () => {
+    const fetchImage = vi.fn(async () => new Uint8Array([1, 2, 3]));
+    const extract = createColorExtractor({ loadSharp: async () => safeSharp, fetchImage });
+    const result = await extract(artworkWithImage('https://upload.wikimedia.org/wikipedia/commons/x.jpg'));
+    expect(fetchImage).toHaveBeenCalled();
+    expect(result).not.toBeNull();
   });
 });

@@ -15,7 +15,7 @@ function artwork(over: Partial<Artwork['imageUrls']> = {}): Artwork {
     mediumCategory: 'painting',
     region: null,
     period: null,
-    imageUrls: { full: 'https://cdn.example/full.jpg', thumbnail: 'https://cdn.example/thumb.jpg', ...over },
+    imageUrls: { full: 'https://images.metmuseum.org/full.jpg', thumbnail: 'https://images.metmuseum.org/thumb.jpg', ...over },
     imageOpenAccess: true,
     metadataOpenAccess: true,
     license: { type: 'CC0', rawValue: 'true', verificationSource: 'test', verifiedAt: '2026-01-01T00:00:00.000Z', confidence: 'high' },
@@ -115,7 +115,7 @@ describe('createColorExtractor — extraction', () => {
       fetchImage,
     });
     await extract(artwork());
-    expect(fetchImage).toHaveBeenCalledWith('https://cdn.example/thumb.jpg');
+    expect(fetchImage).toHaveBeenCalledWith('https://images.metmuseum.org/thumb.jpg');
   });
 
   it('skips fully transparent pixels when an alpha channel is present', async () => {

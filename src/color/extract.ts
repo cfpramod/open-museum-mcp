@@ -98,6 +98,40 @@ const PRIVATE_HOST_RE = new RegExp(
 // A hostname like "169.254.169.254.nip.io" resolves to 169.254.169.254.
 const METADATA_RESOLVER_SUFFIX_RE = /\.(nip\.io|xip\.io|sslip\.io)$/i;
 
+// Positive allowlist of known museum image CDN hostnames. Color extraction is
+// attempted ONLY for these hosts. Any other host (including unknown third-party
+// CDNs that Europeana's edmIsShownBy may reference) causes extraction to fail
+// OPEN — the record is still valid, color is simply omitted. This closes the
+// DNS-rebinding vector (F1): an attacker-controlled domain that resolves to an
+// internal IP passes isSafeImageUrl's string checks but is stopped here before
+// any outbound fetch occurs.
+const CDN_ALLOWLIST = new Set([
+  'images.metmuseum.org',           // Met Museum image CDN
+  'openaccess-cdn.clevelandart.org', // Cleveland Museum of Art CDN
+  'www.artic.edu',                   // Art Institute of Chicago (full images)
+  'iiif.artic.edu',                  // Art Institute of Chicago (IIIF server)
+  'upload.wikimedia.org',            // Wikimedia Commons media repository
+  'commons.wikimedia.org',           // Wikimedia Commons (some thumb paths)
+  'api.europeana.eu',                // Europeana thumbnail proxy
+  // Europeana edmIsShownBy (full images) comes from arbitrary per-provider
+  // CDNs — those are intentionally NOT listed here and will fail open.
+]);
+
+/**
+ * Returns true when the image URL's hostname is on the CDN allowlist.
+ * Non-allowlisted hosts cause color extraction to fail open (return null)
+ * without any outbound fetch — the record itself is unaffected.
+ */
+export function isAllowlistedImageHost(urlString: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(urlString);
+  } catch {
+    return false;
+  }
+  return CDN_ALLOWLIST.has(url.hostname);
+}
+
 /**
  * Returns true when a native (non-IPv4-mapped) IPv6 hostname falls in a private
  * or cloud-infrastructure range not covered by PRIVATE_HOST_RE:
@@ -242,6 +276,11 @@ export function createColorExtractor(opts: ColorExtractorOptions = {}): ColorExt
 
     // SSRF guard: reject private IPs and non-HTTP(S) schemes before any fetch.
     if (!isSafeImageUrl(url)) return null;
+
+    // CDN allowlist: only attempt color extraction for known museum image hosts.
+    // Unknown / third-party hosts (e.g. Europeana's per-provider edmIsShownBy
+    // CDNs) fail open — color is omitted, the record stays valid.
+    if (!isAllowlistedImageHost(url)) return null;
 
     const sharp = await loadSharp();
     if (!sharp) return null;
