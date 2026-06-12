@@ -652,3 +652,25 @@ describe('SSRF guard — IPv4-mapped IPv6 and metadata hostname bypass vectors (
     expect(isSafeImageUrl('http://169.254.169.254.nip.io/image.jpg')).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// F2: native IPv6 private/link-local ranges bypass the denylist
+// ---------------------------------------------------------------------------
+
+describe('SSRF guard — native IPv6 private/link-local ranges (F2)', () => {
+  it('rejects unique-local address [fc00::1] (fc00::/7)', () => {
+    expect(isSafeImageUrl('http://[fc00::1]/image.jpg')).toBe(false);
+  });
+
+  it('rejects AWS IMDSv2 address [fd00:ec2::254] (within fc00::/7 as fd prefix)', () => {
+    expect(isSafeImageUrl('http://[fd00:ec2::254]/latest/meta-data/')).toBe(false);
+  });
+
+  it('rejects link-local address [fe80::1] (fe80::/10)', () => {
+    expect(isSafeImageUrl('http://[fe80::1]/image.jpg')).toBe(false);
+  });
+
+  it('rejects the IPv6 unspecified address [::]', () => {
+    expect(isSafeImageUrl('http://[::]/image.jpg')).toBe(false);
+  });
+});

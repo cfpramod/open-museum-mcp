@@ -99,10 +99,40 @@ const PRIVATE_HOST_RE = new RegExp(
 const METADATA_RESOLVER_SUFFIX_RE = /\.(nip\.io|xip\.io|sslip\.io)$/i;
 
 /**
+ * Returns true when a native (non-IPv4-mapped) IPv6 hostname falls in a private
+ * or cloud-infrastructure range not covered by PRIVATE_HOST_RE:
+ *   - fc00::/7  (unique-local — IPv6 equivalent of RFC1918 private ranges)
+ *   - fe80::/10 (link-local — IPv6 equivalent of 169.254.x.x)
+ *   - ::        (unspecified address, all zeros)
+ *
+ * Operates on the bracket-stripped WHATWG-normalized hostname.  WHATWG always
+ * lowercases and compresses IPv6, so the first colon-delimited group is a
+ * predictable 1–4 hex digit string that can be checked with bitmask arithmetic.
+ */
+function isPrivateNativeIPv6(h: string): boolean {
+  if (h === '::') return true;
+  // Addresses starting with '::' (other than bare '::') are handled by
+  // PRIVATE_HOST_RE (::1 loopback, ::ffff:... IPv4-mapped) — skip here.
+  if (h.startsWith('::')) return false;
+  const firstColon = h.indexOf(':');
+  if (firstColon <= 0) return false;
+  const val = parseInt(h.slice(0, firstColon), 16);
+  if (isNaN(val)) return false;
+  // fc00::/7 — unique-local: first 7 bits == 1111 110x (mask 0xfe00, value 0xfc00).
+  // Covers fc00:: through fdff::, including fd00:ec2::254 (AWS IMDSv2).
+  if ((val & 0xfe00) === 0xfc00) return true;
+  // fe80::/10 — link-local: first 10 bits == 1111 1110 10xx xxxx (mask 0xffc0, value 0xfe80).
+  // Covers fe80:: through febf::.
+  if ((val & 0xffc0) === 0xfe80) return true;
+  return false;
+}
+
+/**
  * Returns true when a URL is safe to fetch as an image:
  *   - scheme is http or https only
  *   - hostname is not a loopback, private-range, link-local, IPv4-mapped IPv6,
- *     known cloud metadata hostname, or known DNS resolver service
+ *     native IPv6 private/link-local, known cloud metadata hostname, or known
+ *     DNS resolver service
  *
  * Called on the initial URL and on every Location hop during redirect following,
  * so both direct and redirect-based SSRF vectors are blocked.
@@ -119,6 +149,7 @@ export function isSafeImageUrl(urlString: string): boolean {
   // Strip them before pattern matching so the regex doesn't need two forms.
   const h = url.hostname.replace(/^\[|\]$/g, '');
   if (PRIVATE_HOST_RE.test(h)) return false;
+  if (isPrivateNativeIPv6(h)) return false;
   if (METADATA_RESOLVER_SUFFIX_RE.test(h)) return false;
   return true;
 }
