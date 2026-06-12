@@ -11,6 +11,7 @@ import {
   isValidPositiveInt,
   rejectFor,
 } from './helpers.js';
+import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const AIC_API = 'https://api.artic.edu/api/v1';
@@ -138,14 +139,14 @@ export const aicFetcher: Fetcher = {
         ? { yearStart: dateStart, yearEnd: dateEnd }
         : parseDisplayDate(displayDate);
 
-    const artistDisplay = asString(r.artist_display);
+    const artistDisplay = sanitizeArtistName(asString(r.artist_display));
     const artistTitle = asString(r.artist_title);
     const attributionType = artistDisplay
       ? detectAttributionType(artistDisplay)
       : 'anonymous';
     // Prefer `artist_title` (canonical name without the parenthetical).
     // Fall back to mining `artist_display` if artist_title is missing.
-    const cleanName = cleanArtistName(artistTitle || artistDisplay.split('(')[0].trim());
+    const cleanName = cleanArtistName(sanitizeArtistName(artistTitle) || artistDisplay.split('(')[0].trim());
     const { nationality, lifespan } = parseArtistDisplay(artistDisplay);
 
     const region = normalizeRegion(asString(r.place_of_origin));
@@ -163,7 +164,7 @@ export const aicFetcher: Fetcher = {
         name: 'Art Institute of Chicago',
         url: 'https://www.artic.edu',
       },
-      title: (asString(r.title) || '(Untitled)').trim(),
+      title: sanitizeTitle(asString(r.title)) || '(Untitled)',
       artist: {
         name: cleanName || 'Unknown',
         nationality,
