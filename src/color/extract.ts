@@ -9,7 +9,7 @@
  * gate, which fails closed). Image-fetch and decode failures fail open too.
  */
 
-import { httpGet } from '../fetchers/helpers.js';
+import { USER_AGENT } from '../fetchers/helpers.js';
 import type { Artwork } from '../types.js';
 import { quantizeColors, type ColorData, type Rgb } from './colorMath.js';
 
@@ -58,18 +58,54 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024;
 
 // Private IP ranges that must never be fetched from museum image URLs.
-// Covers: loopback (127.x), class-A private (10.x), class-B private
-// (172.16–172.31), class-C private (192.168.x), link-local / metadata
-// (169.254.x — the AWS/GCP IMDS address), and the "localhost" hostname.
-const PRIVATE_HOST_RE =
-  /^(localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|169\.254\.\d{1,3}\.\d{1,3}|::1|0\.0\.0\.0)$/i;
+// Covers IPv4 loopback/private/link-local, IPv6 loopback, IPv4-mapped IPv6
+// (::ffff:a.b.c.d decimal notation and ::ffff:hex:hex notation for 169.254.x.x),
+// known cloud metadata hostnames, and known DNS-to-IP resolver services.
+const PRIVATE_HOST_RE = new RegExp(
+  '^(' +
+  // IPv4 loopback and wildcard
+  'localhost|0\\.0\\.0\\.0|' +
+  '127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|' +
+  // IPv4 private class-A
+  '10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|' +
+  // IPv4 private class-B (172.16–172.31)
+  '172\\.(1[6-9]|2\\d|3[01])\\.\\d{1,3}\\.\\d{1,3}|' +
+  // IPv4 private class-C
+  '192\\.168\\.\\d{1,3}\\.\\d{1,3}|' +
+  // IPv4 link-local / AWS+GCP IMDS
+  '169\\.254\\.\\d{1,3}\\.\\d{1,3}|' +
+  // IPv6 loopback
+  '::1|' +
+  // IPv4-mapped IPv6: ::ffff:a.b.c.d — loopback
+  '::ffff:127\\.\\d+\\.\\d+\\.\\d+|' +
+  // IPv4-mapped IPv6: ::ffff:a.b.c.d — class-A private
+  '::ffff:10\\.\\d+\\.\\d+\\.\\d+|' +
+  // IPv4-mapped IPv6: ::ffff:a.b.c.d — class-B private
+  '::ffff:172\\.(1[6-9]|2\\d|3[01])\\.\\d+\\.\\d+|' +
+  // IPv4-mapped IPv6: ::ffff:a.b.c.d — class-C private
+  '::ffff:192\\.168\\.\\d+\\.\\d+|' +
+  // IPv4-mapped IPv6: ::ffff:a.b.c.d — link-local / IMDS (decimal)
+  '::ffff:169\\.254\\.\\d+\\.\\d+|' +
+  // IPv4-mapped IPv6: ::ffff:a9fe:a9fe = 169.254.169.254 (hex, WHATWG-compressed)
+  '::ffff:a9fe:a9fe|' +
+  // GCP metadata hostname
+  'metadata\\.google\\.internal' +
+  ')$',
+  'i',
+);
+
+// Known DNS-to-IP resolver suffixes used in SSRF probes (e.g. nip.io, sslip.io).
+// A hostname like "169.254.169.254.nip.io" resolves to 169.254.169.254.
+const METADATA_RESOLVER_SUFFIX_RE = /\.(nip\.io|xip\.io|sslip\.io)$/i;
 
 /**
  * Returns true when a URL is safe to fetch as an image:
  *   - scheme is http or https only
- *   - hostname is not a loopback, private-range, or link-local address
+ *   - hostname is not a loopback, private-range, link-local, IPv4-mapped IPv6,
+ *     known cloud metadata hostname, or known DNS resolver service
  *
- * This is the SSRF guard for the colour-extraction path.
+ * Called on the initial URL and on every Location hop during redirect following,
+ * so both direct and redirect-based SSRF vectors are blocked.
  */
 export function isSafeImageUrl(urlString: string): boolean {
   let url: URL;
@@ -79,7 +115,12 @@ export function isSafeImageUrl(urlString: string): boolean {
     return false;
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
-  return !PRIVATE_HOST_RE.test(url.hostname);
+  // WHATWG URL serializes IPv6 hostnames with surrounding brackets ("[::1]").
+  // Strip them before pattern matching so the regex doesn't need two forms.
+  const h = url.hostname.replace(/^\[|\]$/g, '');
+  if (PRIVATE_HOST_RE.test(h)) return false;
+  if (METADATA_RESOLVER_SUFFIX_RE.test(h)) return false;
+  return true;
 }
 
 async function defaultLoadSharp(): Promise<SharpLike | null> {
@@ -96,12 +137,54 @@ async function defaultLoadSharp(): Promise<SharpLike | null> {
   }
 }
 
+// Hard cap on redirect hops. Museum CDNs don't chain beyond 2–3 hops;
+// anything deeper is suspicious. Fail open (return null) on overflow.
+const MAX_REDIRECT_HOPS = 5;
+
+/**
+ * Fetch an image URL following redirects manually so we can re-run
+ * isSafeImageUrl on every Location header before following. Uses
+ * `redirect: 'manual'` to prevent the platform fetch from silently
+ * following a redirect to a private IP (C2 / redirect TOCTOU fix).
+ */
+async function fetchImageWithSafeRedirects(startUrl: string): Promise<Response | null> {
+  let url = startUrl;
+  for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT },
+        redirect: 'manual',
+      });
+    } catch {
+      return null;
+    }
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) return null;
+      // Resolve relative Location against the current URL before validating.
+      let next: string;
+      try {
+        next = new URL(location, url).href;
+      } catch {
+        return null;
+      }
+      if (!isSafeImageUrl(next)) return null;
+      url = next;
+      continue;
+    }
+    return res;
+  }
+  return null;
+}
+
 async function defaultFetchImage(url: string): Promise<Uint8Array | null> {
   try {
     // Museum CDNs can also 403 a UA-less request from datacenter IPs; send the
     // descriptive UA on the enrichment image fetch too. See helpers.USER_AGENT.
-    const res = await httpGet(url);
-    if (!res.ok) return null;
+    // Manual redirect following re-validates every Location hop (C2 guard).
+    const res = await fetchImageWithSafeRedirects(url);
+    if (!res || !res.ok) return null;
     const declared = Number(res.headers.get('content-length'));
     if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES) return null;
     const bytes = new Uint8Array(await res.arrayBuffer());

@@ -184,7 +184,9 @@ function tryRangeRegex(s: string): DateRange | null {
 }
 
 function tryCenturyRange(s: string): DateRange | null {
-  const m = s.match(/([\w-]+)\s*[-–]\s*([\w-]+)\s*(?:-|\s)?\s*century\s*(b\.?c\.?e?\.?|bc)?/i);
+  // Bound [\w-]{1,30}: legitimate ordinal tokens ("twenty-first", "xxii") are
+  // short; unbounded [\w-]+ caused catastrophic backtracking on long inputs.
+  const m = s.match(/([\w-]{1,30})\s*[-–]\s*([\w-]{1,30})\s*(?:-|\s)?\s*century\s*(b\.?c\.?e?\.?|bc)?/i);
   if (!m) return null;
   const startN = ordinalToNumber(m[1]);
   const endN = ordinalToNumber(m[2]);
@@ -248,7 +250,8 @@ function tryCentury(s: string): DateRange | null {
 
   const stripped = s.replace(/\b(early|mid|middle|late)\b[\s\-]*/i, ' ').trim();
 
-  const m = stripped.match(/([\w-]+)\s*(?:-|\s)?\s*century\s*(b\.?c\.?e?\.?|bc)?/i);
+  // Bound [\w-]{1,30}: same catastrophic-backtracking prevention as tryCenturyRange.
+  const m = stripped.match(/([\w-]{1,30})\s*(?:-|\s)?\s*century\s*(b\.?c\.?e?\.?|bc)?/i);
   if (!m) return null;
 
   const num = ordinalToNumber(m[1]);
@@ -298,12 +301,21 @@ function tryDynasty(s: string): DateRange | null {
  * Returns {null, null} when nothing matches — never guesses. BCE is encoded
  * as negative integers so range arithmetic Just Works.
  */
+// Defense-in-depth cap on the parser input. Museum display dates are short,
+// but wikimedia/met sometimes pass full prose descriptions (e.g. "c. 1560s.
+// Oil on canvas…", ~130 chars) to let the parser extract an embedded year.
+// 256 covers all observed museum inputs while still blocking 10k-char payloads.
+// The primary O(n²) defense is the {1,30}-bounded quantifiers in the century
+// regexes below; this cap is a belt-and-suspenders guard on top.
+const DATE_INPUT_MAX = 256;
+
 export function parseDisplayDate(input: string | null | undefined): DateRange {
   if (!input || typeof input !== 'string') {
     return { yearStart: null, yearEnd: null };
   }
   const s = input.trim();
   if (!s) return { yearStart: null, yearEnd: null };
+  if (s.length > DATE_INPUT_MAX) return { yearStart: null, yearEnd: null };
 
   const cross = tryCrossEraRange(s);
   if (cross) return cross;

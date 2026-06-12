@@ -7,13 +7,14 @@
  *   3. Decompression bomb: uncompressed pixel cap before decode
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { aicFetcher } from '../src/fetchers/aic.js';
 import { clevelandFetcher } from '../src/fetchers/cleveland.js';
 import { europeanaFetcher } from '../src/fetchers/europeana.js';
 import { metFetcher } from '../src/fetchers/met.js';
 import { wikimediaFetcher } from '../src/fetchers/wikimedia.js';
 import { createColorExtractor, isSafeImageUrl } from '../src/color/extract.js';
+import { parseDisplayDate } from '../src/dateParser.js';
 import type { Artwork } from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -484,5 +485,170 @@ describe('decompression bomb guard — uncompressed pixel cap', () => {
     expect(metadataCalled).toBe(true);
     expect(result).not.toBeNull();
     expect(result?.dominantColor).toBe('#ff0000');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C1 regression: parseDisplayDate must return fast on attacker-length inputs
+// ---------------------------------------------------------------------------
+
+describe('parseDisplayDate — algorithmic-complexity DoS guard', () => {
+  it('returns {null,null} in <50ms for a 10k-char input (no catastrophic backtracking)', () => {
+    const start = performance.now();
+    const result = parseDisplayDate('A'.repeat(10_000));
+    const elapsed = performance.now() - start;
+    expect(result).toEqual({ yearStart: null, yearEnd: null });
+    expect(elapsed).toBeLessThan(50);
+  });
+
+  it('returns {null,null} for an input beyond DATE_INPUT_MAX that is not a date', () => {
+    const result = parseDisplayDate('X'.repeat(200));
+    expect(result).toEqual({ yearStart: null, yearEnd: null });
+  });
+
+  it('still parses legitimate short date strings after the guard', () => {
+    expect(parseDisplayDate('1889')).toEqual({ yearStart: 1889, yearEnd: 1889 });
+    expect(parseDisplayDate('14th-15th century')).toMatchObject({ yearStart: 1301 });
+    expect(parseDisplayDate('Tang dynasty (618–907)')).toMatchObject({ yearStart: 618, yearEnd: 907 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C2 regression: redirect TOCTOU — defaultFetchImage must re-validate Location
+// ---------------------------------------------------------------------------
+
+describe('SSRF guard — redirect bypass prevention (C2)', () => {
+  // Reusable sharp stub that would yield a colour result if bytes are decoded.
+  const safeSharp = (() => {
+    const chain = {
+      metadata: async () => ({ width: 2, height: 2, channels: 3 }),
+      resize: () => chain,
+      raw: () => chain,
+      toBuffer: async () => ({
+        data: new Uint8Array([255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0]),
+        info: { width: 2, height: 2, channels: 3 },
+      }),
+    };
+    return chain;
+  }) as unknown as import('../src/color/extract.js').SharpLike;
+
+  function artworkWithImage(url: string): Artwork {
+    return {
+      id: 'test:redirect',
+      museum: { code: 'test', name: 'TEST', url: 'https://test.example' },
+      title: 'x',
+      artist: { name: 'A', attributionType: 'named' },
+      displayDate: '1900',
+      yearStart: 1900,
+      yearEnd: 1900,
+      medium: 'oil',
+      mediumCategory: 'painting',
+      region: null,
+      period: null,
+      imageUrls: { full: url },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      license: {
+        type: 'CC0',
+        rawValue: 'true',
+        verificationSource: 'test',
+        verifiedAt: '2026-01-01T00:00:00.000Z',
+        confidence: 'high',
+      },
+      source: { apiUrl: 'https://test.example/api', pageUrl: 'https://test.example/1' },
+    };
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('blocks extraction when a CDN URL 302-redirects to the metadata IP', async () => {
+    // Initial URL passes isSafeImageUrl (legitimate CDN).
+    // The CDN 302s to the metadata endpoint. defaultFetchImage must NOT follow
+    // the redirect silently — it must re-check the Location and abort.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: 'http://169.254.169.254/latest/meta-data/' },
+        }),
+      ),
+    );
+    // fetchImage is NOT injected — exercises defaultFetchImage redirect guard
+    const extract = createColorExtractor({ loadSharp: async () => safeSharp });
+    const result = await extract(artworkWithImage('https://images.metmuseum.org/cdn/img.jpg'));
+    expect(result).toBeNull();
+  });
+
+  it('blocks extraction when a redirect chain leads to a private class-C IP', async () => {
+    let callCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return new Response(null, {
+            status: 301,
+            headers: { location: 'https://another-cdn.example.com/img.jpg' },
+          });
+        }
+        // Second hop redirects to private IP
+        return new Response(null, {
+          status: 302,
+          headers: { location: 'https://192.168.1.1/exfil.jpg' },
+        });
+      }),
+    );
+    const extract = createColorExtractor({ loadSharp: async () => safeSharp });
+    const result = await extract(artworkWithImage('https://upload.wikimedia.org/img.jpg'));
+    expect(result).toBeNull();
+  });
+
+  it('follows safe redirects to completion', async () => {
+    let callCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        callCount++;
+        if (callCount === 1) {
+          // Safe redirect to another CDN
+          return new Response(null, {
+            status: 302,
+            headers: { location: 'https://cdn2.example.com/img.jpg' },
+          });
+        }
+        // Final safe response with image bytes
+        return new Response(new Uint8Array([255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0]), {
+          status: 200,
+          headers: { 'content-type': 'image/jpeg' },
+        });
+      }),
+    );
+    const extract = createColorExtractor({ loadSharp: async () => safeSharp });
+    const result = await extract(artworkWithImage('https://images.metmuseum.org/img.jpg'));
+    expect(result).not.toBeNull();
+    expect(result?.dominantColor).toBe('#ff0000');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// I1 regression: SSRF denylist — IPv4-mapped IPv6 + known metadata hostnames
+// ---------------------------------------------------------------------------
+
+describe('SSRF guard — IPv4-mapped IPv6 and metadata hostname bypass vectors (I1)', () => {
+  it('rejects IPv4-mapped IPv6 form of the metadata IP: [::ffff:169.254.169.254]', () => {
+    expect(isSafeImageUrl('http://[::ffff:169.254.169.254]/latest/meta-data/')).toBe(false);
+  });
+
+  it('rejects compressed IPv6 hex form of the metadata IP: [::ffff:a9fe:a9fe]', () => {
+    expect(isSafeImageUrl('http://[::ffff:a9fe:a9fe]/image.jpg')).toBe(false);
+  });
+
+  it('rejects GCP metadata hostname: metadata.google.internal', () => {
+    expect(isSafeImageUrl('http://metadata.google.internal/computeMetadata/v1/')).toBe(false);
+  });
+
+  it('rejects nip.io DNS resolver for the metadata IP: 169.254.169.254.nip.io', () => {
+    expect(isSafeImageUrl('http://169.254.169.254.nip.io/image.jpg')).toBe(false);
   });
 });
