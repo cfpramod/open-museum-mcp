@@ -604,17 +604,17 @@ describe('SSRF guard — redirect bypass prevention (C2)', () => {
     expect(result).toBeNull();
   });
 
-  it('follows safe redirects to completion', async () => {
+  it('follows safe redirects to completion (redirect stays on allowlisted CDN)', async () => {
     let callCount = 0;
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
         callCount++;
         if (callCount === 1) {
-          // Safe redirect to another CDN
+          // Safe redirect to another allowlisted CDN host
           return new Response(null, {
             status: 302,
-            headers: { location: 'https://cdn2.example.com/img.jpg' },
+            headers: { location: 'https://upload.wikimedia.org/resized/img.jpg' },
           });
         }
         // Final safe response with image bytes
@@ -628,6 +628,36 @@ describe('SSRF guard — redirect bypass prevention (C2)', () => {
     const result = await extract(artworkWithImage('https://images.metmuseum.org/img.jpg'));
     expect(result).not.toBeNull();
     expect(result?.dominantColor).toBe('#ff0000');
+  });
+
+  it('blocks extraction when an allowlisted CDN open-redirects to an off-allowlist domain (F3)', async () => {
+    // An allowlisted CDN 302s to a host NOT on the allowlist. Even though the
+    // destination is a safe public hostname (passes isSafeImageUrl), the
+    // allowlist check on the hop must refuse it — closes the open-redirect
+    // DNS-rebinding vector (F3). The off-allowlist URL must never be fetched.
+    const fetchedUrls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        fetchedUrls.push(String(url));
+        if (String(url).includes('metmuseum.org')) {
+          // Allowlisted CDN redirects to an off-allowlist host
+          return new Response(null, {
+            status: 302,
+            headers: { location: 'https://off-allowlist.example.com/exfil.jpg' },
+          });
+        }
+        // This 200 should never be reached — allowlist check must block the redirect
+        return new Response(new Uint8Array([255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0]), {
+          status: 200,
+        });
+      }),
+    );
+    const extract = createColorExtractor({ loadSharp: async () => safeSharp });
+    const result = await extract(artworkWithImage('https://images.metmuseum.org/cdn/img.jpg'));
+    expect(result).toBeNull();
+    // The off-allowlist redirect target must never have been fetched
+    expect(fetchedUrls.some(u => u.includes('off-allowlist'))).toBe(false);
   });
 });
 

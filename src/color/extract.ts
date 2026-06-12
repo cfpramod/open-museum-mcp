@@ -234,7 +234,7 @@ async function fetchImageWithSafeRedirects(startUrl: string): Promise<Response |
       } catch {
         return null;
       }
-      if (!isSafeImageUrl(next)) return null;
+      if (!isSafeImageUrl(next) || !isAllowlistedImageHost(next)) return null;
       url = next;
       continue;
     }
