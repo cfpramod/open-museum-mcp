@@ -24,9 +24,11 @@ function artwork(over: Partial<Artwork['imageUrls']> = {}): Artwork {
 }
 
 // A fake sharp that ignores resize and yields a fixed raw RGB(A) buffer.
+// metadata() returns dimensions well within the decompression-bomb cap.
 function fakeSharp(data: Uint8Array, channels: number): SharpLike {
   return (() => {
     const chain = {
+      metadata: async () => ({ width: 2, height: 2, channels }),
       resize: () => chain,
       raw: () => chain,
       toBuffer: async () => ({ data, info: { width: 2, height: 2, channels } }),

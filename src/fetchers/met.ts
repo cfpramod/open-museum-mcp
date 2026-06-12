@@ -4,6 +4,7 @@ import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mapp
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { asOptionalString, asString, httpGet, isValidPositiveInt, rejectFor } from './helpers.js';
+import { sanitizeArtistName, sanitizeDescription, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const MET_API = 'https://collectionapi.metmuseum.org/public/collection/v1';
@@ -65,7 +66,7 @@ export const metFetcher: Fetcher = {
     const displayDate = asString(r.objectDate);
     const dateRange = parseDisplayDate(displayDate);
 
-    const artistRaw = asString(r.artistDisplayName);
+    const artistRaw = sanitizeArtistName(asString(r.artistDisplayName));
     const attributionType = detectAttributionType(artistRaw);
     const cleanName = cleanArtistName(artistRaw);
 
@@ -90,7 +91,7 @@ export const metFetcher: Fetcher = {
         name: 'The Metropolitan Museum of Art',
         url: 'https://www.metmuseum.org',
       },
-      title: (asString(r.title) || '(Untitled)').trim(),
+      title: sanitizeTitle(asString(r.title)) || '(Untitled)',
       artist: {
         name: cleanName || 'Unknown',
         nationality: asOptionalString(r.artistNationality),
@@ -115,7 +116,7 @@ export const metFetcher: Fetcher = {
         apiUrl: `${MET_API}/objects/${objectID}`,
         pageUrl: asString(r.objectURL) || `https://www.metmuseum.org/art/collection/search/${objectID}`,
       },
-      description: asOptionalString(r.objectName),
+      description: asOptionalString(sanitizeDescription(asString(r.objectName))),
       rawTags: Array.isArray(r.tags)
         ? (r.tags as Array<unknown>)
             .map((t) => (t && typeof t === 'object' ? (t as { term?: unknown }).term : undefined))

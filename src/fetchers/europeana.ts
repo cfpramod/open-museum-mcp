@@ -4,6 +4,7 @@ import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mapp
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { asOptionalString, asString, httpGet } from './helpers.js';
+import { sanitizeArtistName, sanitizeDescription, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const EUROPEANA_API = 'https://api.europeana.eu/record/v2';
@@ -82,13 +83,15 @@ function parseRecord(raw: Record<string, unknown>): {
   medium: string;
 } {
   const id = normalizeEuropeanaId(asString(raw.id));
-  const title =
+  const title = sanitizeTitle(
     pickLangAware(raw.dcTitleLangAware) ||
     firstString(raw.title) ||
-    firstString(raw.dcTitle);
-  const artist =
+    firstString(raw.dcTitle),
+  );
+  const artist = sanitizeArtistName(
     pickLangAware(raw.dcCreatorLangAware) ||
-    firstString(raw.dcCreator);
+    firstString(raw.dcCreator),
+  );
   const displayDate =
     firstString(raw.year) ||
     firstString(raw.edmTimespanLabel) ||
@@ -98,9 +101,10 @@ function parseRecord(raw: Record<string, unknown>): {
   const edmIsShownAt = firstString(raw.edmIsShownAt);
   const edmIsShownBy = firstString(raw.edmIsShownBy);
   const edmPreview = firstString(raw.edmPreview);
-  const description =
+  const description = sanitizeDescription(
     pickLangAware(raw.dcDescriptionLangAware) ||
-    firstString(raw.dcDescription);
+    firstString(raw.dcDescription),
+  );
   // Medium signal: EDM type/medium/format fields. dcFormat is sometimes a MIME
   // type ("image/jpeg") — harmless, as normalizeMedium keyword-gates the text.
   const medium = [

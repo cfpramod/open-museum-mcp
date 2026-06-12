@@ -4,6 +4,7 @@ import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { asFiniteNumber, asString, httpGet, isValidPositiveInt, rejectFor } from './helpers.js';
+import { ARTIST_NAME_MAX, DESCRIPTION_MAX, TITLE_MAX } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
@@ -290,13 +291,13 @@ export const wikimediaFetcher: Fetcher = {
     const cleanObjectName = stripFileNumberSuffix(stripLanguagePrefix(objectName));
     const cleanFileTitle = stripFileNumberSuffix(fileTitle);
     const rawTitle = (cleanObjectName || cleanFileTitle).trim();
-    const title = rawTitle || '(Untitled)';
+    const title = (rawTitle || '(Untitled)').slice(0, TITLE_MAX);
 
-    const artistRaw = stripHtml(getExtField(ext, 'Artist'));
+    const artistRaw = stripHtml(getExtField(ext, 'Artist')).slice(0, ARTIST_NAME_MAX);
     const attributionType = detectAttributionType(artistRaw);
     const cleanName = cleanArtistName(artistRaw);
 
-    const description = stripQsMetadata(stripHtml(getExtField(ext, 'ImageDescription')));
+    const description = stripQsMetadata(stripHtml(getExtField(ext, 'ImageDescription'))).slice(0, DESCRIPTION_MAX);
     // Commons has no structured creation-date field. DateTime extmetadata is
     // upload time, not artwork time. Source order, most-trustworthy first:
     //   1. ImageDescription prose ("c. 1560s." → {1560, 1569})

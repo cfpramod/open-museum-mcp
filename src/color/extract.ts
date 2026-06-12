@@ -13,15 +13,22 @@ import { httpGet } from '../fetchers/helpers.js';
 import type { Artwork } from '../types.js';
 import { quantizeColors, type ColorData, type Rgb } from './colorMath.js';
 
-/** Minimal structural type for the slice of sharp's API we use. */
-export type SharpLike = (input: Uint8Array) => {
-  resize: (w: number, h: number, opts?: unknown) => ReturnType<SharpLike>;
-  raw: () => ReturnType<SharpLike>;
+/**
+ * Minimal structural type for the slice of sharp's API we use.
+ * Includes metadata() for the decompression-bomb pre-check (reads image
+ * header only, much cheaper than full decode).
+ */
+type SharpChain = {
+  metadata: () => Promise<{ width?: number; height?: number; channels?: number }>;
+  resize: (w: number, h: number, opts?: unknown) => SharpChain;
+  raw: () => SharpChain;
   toBuffer: (opts: { resolveWithObject: true }) => Promise<{
     data: Uint8Array;
     info: { width: number; height: number; channels: number };
   }>;
 };
+
+export type SharpLike = (input: Uint8Array, opts?: unknown) => SharpChain;
 
 export interface ColorExtractorOptions {
   /**
@@ -43,6 +50,37 @@ const DEFAULT_SAMPLE = 32;
 // multi-MB response means a wrong/oversized URL, so we fail open past the cap
 // rather than buffer it. Checked against Content-Length and the actual bytes.
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+// Decompression-bomb cap: reject images whose uncompressed pixel buffer
+// (width × height × channels) would exceed 50 MB. A 50 MP RGB image expands
+// to ~150 MB; this cap rejects pathological inputs well before decode while
+// leaving legitimate high-resolution thumbnails untouched.
+const MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024;
+
+// Private IP ranges that must never be fetched from museum image URLs.
+// Covers: loopback (127.x), class-A private (10.x), class-B private
+// (172.16–172.31), class-C private (192.168.x), link-local / metadata
+// (169.254.x — the AWS/GCP IMDS address), and the "localhost" hostname.
+const PRIVATE_HOST_RE =
+  /^(localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|169\.254\.\d{1,3}\.\d{1,3}|::1|0\.0\.0\.0)$/i;
+
+/**
+ * Returns true when a URL is safe to fetch as an image:
+ *   - scheme is http or https only
+ *   - hostname is not a loopback, private-range, or link-local address
+ *
+ * This is the SSRF guard for the colour-extraction path.
+ */
+export function isSafeImageUrl(urlString: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(urlString);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+  return !PRIVATE_HOST_RE.test(url.hostname);
+}
 
 async function defaultLoadSharp(): Promise<SharpLike | null> {
   try {
@@ -88,6 +126,9 @@ export function createColorExtractor(opts: ColorExtractorOptions = {}): ColorExt
     const url = art.imageUrls.thumbnail || art.imageUrls.full;
     if (!url) return null;
 
+    // SSRF guard: reject private IPs and non-HTTP(S) schemes before any fetch.
+    if (!isSafeImageUrl(url)) return null;
+
     const sharp = await loadSharp();
     if (!sharp) return null;
 
@@ -95,7 +136,15 @@ export function createColorExtractor(opts: ColorExtractorOptions = {}): ColorExt
     if (!bytes || bytes.length === 0) return null;
 
     try {
-      const { data, info } = await sharp(bytes)
+      const instance = sharp(bytes);
+
+      // Decompression-bomb pre-check: read the image header only (cheap) and
+      // reject before decode if the uncompressed buffer would exceed the cap.
+      const meta = await instance.metadata();
+      const uncompressed = (meta.width ?? 0) * (meta.height ?? 0) * (meta.channels ?? 4);
+      if (uncompressed > MAX_UNCOMPRESSED_BYTES) return null;
+
+      const { data, info } = await instance
         .resize(size, size, { fit: 'inside' })
         .raw()
         .toBuffer({ resolveWithObject: true });

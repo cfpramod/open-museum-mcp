@@ -11,6 +11,7 @@ import {
   isValidPositiveInt,
   rejectFor,
 } from './helpers.js';
+import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const CLEVELAND_API = 'https://openaccess-api.clevelandart.org/api';
@@ -111,7 +112,7 @@ export const clevelandFetcher: Fetcher = {
       ? (r.creators as Array<Record<string, unknown>>)
       : [];
     const primary = creators[0];
-    const description = asString(primary?.description);
+    const description = sanitizeArtistName(asString(primary?.description));
     const attributionType = detectAttributionType(description);
     const parsed = parseCreatorDescription(description);
     const cleanName = cleanArtistName(parsed.name);
@@ -140,7 +141,7 @@ export const clevelandFetcher: Fetcher = {
         name: 'Cleveland Museum of Art',
         url: 'https://www.clevelandart.org',
       },
-      title: (asString(r.title) || '(Untitled)').trim(),
+      title: sanitizeTitle(asString(r.title)) || '(Untitled)',
       artist: {
         name: cleanName || 'Unknown',
         nationality: parsed.nationality,
