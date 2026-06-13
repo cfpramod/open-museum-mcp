@@ -38,7 +38,7 @@ function freetextEntries(content: Record<string, unknown>, key: string): Freetex
   return Array.isArray(arr) ? (arr as FreetextEntry[]) : [];
 }
 
-/** First freetext entry whose label (case-insensitive) is in `labels`, else the first entry. */
+/** Content of the first freetext entry whose label (case-insensitive) is in `labels`, else "". */
 function pickByLabel(entries: FreetextEntry[], labels: Set<string>): string {
   for (const e of entries) {
     const label = typeof e.label === 'string' ? e.label.toLowerCase() : '';

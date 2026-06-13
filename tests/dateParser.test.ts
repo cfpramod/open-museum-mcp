@@ -55,6 +55,13 @@ describe('parseDisplayDate', () => {
     it('parses "100 BC-100 AD" (unpunctuated AD marker) as -100 to 100', () => {
       expect(parseDisplayDate('100 BC-100 AD')).toEqual({ yearStart: -100, yearEnd: 100 });
     });
+
+    // Guard: an ad-WORD ("advance", "Adena") in a pure-BCE range must NOT be read
+    // as a CE/AD marker. AD is only recognized anchored after the second number
+    // in tryCrossEraRange, never via a loose whole-string presence check.
+    it('keeps a pure-BCE range with a trailing ad-word as -300 to -100', () => {
+      expect(parseDisplayDate('300-100 B.C. advance')).toEqual({ yearStart: -300, yearEnd: -100 });
+    });
   });
 
   describe('CE marker', () => {
