@@ -1,0 +1,57 @@
+{
+  "status": 200,
+  "responseCode": 1,
+  "response": {
+    "id": "ld1-1643381040022-1643381058802-1",
+    "unitCode": "SAAM",
+    "type": "edanmdm",
+    "url": "edanmdm:saam_1929.8.175.19",
+    "title": "Necklace",
+    "content": {
+      "freetext": {
+        "date": [{ "label": "Date", "content": "100 B.C.-100 A.D." }],
+        "name": [{ "label": "Artist", "content": "Unidentified" }],
+        "physicalDescription": [
+          { "label": "Medium", "content": "faience and glass" },
+          { "label": "Dimensions", "content": "length: 15 in. (38.0 cm)" }
+        ],
+        "objectType": [{ "label": "Type", "content": "Decorative Arts-Jewelry" }],
+        "creditLine": [
+          { "label": "Credit Line", "content": "Smithsonian American Art Museum, Gift of John Gellatly" }
+        ],
+        "dataSource": [{ "label": "Data Source", "content": "Smithsonian American Art Museum" }]
+      },
+      "indexedStructured": {
+        "object_type": ["Decorative arts"],
+        "online_media_type": ["Images"]
+      },
+      "descriptiveNonRepeating": {
+        "guid": "http://n2t.net/ark:/65665/vk780404571-5188-4590-ab8a-af39acc86617",
+        "title": { "label": "Title", "content": "Necklace" },
+        "record_ID": "saam_1929.8.175.19",
+        "unit_code": "SAAM",
+        "data_source": "Smithsonian American Art Museum",
+        "record_link": "https://americanart.si.edu/collections/search/artwork/?id=29819",
+        "metadata_usage": { "access": "CC0" },
+        "online_media": {
+          "mediaCount": 1,
+          "media": [
+            {
+              "id": "media:SAAM-1929.8.175.19_1",
+              "guid": "http://n2t.net/ark:/65665/bj902eec5f5-91e9-44e2-8c19-591a33181cc4",
+              "type": "Images",
+              "idsId": "SAAM-1929.8.175.19_1",
+              "usage": { "access": "CC0" },
+              "content": "https://ids.si.edu/ids/deliveryService?id=SAAM-1929.8.175.19_1",
+              "thumbnail": "https://ids.si.edu/ids/deliveryService?id=SAAM-1929.8.175.19_1",
+              "resources": [
+                { "label": "High-resolution TIFF", "url": "https://ids.si.edu/ids/download?id=SAAM-1929.8.175.19_1.tif", "width": 2200, "height": 3000 },
+                { "label": "High-resolution JPEG", "url": "https://ids.si.edu/ids/download?id=SAAM-1929.8.175.19_1.jpg", "width": 2200, "height": 3000 }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

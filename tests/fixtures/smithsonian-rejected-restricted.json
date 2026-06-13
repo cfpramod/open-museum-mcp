@@ -1,0 +1,37 @@
+{
+  "status": 200,
+  "responseCode": 1,
+  "response": {
+    "id": "ld1-restricted-example-1",
+    "unitCode": "NMAH",
+    "type": "edanmdm",
+    "url": "edanmdm:nmah_restricted_example",
+    "title": "Restricted Object",
+    "content": {
+      "freetext": {
+        "date": [{ "label": "Date", "content": "1925" }],
+        "name": [{ "label": "Maker", "content": "Example Maker" }]
+      },
+      "descriptiveNonRepeating": {
+        "record_ID": "nmah_restricted_example",
+        "unit_code": "NMAH",
+        "data_source": "National Museum of American History",
+        "record_link": "https://americanhistory.si.edu/collections/search/object/example",
+        "metadata_usage": { "access": "Usage conditions apply" },
+        "online_media": {
+          "mediaCount": 1,
+          "media": [
+            {
+              "id": "media:NMAH-restricted_1",
+              "type": "Images",
+              "idsId": "NMAH-restricted_1",
+              "usage": { "access": "Usage conditions apply" },
+              "content": "https://ids.si.edu/ids/deliveryService?id=NMAH-restricted_1",
+              "thumbnail": "https://ids.si.edu/ids/deliveryService?id=NMAH-restricted_1"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

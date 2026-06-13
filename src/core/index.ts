@@ -77,3 +77,4 @@ export { clevelandFetcher } from '../fetchers/cleveland.js';
 export { aicFetcher } from '../fetchers/aic.js';
 export { wikimediaFetcher } from '../fetchers/wikimedia.js';
 export { europeanaFetcher } from '../fetchers/europeana.js';
+export { smithsonianFetcher } from '../fetchers/smithsonian.js';

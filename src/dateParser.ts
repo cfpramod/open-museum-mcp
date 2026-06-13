@@ -92,15 +92,22 @@ function centuryRange(n: number, era: 'ce' | 'bce', qualifier?: string): DateRan
 
 // True only when the string carries BOTH a BCE marker and a CE marker —
 // signals a cross-era range that tryRangeRegex must defer on so
-// tryCrossEraRange can handle it correctly.
+// tryCrossEraRange can handle it correctly. The CE side accepts CE/C.E.
+// as well as AD/A.D.: the Smithsonian (and many US museums) write the
+// upper bound of an antiquity range as "A.D." rather than "CE", e.g.
+// "100 B.C.-100 A.D.". Without the AD marker, hasMixedEras returns false,
+// tryRangeRegex can't parse the punctuated form, and trySingleYear grabs
+// only the BCE half — collapsing "100 B.C.-100 A.D." to {-100, -100}.
 function hasMixedEras(s: string): boolean {
   const hasBce = /\b(b\.?c\.?e?\.?|bc)\b/i.test(s);
   if (!hasBce) return false;
-  return /\bce\b/i.test(s) || /\bc\.e\./i.test(s);
+  return /\bce\b/i.test(s) || /\bc\.e\./i.test(s) || /\ba\.?d\.?/i.test(s);
 }
 
 function tryCrossEraRange(s: string): DateRange | null {
-  const m = s.match(/(\d{1,5})\s*(?:b\.?c\.?e?\.?|bc)\s*[-–]\s*(\d{1,5})\s*(?:c\.?e\.?|ce)/i);
+  const m = s.match(
+    /(\d{1,5})\s*(?:b\.?c\.?e?\.?|bc)\s*[-–]\s*(\d{1,5})\s*(?:c\.?e\.?|ce|a\.?d\.?|ad)/i,
+  );
   if (m) {
     return {
       yearStart: -parseInt(m[1], 10),

@@ -277,12 +277,97 @@ export const validateEuropeanaLicense: LicenseValidator = (raw) => {
   };
 };
 
+// The Smithsonian Open Access API expresses rights in EDAN's two-value
+// controlled vocabulary (`access` ∈ {"CC0", "Usage conditions apply"}), and
+// it does so at TWO independent levels:
+//   - object metadata: content.descriptiveNonRepeating.metadata_usage.access
+//   - per-media image:  content.descriptiveNonRepeating.online_media.media[].usage.access
+// The two can diverge — a record's catalog metadata may be CC0 while a
+// specific image carries usage conditions — so we keep imageOpenAccess and
+// metadataOpenAccess distinct (per the project's two-tier rights model).
+//
+// Strict-default-deny spine: a record is ACCEPTED only when the object-level
+// metadata_usage.access is exactly "CC0". imageOpenAccess is set independently
+// from the FIRST image media's usage.access — so a metadata-CC0 record whose
+// image is not CC0 is accepted as open metadata with imageOpenAccess=false, and
+// the fetcher then declines to surface the restricted image URL. Missing,
+// null, or "Usage conditions apply" at the metadata level rejects outright.
+function smithsonianAccess(obj: Record<string, unknown>): {
+  metadata: string | undefined;
+  firstMediaCc0: boolean;
+} {
+  const content = obj.content;
+  const dnr =
+    content && typeof content === 'object'
+      ? (content as Record<string, unknown>).descriptiveNonRepeating
+      : undefined;
+  const dnrObj = dnr && typeof dnr === 'object' ? (dnr as Record<string, unknown>) : {};
+
+  const mu = dnrObj.metadata_usage;
+  const metaAccess =
+    mu && typeof mu === 'object' ? (mu as { access?: unknown }).access : undefined;
+  const metadata = typeof metaAccess === 'string' ? metaAccess : undefined;
+
+  const om = dnrObj.online_media;
+  const mediaArr =
+    om && typeof om === 'object' && Array.isArray((om as { media?: unknown }).media)
+      ? ((om as { media: unknown[] }).media)
+      : [];
+  // Select the SAME primary media the fetcher's pickImage() will surface — the
+  // first Images-type entry, falling back to the first entry — so imageOpenAccess
+  // describes exactly the asset that ends up on the wire, not a different one.
+  const isImagesType = (m: unknown): boolean =>
+    !!m &&
+    typeof m === 'object' &&
+    typeof (m as { type?: unknown }).type === 'string' &&
+    ((m as { type: string }).type).toLowerCase() === 'images';
+  const primaryMedia = mediaArr.find(isImagesType) ?? mediaArr[0];
+  const mediaUsage =
+    primaryMedia && typeof primaryMedia === 'object'
+      ? (primaryMedia as { usage?: unknown }).usage
+      : undefined;
+  const mediaAccess =
+    mediaUsage && typeof mediaUsage === 'object'
+      ? (mediaUsage as { access?: unknown }).access
+      : undefined;
+  const firstMediaCc0 = typeof mediaAccess === 'string' && mediaAccess.toUpperCase() === 'CC0';
+
+  return { metadata, firstMediaCc0 };
+}
+
+export const validateSmithsonianLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('smithsonian: object missing or not an object');
+  }
+  const { metadata, firstMediaCc0 } = smithsonianAccess(raw as Record<string, unknown>);
+  if (typeof metadata === 'string' && metadata.toUpperCase() === 'CC0') {
+    return {
+      accepted: true,
+      license: {
+        type: 'CC0',
+        rawValue: metadata,
+        verificationSource: 'smithsonian.metadata_usage.access',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      // Metadata is CC0; the image is open only if its own media usage is CC0.
+      imageOpenAccess: firstMediaCc0,
+      metadataOpenAccess: true,
+      reason: 'smithsonian: metadata_usage.access=CC0',
+    };
+  }
+  return reject(
+    `smithsonian: metadata_usage.access=${metadata ?? 'missing'} (strict default reject)`,
+  );
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
   aic: validateAicLicense,
   wikimedia: validateWikimediaLicense,
   europeana: validateEuropeanaLicense,
+  smithsonian: validateSmithsonianLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {
