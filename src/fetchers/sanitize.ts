@@ -30,8 +30,38 @@ function decodeEntities(s: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)));
 }
 
+// Remove HTML tags with a single linear pass instead of a `/<[^>]*>/g` global
+// replace. That regex is super-linear (O(n²)) on a pathological all-'<' string
+// with no closing '>': at every '<' the engine scans to the end before failing
+// to find a '>', then restarts one position over. Museum field values are
+// attacker-controlled (the E1 threat model), so an uncapped '<<<<…' title would
+// be a polynomial-ReDoS (CodeQL js/polynomial-redos). This scan is O(n) and
+// preserves the regex's exact semantics: it strips each `<` up to the FIRST
+// following `>`, and leaves an unclosed trailing `<…` (no `>`) verbatim, exactly
+// as `/<[^>]*>/` would (it can't match without a closing `>`).
+function stripTags(s: string): string {
+  let out = '';
+  let i = 0;
+  while (i < s.length) {
+    const lt = s.indexOf('<', i);
+    if (lt === -1) {
+      out += s.slice(i);
+      break;
+    }
+    out += s.slice(i, lt);
+    const gt = s.indexOf('>', lt + 1);
+    if (gt === -1) {
+      // No closing '>': the unclosed '<…' tail is not a tag — keep it verbatim.
+      out += s.slice(lt);
+      break;
+    }
+    i = gt + 1; // skip the '<…>' tag
+  }
+  return out;
+}
+
 export function stripHtml(s: string): string {
-  return decodeEntities(s.replace(/<[^>]*>/g, ''))
+  return decodeEntities(stripTags(s))
     .replace(/\s+/g, ' ')
     .trim();
 }
