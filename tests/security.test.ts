@@ -15,6 +15,7 @@ import { metFetcher } from '../src/fetchers/met.js';
 import { wikimediaFetcher } from '../src/fetchers/wikimedia.js';
 import { createColorExtractor, isSafeImageUrl } from '../src/color/extract.js';
 import { parseDisplayDate } from '../src/dateParser.js';
+import { sanitizeTitle, stripHtml } from '../src/fetchers/sanitize.js';
 import type { Artwork } from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -510,6 +511,24 @@ describe('parseDisplayDate — algorithmic-complexity DoS guard', () => {
     expect(parseDisplayDate('1889')).toEqual({ yearStart: 1889, yearEnd: 1889 });
     expect(parseDisplayDate('14th-15th century')).toMatchObject({ yearStart: 1301 });
     expect(parseDisplayDate('Tang dynasty (618–907)')).toMatchObject({ yearStart: 618, yearEnd: 907 });
+  });
+});
+
+describe('stripHtml — polynomial-ReDoS guard (CodeQL js/polynomial-redos)', () => {
+  it('strips a 1M-char all-"<" payload in <50ms (input bounded before the O(n²) regex)', () => {
+    // Without the STRIP_INPUT_MAX ceiling, `<[^>]*>` on this input is O(n²) and
+    // would hang the sanitizer on attacker-controlled museum text.
+    const payload = '<'.repeat(1_000_000);
+    const start = performance.now();
+    const out = sanitizeTitle(payload);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(50);
+    expect(out.length).toBeLessThanOrEqual(256);
+  });
+
+  it('still strips tags and decodes entities in legitimate short text', () => {
+    expect(sanitizeTitle('<b>Sunflowers</b> &amp; Co.')).toBe('Sunflowers & Co.');
+    expect(stripHtml('<p>Hello <i>world</i></p>')).toBe('Hello world');
   });
 });
 

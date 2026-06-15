@@ -28,6 +28,7 @@ import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
 import { europeanaFetcher } from './fetchers/europeana.js';
 import { metFetcher } from './fetchers/met.js';
+import { smithsonianFetcher } from './fetchers/smithsonian.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import type { Fetcher } from './fetchers/types.js';
 import { VERSION } from './version.js';
@@ -56,6 +57,17 @@ if (process.env.EUROPEANA_API_KEY) {
 } else {
   console.error(
     '[open-museum-mcp] EUROPEANA_API_KEY not set; Europeana fetcher disabled. Set it in ~/.open-museum-mcp/.env or your shell to enable.',
+  );
+}
+
+// Smithsonian Open Access requires a per-user api.data.gov key (free). Only
+// register the fetcher when the key is present — otherwise leave it out of the
+// federation rather than throwing on every search call.
+if (process.env.SI_API_KEY) {
+  FETCHERS[smithsonianFetcher.code] = smithsonianFetcher;
+} else {
+  console.error(
+    '[open-museum-mcp] SI_API_KEY not set; Smithsonian fetcher disabled. Set it in ~/.open-museum-mcp/.env or your shell to enable.',
   );
 }
 

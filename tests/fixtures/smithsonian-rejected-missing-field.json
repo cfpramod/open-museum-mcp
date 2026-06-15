@@ -1,0 +1,34 @@
+{
+  "status": 200,
+  "responseCode": 1,
+  "response": {
+    "id": "ld1-missing-usage-example-1",
+    "unitCode": "NMNHANTHRO",
+    "type": "edanmdm",
+    "url": "edanmdm:nmnhanthropology_missing_example",
+    "title": "Object With No Metadata Usage Block",
+    "content": {
+      "freetext": {
+        "date": [{ "label": "Date", "content": "1880" }],
+        "name": [{ "label": "Maker", "content": "Example Maker" }]
+      },
+      "descriptiveNonRepeating": {
+        "record_ID": "nmnhanthropology_missing_example",
+        "unit_code": "NMNHANTHRO",
+        "data_source": "NMNH - Anthropology Dept.",
+        "record_link": "https://collections.nmnh.si.edu/object/example",
+        "online_media": {
+          "mediaCount": 1,
+          "media": [
+            {
+              "id": "media:NMNH-missing_1",
+              "type": "Images",
+              "idsId": "NMNH-missing_1",
+              "content": "https://ids.si.edu/ids/deliveryService?id=NMNH-missing_1"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -40,6 +40,28 @@ describe('parseDisplayDate', () => {
     it('parses "100 BC - 200 CE" as -100 to 200', () => {
       expect(parseDisplayDate('100 BC - 200 CE')).toEqual({ yearStart: -100, yearEnd: 200 });
     });
+
+    // The Smithsonian (and many US museums) write the CE bound as "A.D." rather
+    // than "CE". Without AD recognition the BCE half alone was captured,
+    // collapsing this to {-100, -100}.
+    it('parses "100 B.C.-100 A.D." (punctuated AD marker) as -100 to 100', () => {
+      expect(parseDisplayDate('100 B.C.-100 A.D.')).toEqual({ yearStart: -100, yearEnd: 100 });
+    });
+
+    it('parses "500 B.C.E.-200 A.D." as -500 to 200', () => {
+      expect(parseDisplayDate('500 B.C.E.-200 A.D.')).toEqual({ yearStart: -500, yearEnd: 200 });
+    });
+
+    it('parses "100 BC-100 AD" (unpunctuated AD marker) as -100 to 100', () => {
+      expect(parseDisplayDate('100 BC-100 AD')).toEqual({ yearStart: -100, yearEnd: 100 });
+    });
+
+    // Guard: an ad-WORD ("advance", "Adena") in a pure-BCE range must NOT be read
+    // as a CE/AD marker. AD is only recognized anchored after the second number
+    // in tryCrossEraRange, never via a loose whole-string presence check.
+    it('keeps a pure-BCE range with a trailing ad-word as -300 to -100', () => {
+      expect(parseDisplayDate('300-100 B.C. advance')).toEqual({ yearStart: -300, yearEnd: -100 });
+    });
   });
 
   describe('CE marker', () => {
