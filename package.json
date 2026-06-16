@@ -35,6 +35,7 @@
     "prepare": "npm run build",
     "test": "NODE_OPTIONS=--experimental-sqlite vitest run",
     "test:watch": "NODE_OPTIONS=--experimental-sqlite vitest",
+    "smoke:smithsonian": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-smithsonian.ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
