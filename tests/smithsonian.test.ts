@@ -68,6 +68,22 @@ describe('Smithsonian adapter normalization', () => {
     expect(result.artwork.artist.attributionType).toBe('named');
   });
 
+  it('parses a verbose comma-delimited attribution into name/nationality/lifespan', () => {
+    // Real live shape (Cooper Hewitt): the whole attribution is one string.
+    const raw = clone('smithsonian-accepted.json');
+    const response = raw.response as { content: { freetext: Record<string, unknown> } };
+    response.content.freetext.name = [
+      { label: 'Artist', content: 'Vincent Van Gogh, The Netherlands, active in France, 1853 – 1890' },
+    ];
+    const result = smithsonianFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.artist.name).toBe('Vincent Van Gogh');
+    expect(result.artwork.artist.nationality).toBe('The Netherlands');
+    expect(result.artwork.artist.lifespan).toBe('1853–1890');
+    expect(result.artwork.artist.attributionType).toBe('named');
+  });
+
   it('does not promote a Sitter-only record to a named artist', () => {
     const raw = clone('smithsonian-accepted.json');
     const response = raw.response as { content: { freetext: Record<string, unknown> } };
@@ -113,6 +129,33 @@ describe('Smithsonian adapter normalization', () => {
     if (result.status !== 'rejected') return;
     expect(result.rejection.reason).toContain('strict default reject');
     expect(result.rejection.reason).toContain('missing');
+  });
+
+  it('rejects a CC0 Libraries "Books" record as non-art (curation gate)', () => {
+    const raw = clone('smithsonian-accepted.json');
+    const response = raw.response as {
+      content: { indexedStructured: Record<string, unknown>; freetext: Record<string, unknown> };
+    };
+    response.content.indexedStructured.object_type = ['Books'];
+    response.content.freetext.objectType = [{ label: 'Type', content: 'Books' }];
+    const result = smithsonianFetcher.normalize(raw);
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.reason).toContain('curation reject');
+    expect(result.rejection.reason).toContain('Books');
+  });
+
+  it('rejects a CC0 Natural History specimen (no object_type) as non-art', () => {
+    const raw = clone('smithsonian-accepted.json');
+    const response = raw.response as {
+      content: { indexedStructured: Record<string, unknown>; freetext: Record<string, unknown> };
+    };
+    delete response.content.indexedStructured.object_type;
+    delete response.content.freetext.objectType;
+    const result = smithsonianFetcher.normalize(raw);
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.reason).toContain('curation reject');
   });
 
   it('rejects garbage input gracefully', () => {
@@ -172,14 +215,19 @@ describe('Smithsonian CDN allowlist (SSRF surface)', () => {
 describe('Smithsonian adapter search', () => {
   const realFetch = globalThis.fetch;
   const realKey = process.env.SI_API_KEY;
+  const realSmithKey = process.env.SMITHSONIAN_API_KEY;
 
   beforeEach(() => {
+    // Use the SI_API_KEY alias path; clear the canonical var for determinism.
+    delete process.env.SMITHSONIAN_API_KEY;
     process.env.SI_API_KEY = 'test-key';
   });
   afterEach(() => {
     globalThis.fetch = realFetch;
     if (realKey === undefined) delete process.env.SI_API_KEY;
     else process.env.SI_API_KEY = realKey;
+    if (realSmithKey === undefined) delete process.env.SMITHSONIAN_API_KEY;
+    else process.env.SMITHSONIAN_API_KEY = realSmithKey;
     vi.restoreAllMocks();
   });
 
@@ -205,11 +253,33 @@ describe('Smithsonian adapter search', () => {
     expect(ids).toEqual(['smithsonian:ld1-aaa-1', 'smithsonian:ld1-bbb-2']);
     expect(capturedUrl).toContain('api.si.edu/openaccess/api/v1.0/search');
     expect(capturedUrl).toContain('api_key=test-key');
-    expect(decodeURIComponent(capturedUrl)).toContain('online_media_type:"Images"');
+    // When has_image is set, the query carries an EDAN `online_media_type:"Images"`
+    // clause alongside the user's terms. This filter is LOAD-BEARING, not a hint:
+    // without it Smithsonian search is dominated by Libraries bibliographic records
+    // (live, "vincent van gogh" returns ~189 matches that are almost all `SIL` books
+    // and only ~1 actual artwork). CC0 is NOT filtered server-side — the strict gate
+    // in normalize re-validates it on every fetched record (defense in depth).
+    // (URLSearchParams encodes spaces as '+', which decodeURIComponent leaves.)
+    const decodedQuery = decodeURIComponent(capturedUrl).replace(/\+/g, ' ');
+    expect(decodedQuery).toContain('egyptian necklace');
+    expect(decodedQuery).toContain('online_media_type:"Images"');
   });
 
-  it('throws a clear error when SI_API_KEY is absent', async () => {
+  it('throws a clear error when no Smithsonian key is set', async () => {
     delete process.env.SI_API_KEY;
-    await expect(smithsonianFetcher.search('q', 5)).rejects.toThrow(/SI_API_KEY not set/);
+    delete process.env.SMITHSONIAN_API_KEY;
+    await expect(smithsonianFetcher.search('q', 5)).rejects.toThrow(/SMITHSONIAN_API_KEY not set/);
+  });
+
+  it('accepts the canonical SMITHSONIAN_API_KEY var', async () => {
+    delete process.env.SI_API_KEY;
+    process.env.SMITHSONIAN_API_KEY = 'canonical-key';
+    let capturedUrl = '';
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      capturedUrl = String(input);
+      return new Response(JSON.stringify({ response: { rows: [] } }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await smithsonianFetcher.search('q', 5);
+    expect(capturedUrl).toContain('api_key=canonical-key');
   });
 });

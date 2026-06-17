@@ -25,6 +25,68 @@ const MAKER_LABELS = new Set(['artist', 'maker', 'author', 'creator', 'manufactu
 const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
   rejectFor('smithsonian', id, reason, rawSnapshot);
 
+// Smithsonian Open Access spans ALL units — including Libraries (bibliographic
+// "Books" records) and Natural History (specimens) — not just art museums. An
+// `online_media_type:"Images"` search still surfaces book covers and specimen
+// photos. `indexedStructured.object_type` (controlled vocabulary) is the direct
+// art/non-art signal: art records carry "Drawings"/"Paintings"/"Decorative
+// arts" etc.; books carry "Books"; specimens carry no object_type at all. We
+// gate on an art-type ALLOWLIST (precision over recall — better to drop an edge
+// artwork than admit a book or a beetle). Matched as a substring of the
+// lowercased controlled value, so "Decorative Arts-Jewelry" and "Drawings" both
+// hit. A record with no recognized art object_type is rejected as non-art.
+const ART_OBJECT_TYPE_KEYWORDS = [
+  'painting',
+  'drawing',
+  'print',
+  'sculpture',
+  'photograph',
+  'decorative art',
+  'textile',
+  'ceramic',
+  'jewel',
+  'costume',
+  'furniture',
+  'glass',
+  'watercolor',
+  'etching',
+  'engraving',
+  'lithograph',
+  'poster',
+  'miniature',
+  'medal',
+  'collage',
+  'mosaic',
+  'tapestry',
+  'enamel',
+  'metalwork',
+  'works on paper',
+  'work on paper',
+];
+
+/** True when any object_type value names an art form on the allowlist. */
+function isArtObjectType(objectTypes: string[]): boolean {
+  for (const t of objectTypes) {
+    const lower = t.toLowerCase();
+    if (ART_OBJECT_TYPE_KEYWORDS.some((k) => lower.includes(k))) return true;
+  }
+  return false;
+}
+
+/** Collect object_type signals from indexedStructured (primary) + freetext (fallback). */
+function objectTypeSignals(content: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const indexed = content.indexedStructured;
+  if (indexed && typeof indexed === 'object') {
+    const ot = (indexed as Record<string, unknown>).object_type;
+    if (Array.isArray(ot)) for (const v of ot) if (typeof v === 'string') out.push(v);
+  }
+  for (const e of freetextEntries(content, 'objectType')) {
+    if (typeof e.content === 'string') out.push(e.content);
+  }
+  return out;
+}
+
 interface FreetextEntry {
   label?: unknown;
   content?: unknown;
@@ -54,6 +116,45 @@ function firstContent(entries: FreetextEntry[]): string {
     if (c) return c;
   }
   return '';
+}
+
+/**
+ * Smithsonian `freetext.name` content ranges from a bare "Gilbert Stuart" to a
+ * verbose, comma-delimited attribution that bundles nationality + biography +
+ * lifespan into one string, e.g.
+ *   "Vincent Van Gogh, The Netherlands, active in France, 1853 – 1890".
+ * Taking it verbatim leaves that whole string in `artist.name`. Split on the
+ * first comma for the name, then mine the trailing segments for a birth–death
+ * lifespan and a nationality (skipping role phrases like "active in France").
+ * A name with no comma is returned unchanged.
+ */
+function parseSmithsonianName(raw: string): {
+  name: string;
+  nationality?: string;
+  lifespan?: string;
+} {
+  const parts = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length <= 1) return { name: raw.trim() };
+
+  const name = parts[0];
+  let nationality: string | undefined;
+  let lifespan: string | undefined;
+  for (const seg of parts.slice(1)) {
+    const yr = seg.match(/(\d{3,4})\s*[–-]\s*(\d{3,4})/);
+    if (yr && !lifespan) {
+      lifespan = `${yr[1]}–${yr[2]}`;
+      continue;
+    }
+    // Skip role/activity phrases ("active in France", "born ...") and any
+    // year-bearing segment; the first plain segment is the nationality/place.
+    if (!nationality && !/\d/.test(seg) && !/^(active|born|died|fl\.?)\b/i.test(seg)) {
+      nationality = seg;
+    }
+  }
+  return { name, nationality, lifespan };
 }
 
 interface SiMedia {
@@ -113,12 +214,18 @@ function pickImage(
   return { full, thumbnail, width, height };
 }
 
+// Canonical env var is SMITHSONIAN_API_KEY (matches the EUROPEANA_API_KEY
+// convention); SI_API_KEY is accepted as a backward-compatible alias.
+export function smithsonianApiKey(): string | undefined {
+  return process.env.SMITHSONIAN_API_KEY || process.env.SI_API_KEY;
+}
+
 function apiKey(): string {
-  const key = process.env.SI_API_KEY;
+  const key = smithsonianApiKey();
   if (!key) {
     throw new Error(
-      'SI_API_KEY not set: the Smithsonian Open Access source requires an api.data.gov key. ' +
-        'Set it in ~/.open-museum-mcp/.env or your shell.',
+      'SMITHSONIAN_API_KEY not set: the Smithsonian Open Access source requires an api.data.gov key. ' +
+        'Set SMITHSONIAN_API_KEY (or the SI_API_KEY alias) in ~/.open-museum-mcp/.env or your shell.',
     );
   }
   return key;
@@ -130,10 +237,13 @@ export const smithsonianFetcher: Fetcher = {
 
   async search(query: string, limit: number, options: SearchOptions = {}): Promise<string[]> {
     const url = new URL(`${SI_API}/search`);
-    // Bias toward records that actually carry an image when has_image is set.
-    // EDAN supports field filters inside `q`; the strict rights gate in
-    // normalize re-validates CC0 on every fetched record regardless (defense in
-    // depth — the search filter is a hint, not a guarantee).
+    // Restrict to records that carry an online image when has_image is set. This
+    // is load-bearing, NOT a removable hint: without it, EDAN search is dominated
+    // by Smithsonian LIBRARIES bibliographic records — live, "vincent van gogh"
+    // returns 189 matches of which 100% of the top page are `SIL` books, and only
+    // ~1 is an actual artwork with an image. The filter is what separates "a van
+    // Gogh" from "books about van Gogh". The strict CC0 gate + the non-art
+    // object_type gate in normalize still re-validate every fetched record.
     const q =
       options.hasImage !== false ? `${query} AND online_media_type:"Images"` : query;
     url.searchParams.set('q', q);
@@ -199,6 +309,18 @@ export const smithsonianFetcher: Fetcher = {
         ? (content.indexedStructured as Record<string, unknown>)
         : {};
 
+    // Non-art curation gate (runs AFTER the rights gate — rights is the hard
+    // boundary; this is a relevance gate that keeps the federated ART result set
+    // free of Smithsonian Libraries book records and Natural History specimens).
+    const objectTypes = objectTypeSignals(content);
+    if (!isArtObjectType(objectTypes)) {
+      return reject(
+        id,
+        `smithsonian: non-art object_type=${objectTypes.length ? objectTypes.join('/') : 'none'} (curation reject)`,
+        raw,
+      );
+    }
+
     // Title: prefer the structured dnr.title.content, fall back to the
     // top-level mirror, then to a placeholder.
     const titleObj =
@@ -206,10 +328,14 @@ export const smithsonianFetcher: Fetcher = {
     const rawTitle = asString(titleObj.content) || asString(record.title);
     const title = sanitizeTitle(rawTitle) || '(Untitled)';
 
-    // Artist: the maker-labelled freetext name, never a Sitter/Subject.
+    // Artist: the maker-labelled freetext name, never a Sitter/Subject. The
+    // verbose Smithsonian attribution string is split into name/nationality/
+    // lifespan before cleaning. Attribution type is detected on the raw string
+    // so prefixes like "after"/"attributed to" are still caught.
     const makerName = sanitizeArtistName(pickByLabel(freetextEntries(content, 'name'), MAKER_LABELS));
     const attributionType = detectAttributionType(makerName);
-    const cleanName = cleanArtistName(makerName);
+    const parsedName = parseSmithsonianName(makerName);
+    const cleanName = cleanArtistName(parsedName.name);
 
     const displayDate = pickByLabel(
       freetextEntries(content, 'date'),
@@ -246,6 +372,8 @@ export const smithsonianFetcher: Fetcher = {
       title,
       artist: {
         name: cleanName || 'Unknown',
+        nationality: parsedName.nationality,
+        lifespan: parsedName.lifespan,
         attributionType,
       },
       displayDate,
