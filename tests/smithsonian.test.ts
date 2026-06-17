@@ -253,12 +253,12 @@ describe('Smithsonian adapter search', () => {
     expect(ids).toEqual(['smithsonian:ld1-aaa-1', 'smithsonian:ld1-bbb-2']);
     expect(capturedUrl).toContain('api.si.edu/openaccess/api/v1.0/search');
     expect(capturedUrl).toContain('api_key=test-key');
-    // No server-side image/CC0 filter — the query is sent verbatim (the broken
-    // `AND online_media_type:"Images"` clause collapsed live results 189 -> 1).
-    // The federation overfetch + has_image filter + CC0 gate do the thinning.
-    // has_image restricts to image-bearing records via the EDAN media filter —
-    // load-bearing, since without it Smithsonian search is dominated by Libraries
-    // book records. The user query is preserved alongside the filter clause.
+    // When has_image is set, the query carries an EDAN `online_media_type:"Images"`
+    // clause alongside the user's terms. This filter is LOAD-BEARING, not a hint:
+    // without it Smithsonian search is dominated by Libraries bibliographic records
+    // (live, "vincent van gogh" returns ~189 matches that are almost all `SIL` books
+    // and only ~1 actual artwork). CC0 is NOT filtered server-side — the strict gate
+    // in normalize re-validates it on every fetched record (defense in depth).
     // (URLSearchParams encodes spaces as '+', which decodeURIComponent leaves.)
     const decodedQuery = decodeURIComponent(capturedUrl).replace(/\+/g, ' ');
     expect(decodedQuery).toContain('egyptian necklace');
