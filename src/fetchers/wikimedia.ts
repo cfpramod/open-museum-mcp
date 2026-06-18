@@ -3,6 +3,7 @@ import { validateWikimediaLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
+import { isNonArtWikimedia } from './curation.js';
 import { asFiniteNumber, asString, httpGet, isValidPositiveInt, rejectFor } from './helpers.js';
 import { ARTIST_NAME_MAX, DESCRIPTION_MAX, TITLE_MAX } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
@@ -292,6 +293,16 @@ export const wikimediaFetcher: Fetcher = {
     const cleanFileTitle = stripFileNumberSuffix(fileTitle);
     const rawTitle = (cleanObjectName || cleanFileTitle).trim();
     const title = (rawTitle || '(Untitled)').slice(0, TITLE_MAX);
+
+    // Curation gate: Commons is a federation, not a curated art museum — it
+    // carries diagrams, logos, charts, maps and publication pages alongside art,
+    // all correctly licensed. Reject non-art here (rights already passed). Uses
+    // the file's categories (Commons' curatorial taxonomy) + MIME + title.
+    const categories = categoryTitles(Array.isArray(page.categories) ? page.categories : []);
+    const nonArt = isNonArtWikimedia({ mime, categories, title });
+    if (nonArt) {
+      return reject(id, `wikimedia: ${nonArt} (curation reject)`, raw);
+    }
 
     const artistRaw = stripHtml(getExtField(ext, 'Artist')).slice(0, ARTIST_NAME_MAX);
     const attributionType = detectAttributionType(artistRaw);

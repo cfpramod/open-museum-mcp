@@ -63,6 +63,28 @@ describe('Wikimedia Commons adapter normalization', () => {
     expect(result.rejection.reason).toContain('missing');
   });
 
+  it('curation-rejects the flagship non-art SVG diagram (wikimedia:157318642), rights aside', () => {
+    const result = wikimediaFetcher.normalize(fixture('wikimedia-rejected-nonart-svg.json'));
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.reason).toMatch(/curation/i);
+    expect(result.rejection.reason).toMatch(/svg/i);
+  });
+
+  it('curation-rejects raster (PNG) non-art via the topical category (wikimedia:175537332)', () => {
+    const result = wikimediaFetcher.normalize(fixture('wikimedia-rejected-nonart-png.json'));
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.reason).toMatch(/curation/i);
+    expect(result.rejection.reason).toMatch(/open access|publishing/i);
+  });
+
+  it('still accepts a genuine artwork after the curation gate (no false positive)', () => {
+    // the existing CC0 photograph fixture is real art with no non-art signal
+    expect(wikimediaFetcher.normalize(fixture('wikimedia-accepted-cc0.json')).status).toBe('accepted');
+    expect(wikimediaFetcher.normalize(fixture('wikimedia-accepted-bruegel.json')).status).toBe('accepted');
+  });
+
   it('rejects garbage input gracefully', () => {
     expect(wikimediaFetcher.normalize(null).status).toBe('rejected');
     expect(wikimediaFetcher.normalize('not an object').status).toBe('rejected');

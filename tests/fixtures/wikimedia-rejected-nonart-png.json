@@ -1,0 +1,28 @@
+{
+  "query": {
+    "pages": [
+      {
+        "pageid": 175537332,
+        "title": "File:Open Access Models Overview.png",
+        "imageinfo": [
+          {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/y/Open_Access_Models_Overview.png",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Open_Access_Models_Overview.png",
+            "mime": "image/png",
+            "width": 1000,
+            "height": 700,
+            "size": 54321,
+            "extmetadata": {
+              "ObjectName": { "value": "Open Access Models Overview" },
+              "License": { "value": "cc0" },
+              "LicenseShortName": { "value": "CC0" }
+            }
+          }
+        ],
+        "categories": [
+          { "title": "Category:Open access (publishing)" }
+        ]
+      }
+    ]
+  }
+}
