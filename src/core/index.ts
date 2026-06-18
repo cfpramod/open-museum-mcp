@@ -40,6 +40,31 @@ export {
 } from './clearance/manifest.js';
 export { clearanceForLicense, type ClearanceDecision, type ClearanceBasis } from './clearance/licenseMap.js';
 
+// Tier-1 delegated-attestor envelope/format library — KEYLESS. `prepareTier1`
+// emits a keyless signing request (the only thing the OMA service signs);
+// `verifyTier1` is the fail-closed, public-key-only verifier. The COSE primitives
+// are exported so the signing service reuses the EXACT pinned to-be-signed bytes
+// (contract C2 — no re-canonicalization).
+export {
+  prepareTier1,
+  verifyTier1,
+  type Tier1SigningRequest,
+  type PrepareTier1Options,
+  type Tier1Envelope,
+  type VerificationState,
+  type VerificationResult,
+  type VerifyTier1Options,
+} from './clearance/tier1.js';
+export {
+  COSE_PROTECTED_EDDSA,
+  CLEARANCE_ASSERTION_LABEL,
+  HARD_BINDING_ASSERTION_LABEL,
+  coseSigStructure,
+  assembleCoseSign1,
+  decodeCoseSign1,
+  hardBindingAssertionBytes,
+} from './clearance/c2paClaim.js';
+
 // Pure helpers a front door commonly needs alongside the federation.
 export { cite, type CiteStyle } from '../cite.js';
 export type { Artwork, ArtworkImages, ArtworkSource, ArtworkLicense, ValidationResult } from '../types.js';
