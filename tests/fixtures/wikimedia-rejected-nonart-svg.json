@@ -1,0 +1,29 @@
+{
+  "query": {
+    "pages": [
+      {
+        "pageid": 157318642,
+        "title": "File:OS-ADM pag.88 Open-access and fake open-access publishing routes.svg",
+        "imageinfo": [
+          {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/x/OS-ADM_pag.88.svg",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:OS-ADM_pag.88_Open-access_and_fake_open-access_publishing_routes.svg",
+            "mime": "image/svg+xml",
+            "width": 800,
+            "height": 600,
+            "size": 12345,
+            "extmetadata": {
+              "ObjectName": { "value": "OS-ADM pag.88 Open-access and fake open-access publishing routes" },
+              "License": { "value": "cc0" },
+              "LicenseShortName": { "value": "CC0" }
+            }
+          }
+        ],
+        "categories": [
+          { "title": "Category:Images of Open science for arts design music" },
+          { "title": "Category:Open access (publishing)" }
+        ]
+      }
+    ]
+  }
+}

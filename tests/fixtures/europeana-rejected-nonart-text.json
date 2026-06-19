@@ -1,0 +1,16 @@
+{
+  "apikey": "test", "success": true, "itemsCount": 1, "totalResults": 1,
+  "items": [
+    {
+      "id": "/9200338/BibliographicResource_3000093834108",
+      "title": ["Municipal council meeting minutes, 1894"],
+      "dcCreator": ["Town clerk"],
+      "dcType": ["Text"],
+      "rights": ["http://creativecommons.org/publicdomain/zero/1.0/"],
+      "edmIsShownBy": ["https://example.org/scan/minutes_1894.jpg"],
+      "edmPreview": ["https://example.org/preview/minutes_1894.jpg"],
+      "dataProvider": ["Regional Archive"],
+      "country": ["Sweden"]
+    }
+  ]
+}

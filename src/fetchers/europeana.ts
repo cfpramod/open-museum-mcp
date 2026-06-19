@@ -3,6 +3,7 @@ import { validateEuropeanaLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
+import { isNonArtEuropeana } from './curation.js';
 import { asOptionalString, asString, httpGet } from './helpers.js';
 import { sanitizeArtistName, sanitizeDescription, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
@@ -207,6 +208,16 @@ export const europeanaFetcher: Fetcher = {
     }
     if (!parsed.id) {
       return reject(id, 'europeana: missing or non-string id', raw);
+    }
+
+    // Curation gate (rights already passed): Europeana federates many archives,
+    // so a non-art TYPE (Text, Sound, Map, specimen, ...) can slip through
+    // TYPE:IMAGE. Reject on the explicit type/medium signal only — never on the
+    // title, so genuine art photographs are not mis-rejected. (Documentary-photo
+    // keyword-noise is a ranking concern, not a non-art gate; see curation.ts.)
+    const nonArt = isNonArtEuropeana({ medium: parsed.medium, title: parsed.title });
+    if (nonArt) {
+      return reject(id, `europeana: non-art type "${nonArt}" (curation reject)`, raw);
     }
 
     const dateRange = parseDisplayDate(parsed.displayDate);

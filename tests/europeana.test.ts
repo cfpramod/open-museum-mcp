@@ -76,6 +76,19 @@ describe('Europeana adapter normalization', () => {
     expect(result.rejection.reason).toContain('rights field missing');
   });
 
+  it('curation-rejects an explicit non-art type (dcType "Text"), rights aside', () => {
+    const result = europeanaFetcher.normalize(fixture('europeana-rejected-nonart-text.json'));
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.reason).toMatch(/curation/i);
+    expect(result.rejection.reason).toMatch(/text/i);
+  });
+
+  it('still accepts genuine artworks after the curation gate (no false positive)', () => {
+    expect(europeanaFetcher.normalize(fixture('europeana-accepted-cc0.json')).status).toBe('accepted');
+    expect(europeanaFetcher.normalize(fixture('europeana-accepted-pdm.json')).status).toBe('accepted');
+  });
+
   it('rejects garbage input', () => {
     expect(europeanaFetcher.normalize(null).status).toBe('rejected');
     expect(europeanaFetcher.normalize('not an object').status).toBe('rejected');
