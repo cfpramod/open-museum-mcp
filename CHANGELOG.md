@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] — 2026-06-21
+
+### Added
+
+- **Reusable IIIF client (`src/iiif/`).** Parses IIIF Presentation + Image API 2.x and 3.x: manifest → label / `rights` URI / image service; `info.json` → real pixel dimensions; builds `/full/max|full/0/default.jpg`; and `meetsPrintResolution()` enforces a ≥3000px long-edge print floor. IIIF is not a guarantee of print size, so dimensions always come from `info.json`. The shared foundation for the museum-coverage expansion. (#87)
+- **Shared commercial-POD rights gate (`src/rights/commercialRights.ts`).** `validateCommercialRights` judges a per-record rights URI for commercial print-on-demand eligibility: allow CC0, Public Domain Mark, CC-BY, CC-BY-SA; hard-exclude every NonCommercial (NC) and NoDerivatives (ND) variant; reject all `rightsstatements.org` assertions ("no known copyright" is a liability disclaimer, not a grant); strict default deny on unknown/missing. Matching uses URL parsing + exact hostname (no substring spoofing — a host like `creativecommons.org.evil.com` is rejected). (#87)
+- **Rijksmuseum direct source.** Keyless integration of the new Rijksmuseum Data Services (Linked-Art JSON-LD) + Micrio IIIF 3.0, replacing the Europeana-mediated Rijks path (richer metadata, authoritative per-object rights, true print pixels). The legacy key-based API shut down 5 Jan 2026. Per-object rights are judged by the commercial gate; images are gated to ≥3000px via `info.json`. (#87)
+- **Non-art curation gate for Wikimedia Commons + Europeana (`src/fetchers/curation.ts`).** These federations are not curated art museums — they carry diagrams, logos, charts, maps and publication pages alongside art, all correctly licensed. The gate rejects non-art (Commons: `image/svg+xml` + a word-boundary category/title denylist; Europeana: explicit non-art `dcType`) while keeping genuine artworks, with precision over recall. The rights gate is unchanged; this is an additional curation layer. (#86)
+
+### Fixed
+
+- **Colour extraction now allowlists the Rijksmuseum Micrio IIIF host (`iiif.micr.io`).** The colour facet previously failed closed for Rijksmuseum images because the host was absent from the CDN allowlist; it is now allowlisted (exact-hostname match, so look-alike hosts are still rejected).
+
+## [0.11.0] — 2026-06-18
+
+### Added
+
+- **Keyless Tier-1 delegated-attestor library (`open-museum-mcp/core`).** `prepareTier1(payloadString, imageBytes)` builds a keyless Tier-1 signing request — byte-exact payload carriage, tier-stable SHA-256 integrity (identical to Tier-0), image hard-binding, and a deterministic C2PA claim (`claimToBeSigned`) — without ever holding a key. `verifyTier1` is the public-key-only, fail-closed verifier (`ATTESTED_DELEGATE` only when integrity, signature, signer-resolves-to-`attestor.did`, `attestor.did != actor`, and bound-asset all hold; otherwise `REJECTED`, never silently downgraded). Exports the pinned COSE primitives (`coseSigStructure`, `assembleCoseSign1`, `COSE_PROTECTED_EDDSA`) so the OMA signing service signs identical bytes verbatim. (#84)
+- **Smithsonian Open Access (EDAN) source.** Federated as an additional source with strict CC0 validation and a non-art `object_type` curation gate (rejects Library books and Natural History specimens). Enabled when `SMITHSONIAN_API_KEY` (or the `SI_API_KEY` alias) is set. (#79, #82)
+
 ## [0.10.2] — 2026-06-10
 
 ### Fixed

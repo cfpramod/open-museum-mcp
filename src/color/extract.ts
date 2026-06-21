@@ -114,6 +114,7 @@ const CDN_ALLOWLIST = new Set([
   'commons.wikimedia.org',           // Wikimedia Commons (some thumb paths)
   'api.europeana.eu',                // Europeana thumbnail proxy
   'ids.si.edu',                      // Smithsonian IDS image server (deliveryService + IIIF)
+  'iiif.micr.io',                    // Rijksmuseum images via Micrio IIIF (data.rijksmuseum.nl)
   // Europeana edmIsShownBy (full images) comes from arbitrary per-provider
   // CDNs — those are intentionally NOT listed here and will fail open.
 ]);
