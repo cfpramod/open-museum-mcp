@@ -42,22 +42,41 @@ function accept(
   return { accepted: true, license, imageOpenAccess: true, metadataOpenAccess: true, reason: `accepted ${type}` };
 }
 
+/** True when `host` is exactly `domain` or a subdomain of it (NOT a substring). */
+function hostIs(host: string, domain: string): boolean {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
 /**
- * Normalize a rights URI for matching: lowercase, drop the scheme + `www.`,
- * collapse whitespace, strip a trailing slash. Keeps the path so license codes
- * (`by-nc-sa`) remain matchable.
+ * Parse a rights URI into its exact hostname + lowercased, non-empty path
+ * segments. Returns null when the value is not a parseable absolute URL. This is
+ * the security boundary: matching the HOSTNAME (not a substring of the whole
+ * string) is what stops `creativecommons.org.evil.com` / `evil.com/?x=creativecommons.org`
+ * from spoofing the gate.
  */
-function normalize(uri: string): string {
-  return uri
-    .trim()
+function parseRights(uri: string): { host: string; segments: string[] } | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(uri.trim());
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  const host = parsed.hostname.toLowerCase();
+  if (!host) return null;
+  const segments = parsed.pathname
     .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '')
-    .replace(/\/+$/, '');
+    .split('/')
+    .filter((s) => s.length > 0);
+  return { host, segments };
 }
 
 /**
  * Validate a rights URI for commercial-POD eligibility.
+ *
+ * Hostname is matched EXACTLY (creativecommons.org / rightsstatements.org, or a
+ * subdomain), never as a substring — the licence path is only trusted once the
+ * host is proven, so a forged host cannot smuggle an allowlisted path through.
  *
  * @param rightsUri the per-object rights statement URI (CC or RightsStatements)
  * @param verificationSource provenance label recorded on the license, e.g.
@@ -71,40 +90,57 @@ export function validateCommercialRights(
     return reject('rights URI missing — strict default deny');
   }
   const raw = rightsUri.trim();
-  const u = normalize(raw);
+  const parsed = parseRights(raw);
+  if (!parsed) {
+    return reject(`rights=${raw}: not a parseable rights URL — strict default deny`);
+  }
+  const { host, segments } = parsed;
 
   // RightsStatements.org is a curatorial assertion vocabulary, NOT a licence
   // grant. "No Copyright"/"No Known Copyright" shifts liability to the reuser;
   // "In Copyright" is closed. None are auto-approvable for commercial sale.
-  if (u.includes('rightsstatements.org')) {
+  if (hostIs(host, 'rightsstatements.org')) {
     return reject(
       `rights=${raw}: rightsstatements.org assertion is a disclaimer, not a licence grant — review required`,
     );
   }
 
-  if (u.includes('publicdomain/zero')) return accept('CC0', raw, verificationSource);
-  if (u.includes('publicdomain/mark')) return accept('PD', raw, verificationSource);
-
-  // For CC licences the code is the path segment after "licenses/", e.g.
-  // "licenses/by-nc-sa/4.0" -> "by-nc-sa". Parse the code from the segments so
-  // the NC/ND substring checks are exact (and beat the bare-"by" match, since
-  // "by-nc" contains "by").
-  const segs = u.split('/');
-  const li = segs.indexOf('licenses');
-  const code = li >= 0 && segs[li + 1] ? segs[li + 1] : '';
-  const parts = code.split('-'); // ["by","nc","sa"]
-
-  if (parts.includes('nc')) {
-    return reject(`rights=${raw}: NonCommercial (NC) — cannot be sold as a reproduction`);
-  }
-  if (parts.includes('nd')) {
-    return reject(`rights=${raw}: NoDerivatives (ND) — a print crop/scale is a derivative`);
+  // Only Creative Commons URIs can be accepted (CC0/PDM/BY/BY-SA all live here).
+  if (!hostIs(host, 'creativecommons.org')) {
+    return reject(`rights=${raw}: unrecognized rights host '${host}' — strict default deny`);
   }
 
-  if (u.includes('creativecommons.org') && parts[0] === 'by') {
-    if (parts.includes('sa')) return accept('CC-BY-SA', raw, verificationSource);
-    if (parts.length === 1) return accept('CC-BY', raw, verificationSource);
+  // Path segments are now trusted (host proven). publicdomain/{zero,mark}.
+  if (segments[0] === 'publicdomain') {
+    if (segments[1] === 'zero') return accept('CC0', raw, verificationSource);
+    if (segments[1] === 'mark') return accept('PD', raw, verificationSource);
+    return reject(`rights=${raw}: unrecognized public-domain tool — strict default deny`);
+  }
+
+  // licenses/<code>/<version>, code e.g. "by", "by-sa", "by-nc-sa".
+  if (segments[0] === 'licenses') {
+    const parts = (segments[1] ?? '').split('-'); // ["by","nc","sa"]
+    if (parts.includes('nc')) {
+      return reject(`rights=${raw}: NonCommercial (NC) — cannot be sold as a reproduction`);
+    }
+    if (parts.includes('nd')) {
+      return reject(`rights=${raw}: NoDerivatives (ND) — a print crop/scale is a derivative`);
+    }
+    if (parts[0] === 'by') {
+      if (parts.includes('sa')) return accept('CC-BY-SA', raw, verificationSource);
+      if (parts.length === 1) return accept('CC-BY', raw, verificationSource);
+    }
   }
 
   return reject(`rights=${raw}: unrecognized or non-open licence — strict default deny`);
+}
+
+/**
+ * True when a URI's HOSTNAME is a recognized rights vocabulary host
+ * (creativecommons.org / rightsstatements.org or a subdomain). Used to pick the
+ * rights classifier out of a record's metadata without substring spoofing.
+ */
+export function isRightsUri(uri: string): boolean {
+  const parsed = parseRights(uri);
+  return parsed !== null && (hostIs(parsed.host, 'creativecommons.org') || hostIs(parsed.host, 'rightsstatements.org'));
 }

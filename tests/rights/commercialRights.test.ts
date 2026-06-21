@@ -85,13 +85,43 @@ describe('validateCommercialRights — commercial-POD rights gate (CC0/PDM/CC-BY
     }
   });
 
-  it('normalizes scheme/host/case/whitespace and trailing slash', () => {
+  it('tolerates surrounding whitespace, uppercase scheme/host and a trailing slash', () => {
     expect(validateCommercialRights('  HTTPS://CreativeCommons.ORG/licenses/BY/4.0  ', SRC).accepted).toBe(true);
-    expect(validateCommercialRights('creativecommons.org/publicdomain/zero/1.0', SRC).license?.type).toBe('CC0');
+    expect(validateCommercialRights('https://creativecommons.org/publicdomain/zero/1.0', SRC).license?.type).toBe('CC0');
+  });
+
+  it('rejects scheme-less rights values (an absolute http(s) URL is required for a safe hostname check)', () => {
+    expect(validateCommercialRights('creativecommons.org/publicdomain/zero/1.0', SRC).accepted).toBe(false);
   });
 
   it('does not misclassify by-nc as by (NC check precedes the bare-BY match)', () => {
     // "by-nc" contains "by" — the NC guard must win.
     expect(validateCommercialRights('https://creativecommons.org/licenses/by-nc/4.0/', SRC).accepted).toBe(false);
+  });
+
+  it('REJECTS host-spoofed licence URLs (exact hostname, not substring — CodeQL incomplete-URL-sanitization)', () => {
+    for (const u of [
+      'https://creativecommons.org.evil.com/publicdomain/zero/1.0/',
+      'https://creativecommons.org.evil.com/licenses/by/4.0/',
+      'https://evil.com/?x=creativecommons.org/licenses/by/4.0',
+      'https://evil.com/creativecommons.org/licenses/by/4.0/',
+      'https://creativecommons.org.attacker.io/licenses/by-sa/4.0/',
+      'https://notcreativecommons.org/licenses/by/4.0/',
+      'https://creativecommons.org@evil.com/licenses/by/4.0/',
+    ]) {
+      expect(validateCommercialRights(u, SRC).accepted, u).toBe(false);
+    }
+  });
+
+  it('accepts the genuine host with a path-only subdomain still rejected unless the path is a real licence', () => {
+    // wiki.creativecommons.org is a real subdomain but /faq is not a licence path
+    expect(validateCommercialRights('https://wiki.creativecommons.org/faq', SRC).accepted).toBe(false);
+    // the canonical host + path still works
+    expect(validateCommercialRights('https://creativecommons.org/licenses/by/4.0/', SRC).accepted).toBe(true);
+  });
+
+  it('rejects unparseable rights values without throwing', () => {
+    expect(validateCommercialRights('not a url', SRC).accepted).toBe(false);
+    expect(validateCommercialRights('http://', SRC).accepted).toBe(false);
   });
 });

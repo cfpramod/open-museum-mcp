@@ -49,6 +49,13 @@ export interface IiifInfo {
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 const asNum = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 
+/** Linear trailing-slash strip (avoids a backtracking `/\/+$/` on attacker text). */
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47 /* '/' */) end--;
+  return s.slice(0, end);
+}
+
 /** IIIF v3 labels are language maps ({en:[...]}); v2 are strings or arrays. */
 function firstLabel(label: unknown): string {
   if (typeof label === 'string') return label;
@@ -142,7 +149,7 @@ export function parseManifest(raw: unknown): IiifManifestParsed {
 
 /** Build the IIIF Image API full-resolution request for a service base. */
 export function fullImageUrl(serviceId: string, apiVersion: IiifApiVersion): string {
-  const base = serviceId.replace(/\/+$/, '');
+  const base = stripTrailingSlashes(serviceId);
   // v3 deprecates `full/full`; the canonical "largest" size is `full/max`.
   return apiVersion === 3 ? `${base}/full/max/0/default.jpg` : `${base}/full/full/0/default.jpg`;
 }
@@ -181,7 +188,7 @@ export async function fetchManifest(url: string): Promise<IiifManifestParsed> {
 
 /** Fetch + parse an Image API info.json for a service base. */
 export async function fetchInfoJson(serviceId: string): Promise<IiifInfo> {
-  const url = `${serviceId.replace(/\/+$/, '')}/info.json`;
+  const url = `${stripTrailingSlashes(serviceId)}/info.json`;
   const res = await httpGet(url, { headers: { Accept: 'application/ld+json,application/json' } });
   if (!res.ok) throw new Error(`iiif: info.json fetch failed (${res.status}) for ${url}`);
   return parseInfoJson(await res.json());

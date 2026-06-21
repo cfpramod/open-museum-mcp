@@ -16,7 +16,7 @@
  */
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
-import { validateCommercialRights } from '../rights/commercialRights.js';
+import { isRightsUri, validateCommercialRights } from '../rights/commercialRights.js';
 import { fetchInfoJson, meetsPrintResolution } from '../iiif/client.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { httpGet, rejectFor } from './helpers.js';
@@ -112,7 +112,8 @@ function pickImageRights(visualItem: Record<string, unknown> | undefined): strin
   if (!visualItem) return null;
   for (const right of arr(visualItem.subject_to).filter(isObj)) {
     for (const id of classifierIds(right)) {
-      if (id.includes('creativecommons.org') || id.includes('rightsstatements.org')) return id;
+      // Exact-hostname match (not substring) — the gate then judges the URI.
+      if (isRightsUri(id)) return id;
     }
   }
   return null;
