@@ -103,3 +103,20 @@ export { aicFetcher } from '../fetchers/aic.js';
 export { wikimediaFetcher } from '../fetchers/wikimedia.js';
 export { europeanaFetcher } from '../fetchers/europeana.js';
 export { smithsonianFetcher } from '../fetchers/smithsonian.js';
+export { rijksmuseumFetcher } from '../fetchers/rijksmuseum.js';
+
+// Coverage foundation: the reusable IIIF client + the shared commercial-POD
+// rights gate (CC0/PDM/CC-BY/CC-BY-SA allow; NC/ND/unknown deny; >=3000px floor).
+export {
+  parseManifest,
+  parseInfoJson,
+  fullImageUrl,
+  meetsPrintResolution,
+  fetchManifest,
+  fetchInfoJson,
+  type IiifManifestParsed,
+  type IiifInfo,
+  type IiifImageRef,
+  type IiifApiVersion,
+} from '../iiif/client.js';
+export { validateCommercialRights } from '../rights/commercialRights.js';

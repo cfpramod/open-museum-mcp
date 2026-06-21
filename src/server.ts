@@ -28,6 +28,7 @@ import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
 import { europeanaFetcher } from './fetchers/europeana.js';
 import { metFetcher } from './fetchers/met.js';
+import { rijksmuseumFetcher } from './fetchers/rijksmuseum.js';
 import { smithsonianFetcher, smithsonianApiKey } from './fetchers/smithsonian.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import type { Fetcher } from './fetchers/types.js';
@@ -47,6 +48,9 @@ const FETCHERS: Record<string, Fetcher> = {
   [clevelandFetcher.code]: clevelandFetcher,
   [aicFetcher.code]: aicFetcher,
   [wikimediaFetcher.code]: wikimediaFetcher,
+  // Rijksmuseum DIRECT (keyless Data Services + Micrio IIIF) — supersedes the
+  // Europeana-mediated Rijks path with richer metadata + true print pixels.
+  [rijksmuseumFetcher.code]: rijksmuseumFetcher,
 };
 
 // Europeana requires a per-user API key (free tier, 10K req/day). Only
