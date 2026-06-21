@@ -72,6 +72,6 @@
     "vitest": "^4.1.5"
   },
   "optionalDependencies": {
-    "sharp": "^0.34.0"
+    "sharp": "^0.35.2"
   }
 }
