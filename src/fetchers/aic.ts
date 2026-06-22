@@ -152,9 +152,15 @@ export const aicFetcher: Fetcher = {
     const region = normalizeRegion(asString(r.place_of_origin));
 
     const imageId = asString(r.image_id);
-    // AIC publishes through IIIF Image API 2.0. 843px-wide is AIC's
-    // standard public-display size; 200px-wide is the thumbnail tier.
-    const fullImage = imageId ? `${AIC_IIIF}/${imageId}/full/843,/0/default.jpg` : '';
+    // AIC publishes through IIIF Image API 2.x. `/full/843,/` is AIC's standard
+    // public-DISPLAY size — but the source holds the full scan at 3.5–4× that
+    // (e.g. a Tokaido plate is 843px wide via this size and ~3500px via `max`).
+    // `/full/max/` returns the largest the IIIF server will produce (AIC's level-2
+    // profile supports it; `max` was added in Image API 2.1 and AIC honors it),
+    // so we ask for the true maximum here and keep 200px as the thumbnail tier.
+    // AIC's data API publishes no PIXEL dimensions (only physical cm), so
+    // `width`/`height`/`maxResolution` stay unset rather than carrying a guess.
+    const fullImage = imageId ? `${AIC_IIIF}/${imageId}/full/max/0/default.jpg` : '';
     const thumbnail = imageId ? `${AIC_IIIF}/${imageId}/full/200,/0/default.jpg` : undefined;
 
     const artwork: Artwork = {

@@ -36,9 +36,12 @@ describe('AIC adapter normalization', () => {
     expect(a.license.rawValue).toBe('true');
     expect(a.imageOpenAccess).toBe(true);
     expect(a.metadataOpenAccess).toBe(true);
+    // `full` requests the IIIF source maximum (`/full/max/`), not the 843px
+    // public-display size — AIC holds the scan at 3.5–4× that. Thumbnail stays 200px.
     expect(a.imageUrls.full).toBe(
-      'https://www.artic.edu/iiif/2/3c27b499-af56-f0d5-93b5-a7f2f1ad5813/full/843,/0/default.jpg',
+      'https://www.artic.edu/iiif/2/3c27b499-af56-f0d5-93b5-a7f2f1ad5813/full/max/0/default.jpg',
     );
+    expect(a.imageUrls.full).not.toContain('/full/843,/');
     expect(a.imageUrls.thumbnail).toContain('/full/200,/');
     expect(a.source.pageUrl).toBe('https://www.artic.edu/artworks/16568');
     expect(a.source.apiUrl).toContain('api.artic.edu');

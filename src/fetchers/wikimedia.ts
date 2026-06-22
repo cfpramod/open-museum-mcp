@@ -4,7 +4,14 @@ import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { isNonArtWikimedia } from './curation.js';
-import { asFiniteNumber, asString, httpGet, isValidPositiveInt, rejectFor } from './helpers.js';
+import {
+  asFiniteNumber,
+  asString,
+  httpGet,
+  isValidPositiveInt,
+  pickMaxResolution,
+  rejectFor,
+} from './helpers.js';
 import { ARTIST_NAME_MAX, DESCRIPTION_MAX, TITLE_MAX } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
@@ -386,6 +393,10 @@ export const wikimediaFetcher: Fetcher = {
         width,
         height,
         byteSize,
+        // Commons serves the original upload as `full`, so it already IS the
+        // maximum — surface it as maxResolution so consumers rank Commons works
+        // on the same true-max field as every other source.
+        maxResolution: pickMaxResolution({ width, height }),
       },
       imageOpenAccess: decision.imageOpenAccess,
       metadataOpenAccess: decision.metadataOpenAccess,

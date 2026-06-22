@@ -19,7 +19,7 @@ import { normalizeMedium } from '../medium.js';
 import { isRightsUri, validateCommercialRights } from '../rights/commercialRights.js';
 import { fetchInfoJson, meetsPrintResolution } from '../iiif/client.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { httpGet, rejectFor } from './helpers.js';
+import { httpGet, pickMaxResolution, rejectFor } from './helpers.js';
 import { ARTIST_NAME_MAX, TITLE_MAX } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
@@ -262,6 +262,9 @@ export const rijksmuseumFetcher: Fetcher = {
         thumbnail: undefined,
         width: width || undefined,
         height: height || undefined,
+        // The IIIF `/full/max/` request already serves the source maximum, and
+        // `width`/`height` come straight from info.json — so they ARE the true max.
+        maxResolution: pickMaxResolution({ width: width || undefined, height: height || undefined }),
       },
       imageOpenAccess: decision.imageOpenAccess,
       metadataOpenAccess: decision.metadataOpenAccess,
