@@ -139,8 +139,12 @@ describe('Smithsonian adapter normalization', () => {
   it('rejects a CC0 Libraries "Books" record as non-art (curation gate)', () => {
     const raw = clone('smithsonian-accepted.json');
     const response = raw.response as {
+      unitCode?: string;
       content: { indexedStructured: Record<string, unknown>; freetext: Record<string, unknown> };
     };
+    // A real Libraries record carries the Libraries unit (SIL), not an art unit —
+    // set it so the curation gate exercises the object_type pass, not unit pass.
+    response.unitCode = 'SIL';
     response.content.indexedStructured.object_type = ['Books'];
     response.content.freetext.objectType = [{ label: 'Type', content: 'Books' }];
     const result = smithsonianFetcher.normalize(raw);
@@ -153,8 +157,12 @@ describe('Smithsonian adapter normalization', () => {
   it('rejects a CC0 Natural History specimen (no object_type) as non-art', () => {
     const raw = clone('smithsonian-accepted.json');
     const response = raw.response as {
+      unitCode?: string;
       content: { indexedStructured: Record<string, unknown>; freetext: Record<string, unknown> };
     };
+    // Entomology specimen: a specimen dept unit + no object_type → rejected by
+    // BOTH passes.
+    response.unitCode = 'NMNHENTO';
     delete response.content.indexedStructured.object_type;
     delete response.content.freetext.objectType;
     const result = smithsonianFetcher.normalize(raw);
@@ -352,5 +360,98 @@ describe('Smithsonian adapter image resolution (hi-res resource over capped deli
     const iu = result.artwork.imageUrls;
     expect(iu.full).toContain('deliveryService');
     expect(iu.maxResolution).toBeUndefined(); // no published dims → honest absence
+  });
+});
+
+describe('Smithsonian non-Western curation deepening (unit pass + expanded art forms)', () => {
+  // Helper: clone the accepted fixture and force a unit + object_type so each
+  // case isolates exactly one curation path.
+  function withUnitAndType(unitCode: string, objectType: string[]) {
+    const raw = clone('smithsonian-accepted.json');
+    const response = raw.response as {
+      unitCode?: string;
+      content: { indexedStructured: Record<string, unknown>; freetext: Record<string, unknown> };
+    };
+    response.unitCode = unitCode;
+    response.content.indexedStructured.object_type = objectType;
+    response.content.freetext.objectType = objectType.map((t) => ({ label: 'Type', content: t }));
+    return raw;
+  }
+
+  // PASS 1 — dedicated art/design museum units accept regardless of form.
+  it('accepts an art-museum-unit record even when the object_type is not on the form list', () => {
+    // A Freer–Sackler (NMAA) handscroll whose form "Handscrolls" is not a keyword
+    // — the unit pass must still accept it.
+    for (const unit of ['NMAA', 'FSG', 'NMAfA', 'SAAM', 'NPG', 'HMSG', 'CHNDM']) {
+      const result = smithsonianFetcher.normalize(withUnitAndType(unit, ['Handscrolls']));
+      expect(result.status, unit).toBe('accepted');
+    }
+  });
+
+  // PASS 2 — non-Western art FORMS now accepted from non-art units (anthropology).
+  it('accepts non-Western art forms from a non-art unit (anthropology) via the form list', () => {
+    const forms = [
+      ['Netsukes'],
+      ['Masks'],
+      ['Carvings (visual works)'],
+      ['Manuscripts'],
+      ['Korans'],
+      ['Lacquer'],
+      ['Vessels (containers)'],
+      ['Vases'],
+      ['Bottles'],
+      ['Dishes (vessels)'],
+    ];
+    for (const ot of forms) {
+      const result = smithsonianFetcher.normalize(withUnitAndType('NMNHANTHRO', ot));
+      expect(result.status, ot.join()).toBe('accepted');
+    }
+  });
+
+  // Word-anchored forms: recover the real art, reject the substring collisions.
+  it('accepts word-anchored art forms (Boxes, Bowls, Urns, Icons, Screens, Fans, Rugs)', () => {
+    for (const ot of [
+      ['Boxes (containers)'],
+      ['Picnic Box'],
+      ['Scarf-Box'],
+      ['Bowls (vessels)'],
+      ['Urns'],
+      ['Icons'],
+      ['Screens'],
+      ['Fans'],
+      ['Rugs'],
+    ]) {
+      const result = smithsonianFetcher.normalize(withUnitAndType('NMNHANTHRO', ot));
+      expect(result.status, ot.join()).toBe('accepted');
+    }
+  });
+
+  it('does NOT let word-anchored forms admit their substring collisions', () => {
+    // box⊄boxing, rug⊄Drugs, bowl⊄Bowling, urn⊄Return, icon⊄Silicon, screen⊄Touchscreen
+    for (const ot of [
+      ['Boxing gloves'],
+      ['Drugs'],
+      ['crude drug'],
+      ['Bowling balls'],
+      ['Returns'],
+      ['Silicon wafers'],
+      ['Touchscreens'],
+    ]) {
+      const result = smithsonianFetcher.normalize(withUnitAndType('NMAH', ot));
+      expect(result.status, ot.join()).toBe('rejected');
+    }
+  });
+
+  // Specimen depts (distinct unit codes) stay rejected — no beetles/minerals.
+  it('keeps natural-history specimen departments out (unit not art + form not art)', () => {
+    for (const [unit, ot] of [
+      ['NMNHENTO', ['Insects']],
+      ['NMNHMINSCI', ['Minerals']],
+      ['NMNHBOTANY', ['Plants']],
+      ['NMNHPALEO', ['Fossils']],
+    ] as Array<[string, string[]]>) {
+      const result = smithsonianFetcher.normalize(withUnitAndType(unit, ot));
+      expect(result.status, unit).toBe('rejected');
+    }
   });
 });
