@@ -35,14 +35,37 @@ const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationRes
 // Smithsonian Open Access spans ALL units — including Libraries (bibliographic
 // "Books" records) and Natural History (specimens) — not just art museums. An
 // `online_media_type:"Images"` search still surfaces book covers and specimen
-// photos. `indexedStructured.object_type` (controlled vocabulary) is the direct
-// art/non-art signal: art records carry "Drawings"/"Paintings"/"Decorative
-// arts" etc.; books carry "Books"; specimens carry no object_type at all. We
-// gate on an art-type ALLOWLIST (precision over recall — better to drop an edge
-// artwork than admit a book or a beetle). Matched as a substring of the
-// lowercased controlled value, so "Decorative Arts-Jewelry" and "Drawings" both
-// hit. A record with no recognized art object_type is rejected as non-art.
+// photos. Curation runs in TWO complementary passes (a record is art if EITHER
+// fires):
+//
+// 1. UNIT pass — the record's `unitCode` names a dedicated art/design museum.
+//    Everything those units image is art by definition, so this recovers forms
+//    the keyword list can't (an FSG handscroll, an NMAfA reliquary). It is the
+//    bigger non-Western win: the Asian-Art (NMAA/FSG), African-Art (NMAfA),
+//    American-Art (SAAM), Portrait (NPG), Hirshhorn (HMSG) and Cooper Hewitt
+//    (CHNDM) units carry the Islamic/Indian/Chinese/African/Korean depth.
+//    Deliberately EXCLUDES the natural-history specimen depts (NMNHENTO beetles,
+//    NMNHMINSCI minerals, NMNHBOTANY/PALEO) and the mixed-history units (NMAH,
+//    NMAAHC) and anthropology (NMNHANTHRO, NMAI) — those fall to pass 2 so a
+//    trophy / machine / ecofact / human-remains record is NOT swept in on unit
+//    alone.
+//
+// 2. OBJECT-TYPE pass — `indexedStructured.object_type` (controlled vocabulary)
+//    names an art form on the allowlist. This is how the mixed-history and
+//    anthropology units contribute (a netsuke / mask / celadon bowl from
+//    NMNHANTHRO) without admitting the non-art around it. Matched as a substring
+//    of the lowercased value, so "Decorative Arts-Jewelry" and "Bowls (vessels)"
+//    both hit. A record with no recognized art object_type AND a non-art unit is
+//    rejected (precision over recall — better to drop an edge object than admit a
+//    book or a beetle).
+
+// Dedicated art/design museum unit codes — pass 1. (FSG = legacy Freer–Sackler
+// code; NMAA = its current "National Museum of Asian Art" code. Both kept so
+// older and newer records resolve.)
+const ART_UNIT_CODES = new Set(['NMAA', 'FSG', 'NMAfA', 'SAAM', 'NPG', 'HMSG', 'CHNDM']);
+
 const ART_OBJECT_TYPE_KEYWORDS = [
+  // Western fine + decorative art (original list).
   'painting',
   'drawing',
   'print',
@@ -69,13 +92,80 @@ const ART_OBJECT_TYPE_KEYWORDS = [
   'metalwork',
   'works on paper',
   'work on paper',
+  // Non-Western art forms that EDAN records as the object's FORM, not a Western
+  // classification — these were the bulk of the dropped non-Western art (netsuke,
+  // masks, celadon vessels, Japanese lacquerware, Islamic/Mughal manuscripts).
+  'mask',
+  'netsuke',
+  'carving',
+  'manuscript',
+  'koran',
+  'quran',
+  'calligraphy',
+  'scroll',
+  'woodblock',
+  'woodcut',
+  'inro',
+  'okimono',
+  'kimono',
+  'robe',
+  'lacquer',
+  'amulet',
+  'pendant',
+  'figurine',
+  'statuette',
+  'relief',
+  'censer',
+  'incense',
+  'carpet',
+  'embroidery',
+  // Decorative-arts vessel/container forms (ceramics, metalwork, lacquer) whose
+  // object_type is the form, not the material — Korean celadon, Chinese bronze,
+  // Japanese tea wares. (Collision-prone short forms — bowl/urn/rug/icon/screen —
+  // live in ART_OBJECT_TYPE_PATTERNS instead, word-anchored.)
+  'vessel',
+  'vase',
+  'jar',
+  'bottle',
+  'ewer',
+  'flask',
+  'dish',
+  'plate',
+  'cup',
+  'teapot',
+  'basket',
 ];
 
-/** True when any object_type value names an art form on the allowlist. */
+// Word-anchored art forms. These collide badly as bare substrings — `box` is
+// inside "boxing gloves", `rug` inside "Drugs"/"crude drug" (NMAH materia
+// medica), `bowl` inside "Bowling", `urn` inside "Return", `icon` inside
+// "Silicon", `screen` inside "Touchscreen", `fan` inside "infant" — so they're
+// matched on WORD BOUNDARIES instead. Recovers Japanese lacquer boxes, hand fans,
+// Korean celadon bowls, funerary urns, religious icons, folding screens and rugs
+// without admitting NMAH sports/electronics/pharmaceutical objects. Patterns are
+// anchored + linear (no backtracking) and run only over short controlled-vocab
+// values.
+const ART_OBJECT_TYPE_PATTERNS = [
+  /\bbox(es)?\b/i,
+  /\bfan(s)?\b/i,
+  /\brug(s)?\b/i,
+  /\bbowl(s)?\b/i,
+  /\burn(s)?\b/i,
+  /\bicon(s)?\b/i,
+  /\bscreen(s)?\b/i,
+];
+
+/** True when the record's unit is a dedicated art/design museum (curation pass 1). */
+function isArtUnit(unitCode: string): boolean {
+  return ART_UNIT_CODES.has(unitCode);
+}
+
+/** True when any object_type value names an art form on the allowlist (curation pass 2). */
 function isArtObjectType(objectTypes: string[]): boolean {
   for (const t of objectTypes) {
     const lower = t.toLowerCase();
     if (ART_OBJECT_TYPE_KEYWORDS.some((k) => lower.includes(k))) return true;
+    if (ART_OBJECT_TYPE_PATTERNS.some((re) => re.test(t))) return true;
   }
   return false;
 }
@@ -354,11 +444,14 @@ export const smithsonianFetcher: Fetcher = {
     // Non-art curation gate (runs AFTER the rights gate — rights is the hard
     // boundary; this is a relevance gate that keeps the federated ART result set
     // free of Smithsonian Libraries book records and Natural History specimens).
+    // A record is art if EITHER its unit is a dedicated art museum (pass 1) OR an
+    // object_type names an art form (pass 2). See the constants block above.
+    const unitCode = asString(record.unitCode);
     const objectTypes = objectTypeSignals(content);
-    if (!isArtObjectType(objectTypes)) {
+    if (!isArtUnit(unitCode) && !isArtObjectType(objectTypes)) {
       return reject(
         id,
-        `smithsonian: non-art object_type=${objectTypes.length ? objectTypes.join('/') : 'none'} (curation reject)`,
+        `smithsonian: non-art unit=${unitCode || 'none'} object_type=${objectTypes.length ? objectTypes.join('/') : 'none'} (curation reject)`,
         raw,
       );
     }
