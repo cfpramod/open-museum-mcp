@@ -31,16 +31,47 @@ export interface ArtworkLicense {
   confidence: RightsConfidence;
 }
 
+/**
+ * Print/archival master image — the largest asset the museum publishes, which
+ * may be NON-DISPLAYABLE in a browser `<img>` (e.g. a multi-hundred-MB TIFF) or
+ * simply too large for screen use. Distinct from `ArtworkImages.full`, which is
+ * always a browser-renderable derivative. Present only when a master exists that
+ * is genuinely larger than `full`; absent when `full` already is the maximum the
+ * source offers (then `maxResolution` mirrors the `full` dims).
+ */
+export interface ArtworkMaster {
+  url: string;
+  width?: number;
+  height?: number;
+  /** MIME type, e.g. `image/tiff` or `image/jpeg`. Flags non-`<img>` masters. */
+  format?: string;
+  byteSize?: number;
+}
+
 export interface ArtworkImages {
+  /** Browser-displayable image (safe for `<img>`). Always a renderable derivative. */
   full: string;
   large?: string;
   thumbnail?: string;
-  /** Pixel width of the `full` asset, when the museum publishes it. */
+  /** Pixel width of the `full` (displayable) asset, when the museum publishes it. */
   width?: number;
-  /** Pixel height of the `full` asset, when the museum publishes it. */
+  /** Pixel height of the `full` (displayable) asset, when the museum publishes it. */
   height?: number;
   /** Byte size of the `full` asset, when the museum publishes it. */
   byteSize?: number;
+  /**
+   * Print/archival master when it is strictly larger than `full` (e.g. Cleveland's
+   * `_full.tif`). Absent when `full` already is the source maximum. See {@link ArtworkMaster}.
+   */
+  master?: ArtworkMaster;
+  /**
+   * TRUE maximum pixel dimensions available for this work, across `full` AND
+   * `master`. The single field the OMA image-quality filter and calendar plate
+   * selection should rank on — so consumers never under-rate a work by reading a
+   * default-size derivative's dims. Absent only when the source publishes no
+   * pixel dimensions at all (e.g. AIC's data API). Additive v0.13 field.
+   */
+  maxResolution?: { width: number; height: number };
 }
 
 export interface ArtworkSource {

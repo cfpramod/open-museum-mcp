@@ -7,8 +7,10 @@ import {
   asFiniteNumber,
   asOptionalString,
   asString,
+  coerceFiniteNumber,
   httpGet,
   isValidPositiveInt,
+  pickMaxResolution,
   rejectFor,
 } from './helpers.js';
 import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
@@ -128,11 +130,38 @@ export const clevelandFetcher: Fetcher = {
     const images = (r.images && typeof r.images === 'object' ? r.images : {}) as Record<string, unknown>;
     const printVariant = images.print as Record<string, unknown> | undefined;
     const webVariant = images.web as Record<string, unknown> | undefined;
-    // Prefer the higher-resolution `print` URL when both are available; fall
-    // back to `web` (smaller display image). The full TIFF is too large for
-    // most consumer use cases, so we don't surface it.
-    const fullImage = asString(printVariant?.url) || asString(webVariant?.url);
+    const fullVariant = images.full as Record<string, unknown> | undefined;
+    // Displayable image: prefer the `print` JPEG (~3400px, renders in <img>),
+    // fall back to `web`. We deliberately do NOT put the `full` asset here —
+    // it's a multi-hundred-MB TIFF that no browser renders.
+    const displayVariant = asString(printVariant?.url) ? printVariant : webVariant;
+    const fullImage = asString(displayVariant?.url);
     const thumbnail = asOptionalString(webVariant?.url);
+    const displayWidth = coerceFiniteNumber(displayVariant?.width) ?? undefined;
+    const displayHeight = coerceFiniteNumber(displayVariant?.height) ?? undefined;
+    const displayBytes = coerceFiniteNumber(displayVariant?.filesize) ?? undefined;
+
+    // Archival master: the `_full.tif` (e.g. 11966×7990, orders of magnitude
+    // larger than `print`). Surfaced as `master` so print/POD consumers can reach
+    // the true maximum, while `full` stays browser-safe. TIFF is flagged via
+    // `format` so consumers know it needs conversion before an <img>.
+    const masterUrl = asString(fullVariant?.url);
+    const masterWidth = coerceFiniteNumber(fullVariant?.width) ?? undefined;
+    const masterHeight = coerceFiniteNumber(fullVariant?.height) ?? undefined;
+    const master = masterUrl
+      ? {
+          url: masterUrl,
+          width: masterWidth,
+          height: masterHeight,
+          format: /\.tif{1,2}$/i.test(masterUrl) ? 'image/tiff' : undefined,
+          byteSize: coerceFiniteNumber(fullVariant?.filesize) ?? undefined,
+        }
+      : undefined;
+
+    const maxResolution = pickMaxResolution(
+      { width: masterWidth, height: masterHeight },
+      { width: displayWidth, height: displayHeight },
+    );
 
     const artwork: Artwork = {
       id,
@@ -158,6 +187,11 @@ export const clevelandFetcher: Fetcher = {
       imageUrls: {
         full: fullImage,
         thumbnail,
+        width: displayWidth,
+        height: displayHeight,
+        byteSize: displayBytes,
+        master,
+        maxResolution,
       },
       imageOpenAccess: decision.imageOpenAccess,
       metadataOpenAccess: decision.metadataOpenAccess,

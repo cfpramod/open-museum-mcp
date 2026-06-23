@@ -54,6 +54,46 @@ export function asFiniteNumber(v: unknown): number | null {
 }
 
 /**
+ * Coerce a number OR a numeric string to a finite number, else null. Cleveland
+ * publishes image `width`/`height`/`filesize` as strings ("11966"); this accepts
+ * both shapes without the caller string-juggling at every field.
+ */
+export function coerceFiniteNumber(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/**
+ * Pick the TRUE-maximum pixel dimensions from a set of candidate image variants
+ * (displayable derivative, archival master, mirror impressions). Ranks by pixel
+ * AREA so a portrait master out-scores a wider-but-shorter derivative. Candidates
+ * missing either dimension are ignored; returns `undefined` when none qualify, so
+ * `imageUrls.maxResolution` stays absent rather than carrying a half-known size.
+ */
+export function pickMaxResolution(
+  ...candidates: Array<{ width?: number; height?: number } | undefined>
+): { width: number; height: number } | undefined {
+  let best: { width: number; height: number } | undefined;
+  let bestArea = 0;
+  for (const c of candidates) {
+    if (!c) continue;
+    const w = asFiniteNumber(c.width);
+    const h = asFiniteNumber(c.height);
+    if (w === null || h === null || w <= 0 || h <= 0) continue;
+    const area = w * h;
+    if (area > bestArea) {
+      bestArea = area;
+      best = { width: w, height: h };
+    }
+  }
+  return best;
+}
+
+/**
  * True when `v` is a valid museum-side artwork ID: a positive integer.
  * Every adapter's `normalize()` makes this exact check before assembling
  * an `<museum>:<id>` string, so it lives here once.

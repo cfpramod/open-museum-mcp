@@ -2,8 +2,15 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateSmithsonianLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
-import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asOptionalString, asString, httpGet, rejectFor } from './helpers.js';
+import type { Artwork, ArtworkMaster, ValidationResult } from '../types.js';
+import {
+  asFiniteNumber,
+  asOptionalString,
+  asString,
+  httpGet,
+  pickMaxResolution,
+  rejectFor,
+} from './helpers.js';
 import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
@@ -165,16 +172,42 @@ interface SiMedia {
   resources?: unknown;
 }
 
+interface PickedImage {
+  full: string;
+  thumbnail?: string;
+  width?: number;
+  height?: number;
+  master?: ArtworkMaster;
+  maxResolution?: { width: number; height: number };
+}
+
+/** Pixel dims of a resource entry, or undefined when not both published. */
+function resourceDims(r: Record<string, unknown> | undefined): { width?: number; height?: number } {
+  if (!r) return {};
+  const w = asFiniteNumber(r.width);
+  const h = asFiniteNumber(r.height);
+  return { width: w !== null && w > 0 ? w : undefined, height: h !== null && h > 0 ? h : undefined };
+}
+
 /**
  * Select the primary image media from `online_media.media[]`. Returns the
- * delivery URL + thumbnail + (when published) pixel dimensions, but ONLY when
+ * displayable URL + thumbnail + (when published) pixel dimensions, but ONLY when
  * the chosen media's own `usage.access` is CC0 — a metadata-CC0 record whose
  * image carries usage conditions surfaces no image (imageOpenAccess=false).
+ *
+ * IMAGE-RESOLUTION FIX: `media.content` points at `ids.si.edu/.../deliveryService`,
+ * which caps the long edge at ~2000px (verified live: a 2900×4362 master serves as
+ * 1330×2000 from deliveryService). The `resources[]` array already carries a
+ * "High-resolution JPEG" entry with the FULL pixels and a direct `download?id=…jpg`
+ * URL (the same image, browser-displayable). Prefer that resource URL + its dims;
+ * fall back to deliveryService only when no hi-res resource is published. (SI's
+ * IIIF endpoint 400s on `/full/max/` for these ids, so we use the published
+ * resource rather than an info.json round-trip — no extra request, true max.)
  */
 function pickImage(
   content: Record<string, unknown>,
   imageOpenAccess: boolean,
-): { full: string; thumbnail?: string; width?: number; height?: number } {
+): PickedImage {
   if (!imageOpenAccess) return { full: '' };
   const dnr = content.descriptiveNonRepeating;
   const om =
@@ -191,27 +224,36 @@ function pickImage(
   const media = mediaArr.find((m) => asString(m.type).toLowerCase() === 'images') ?? mediaArr[0];
   if (!media) return { full: '' };
 
-  const full = asString(media.content);
   const thumbnail = asOptionalString(media.thumbnail);
-
-  // Mine published pixel dimensions from the high-res rendition for the
-  // additive imageUrls.width/height fields (DX). Prefer JPEG over TIFF.
-  let width: number | undefined;
-  let height: number | undefined;
   const resources = Array.isArray(media.resources)
     ? (media.resources as Array<Record<string, unknown>>)
     : [];
   const jpeg = resources.find((r) => /jpeg|jpg/i.test(asString(r.label)));
   const tiff = resources.find((r) => /tiff|tif/i.test(asString(r.label)));
-  const dims = jpeg ?? tiff;
-  if (dims) {
-    const w = asFiniteNumber(dims.width);
-    const h = asFiniteNumber(dims.height);
-    if (w !== null && w > 0) width = w;
-    if (h !== null && h > 0) height = h;
-  }
+  const jpegDims = resourceDims(jpeg);
+  const tiffDims = resourceDims(tiff);
 
-  return { full, thumbnail, width, height };
+  // Displayable `full`: the hi-res JPEG resource (true max, renders in <img>),
+  // falling back to the capped deliveryService URL only when no hi-res JPEG URL.
+  const jpegUrl = asString(jpeg?.url);
+  const full = jpegUrl || asString(media.content);
+  const usingHiRes = Boolean(jpegUrl);
+  const width = usingHiRes ? jpegDims.width : undefined;
+  const height = usingHiRes ? jpegDims.height : undefined;
+
+  // Archival master: a TIFF resource, when published and strictly larger than the
+  // displayable JPEG. Non-<img>-renderable, so flagged with `format`.
+  const tiffUrl = asString(tiff?.url);
+  const tiffArea = (tiffDims.width ?? 0) * (tiffDims.height ?? 0);
+  const jpegArea = (jpegDims.width ?? 0) * (jpegDims.height ?? 0);
+  const master: ArtworkMaster | undefined =
+    tiffUrl && tiffArea > jpegArea
+      ? { url: tiffUrl, width: tiffDims.width, height: tiffDims.height, format: 'image/tiff' }
+      : undefined;
+
+  const maxResolution = pickMaxResolution(jpegDims, tiffDims);
+
+  return { full, thumbnail, width, height, master, maxResolution };
 }
 
 // Canonical env var is SMITHSONIAN_API_KEY (matches the EUROPEANA_API_KEY
@@ -388,6 +430,8 @@ export const smithsonianFetcher: Fetcher = {
         thumbnail: image.thumbnail,
         width: image.width,
         height: image.height,
+        master: image.master,
+        maxResolution: image.maxResolution,
       },
       imageOpenAccess: decision.imageOpenAccess,
       metadataOpenAccess: decision.metadataOpenAccess,

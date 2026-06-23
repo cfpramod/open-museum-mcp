@@ -2,9 +2,16 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateWikimediaLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
-import type { Artwork, ValidationResult } from '../types.js';
+import type { Artwork, ArtworkMaster, ValidationResult } from '../types.js';
 import { isNonArtWikimedia } from './curation.js';
-import { asFiniteNumber, asString, httpGet, isValidPositiveInt, rejectFor } from './helpers.js';
+import {
+  asFiniteNumber,
+  asString,
+  httpGet,
+  isValidPositiveInt,
+  pickMaxResolution,
+  rejectFor,
+} from './helpers.js';
 import { ARTIST_NAME_MAX, DESCRIPTION_MAX, TITLE_MAX } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
@@ -15,6 +22,32 @@ const COMMONS_PAGE = 'https://commons.wikimedia.org/wiki';
 // videos, audio and other media too; v0.3 surfaces only static images so the
 // `imageUrls.full` contract holds.
 const IMAGE_MIME_PREFIX = 'image/';
+
+// MIME types a browser renders directly in an `<img>`. Commons ALSO hosts art
+// scans whose original is a TIFF/DjVu/XCF — those pass the `image/` prefix and
+// can survive the curation gate (a raster TIFF is a legitimate artwork), but a
+// browser won't render them. Per the `full = always displayable` contract (PR
+// #105), a non-displayable original is routed to `master` and `full` is set to a
+// Commons-rendered JPEG derivative. Positive allowlist: anything NOT in this set
+// is treated as non-displayable.
+const DISPLAYABLE_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+
+// Width of the rendered displayable derivative requested for non-`<img>` originals
+// (via `iiurlwidth`, with `Special:FilePath?width=` as the no-extra-data fallback).
+// MediaWiki never upscales past the original, so this is an upper bound, not a force.
+const WIKIMEDIA_DISPLAY_WIDTH = 2048;
+
+/**
+ * Stable Commons render URL for a file at a given width. `Special:FilePath` 302s
+ * to the rendered thumbnail; for a non-web original (TIFF/DjVu) that thumbnail is
+ * a JPEG/PNG, so this yields a browser-displayable `full` without the upload-path
+ * hash. Used as the fallback when imageinfo's `thumburl` is absent.
+ */
+function commonsRenderUrl(pageTitle: string, width: number): string {
+  const file = pageTitle.replace(/^File:/i, '').trim();
+  if (!file) return '';
+  return `${COMMONS_PAGE}/Special:FilePath/${encodeURIComponent(file)}?width=${width}`;
+}
 
 const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
   rejectFor('wikimedia', id, reason, rawSnapshot);
@@ -224,6 +257,10 @@ export const wikimediaFetcher: Fetcher = {
     // creation dates ("1910s paintings by Claude Monet" etc).
     url.searchParams.set('prop', 'imageinfo|categories');
     url.searchParams.set('iiprop', 'url|size|mime|extmetadata');
+    // Ask for a rendered-thumbnail URL too. For browser-displayable originals
+    // (JPEG/PNG/…) we ignore it and serve the full original; for a non-`<img>`
+    // original (TIFF/DjVu) `thumburl` is the Commons-rendered JPEG we put in `full`.
+    url.searchParams.set('iiurlwidth', String(WIKIMEDIA_DISPLAY_WIDTH));
     url.searchParams.set(
       'iiextmetadatafilter',
       'License|LicenseShortName|LicenseUrl|UsageTerms|Artist|ObjectName|DateTime|Credit|ImageDescription',
@@ -334,11 +371,50 @@ export const wikimediaFetcher: Fetcher = {
       if (fromCats) dateRange = fromCats;
     }
 
-    const fullImage = asString(info.url);
     const pageUrl = asString(info.descriptionurl) || `${COMMONS_PAGE}/?curid=${pageId}`;
-    const width = asFiniteNumber(info.width) ?? undefined;
-    const height = asFiniteNumber(info.height) ?? undefined;
-    const byteSize = asFiniteNumber(info.size) ?? undefined;
+    const originalImageUrl = asString(info.url);
+    const originalWidth = asFiniteNumber(info.width) ?? undefined;
+    const originalHeight = asFiniteNumber(info.height) ?? undefined;
+    const originalBytes = asFiniteNumber(info.size) ?? undefined;
+
+    // `full` must be browser-`<img>`-renderable (PR #105 contract). When the
+    // Commons original already is (JPEG/PNG/…), it's also the maximum — serve it
+    // directly. When it isn't (e.g. a TIFF art scan), route the original to
+    // `master` and serve a Commons-rendered JPEG as `full`; `maxResolution` still
+    // reports the original (master) pixels — the true max.
+    let fullImage: string;
+    let width: number | undefined;
+    let height: number | undefined;
+    let byteSize: number | undefined;
+    let master: ArtworkMaster | undefined;
+    const maxResolution = pickMaxResolution({ width: originalWidth, height: originalHeight });
+
+    if (DISPLAYABLE_IMAGE_MIMES.has(mime)) {
+      fullImage = originalImageUrl;
+      width = originalWidth;
+      height = originalHeight;
+      byteSize = originalBytes;
+    } else {
+      const rendered = asString(info.thumburl) || commonsRenderUrl(asString(page.title), WIKIMEDIA_DISPLAY_WIDTH);
+      if (!rendered) {
+        // No displayable rendition obtainable — we can't honor the `full`
+        // contract, so reject rather than emit a non-renderable TIFF as `full`.
+        return reject(id, `wikimedia: ${mime} original has no browser-displayable rendition`, raw);
+      }
+      fullImage = rendered;
+      width = asFiniteNumber(info.thumbwidth) ?? undefined;
+      height = asFiniteNumber(info.thumbheight) ?? undefined;
+      // The original is strictly larger than the 2048px-capped derivative, so
+      // `maxResolution` (initialised from the original dims above) already reports
+      // the master's pixels — the true max.
+      master = {
+        url: originalImageUrl,
+        width: originalWidth,
+        height: originalHeight,
+        format: mime,
+        byteSize: originalBytes,
+      };
+    }
     // Credit field is HTML; pull out the first http(s) href as the upstream
     // pointer. Important: don't strip HTML before extracting — stripHtml
     // would discard the `<a href>` we need.
@@ -386,6 +462,8 @@ export const wikimediaFetcher: Fetcher = {
         width,
         height,
         byteSize,
+        master,
+        maxResolution,
       },
       imageOpenAccess: decision.imageOpenAccess,
       metadataOpenAccess: decision.metadataOpenAccess,

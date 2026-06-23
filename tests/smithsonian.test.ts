@@ -45,10 +45,15 @@ describe('Smithsonian adapter normalization', () => {
     expect(a.license.rawValue).toBe('CC0');
     expect(a.imageOpenAccess).toBe(true);
     expect(a.metadataOpenAccess).toBe(true);
-    expect(a.imageUrls.full).toContain('ids.si.edu');
+    // `full` is the hi-res JPEG resource (true max), NOT the ~2000px-capped
+    // deliveryService URL the record's `media.content` points at.
+    expect(a.imageUrls.full).toContain('ids.si.edu/ids/download');
+    expect(a.imageUrls.full).toContain('.jpg');
+    expect(a.imageUrls.full).not.toContain('deliveryService');
     expect(a.imageUrls.thumbnail).toContain('ids.si.edu');
     expect(a.imageUrls.width).toBe(2200);
     expect(a.imageUrls.height).toBe(3000);
+    expect(a.imageUrls.maxResolution).toEqual({ width: 2200, height: 3000 });
     expect(a.source.apiUrl).toContain('api.si.edu/openaccess');
     expect(a.source.pageUrl).toContain('americanart.si.edu');
     expect(a.description).toBe('Decorative Arts-Jewelry');
@@ -281,5 +286,71 @@ describe('Smithsonian adapter search', () => {
     }) as unknown as typeof fetch;
     await smithsonianFetcher.search('q', 5);
     expect(capturedUrl).toContain('api_key=canonical-key');
+  });
+});
+
+describe('Smithsonian adapter image resolution (hi-res resource over capped deliveryService)', () => {
+  // Regression guard: `media.content` is a `deliveryService` URL that caps the
+  // long edge at ~2000px; the `resources[]` array already carries the full-pixel
+  // "High-resolution JPEG" with a direct download URL + true dims. `full` must use
+  // the resource URL so works aren't under-rated on understated resolution.
+  it('uses the hi-res JPEG resource URL + dims, not the deliveryService default', () => {
+    const result = smithsonianFetcher.normalize(fixture('smithsonian-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const iu = result.artwork.imageUrls;
+    expect(iu.full).toBe('https://ids.si.edu/ids/download?id=SAAM-1929.8.175.19_1.jpg');
+    expect(iu.maxResolution).toEqual({ width: 2200, height: 3000 });
+  });
+
+  it('does not surface a same-size TIFF as a master (master means MORE pixels than `full`)', () => {
+    // The fixture's TIFF and JPEG are both 2200×3000 — a same-resolution TIFF adds
+    // no max-resolution signal, so no `master` is emitted.
+    const result = smithsonianFetcher.normalize(fixture('smithsonian-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.imageUrls.master).toBeUndefined();
+  });
+
+  it('surfaces a TIFF master when it is strictly larger than the displayable JPEG', () => {
+    const raw = structuredClone(fixture('smithsonian-accepted.json')) as {
+      response: {
+        content: {
+          descriptiveNonRepeating: {
+            online_media: { media: Array<{ resources: Array<Record<string, unknown>> }> };
+          };
+        };
+      };
+    };
+    const resources = raw.response.content.descriptiveNonRepeating.online_media.media[0].resources;
+    // Bump the TIFF resource to a true archival size larger than the 2200×3000 JPEG.
+    const tiff = resources.find((r) => /tiff|tif/i.test(String(r.label)));
+    if (!tiff) throw new Error('fixture has no TIFF resource');
+    tiff.width = 6000;
+    tiff.height = 8000;
+    const result = smithsonianFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const iu = result.artwork.imageUrls;
+    expect(iu.full).toContain('.jpg'); // displayable stays the JPEG
+    expect(iu.master?.url).toContain('.tif');
+    expect(iu.master?.format).toBe('image/tiff');
+    expect(iu.master?.width).toBe(6000);
+    expect(iu.maxResolution).toEqual({ width: 6000, height: 8000 });
+  });
+
+  it('falls back to the deliveryService URL when no hi-res resource is published', () => {
+    const raw = structuredClone(fixture('smithsonian-accepted.json')) as {
+      response: {
+        content: {
+          descriptiveNonRepeating: {
+            online_media: { media: Array<Record<string, unknown>> };
+          };
+        };
+      };
+    };
+    raw.response.content.descriptiveNonRepeating.online_media.media[0].resources = [];
+    const result = smithsonianFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const iu = result.artwork.imageUrls;
+    expect(iu.full).toContain('deliveryService');
+    expect(iu.maxResolution).toBeUndefined(); // no published dims → honest absence
   });
 });

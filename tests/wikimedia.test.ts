@@ -925,3 +925,89 @@ describe('Wikimedia Commons adapter mediumCategory', () => {
     expect(result.artwork.mediumCategory).toBe('other');
   });
 });
+
+describe('Wikimedia non-displayable originals (image/tiff → displayable full + master) [W1]', () => {
+  // PR #105 made `full` contractually browser-displayable. Commons hosts raster
+  // TIFF art scans that pass the image/ MIME prefix AND survive the curation gate
+  // (a TIFF painting is legitimate art) but DON'T render in an <img>. They must be
+  // routed to `master`, with `full` set to a Commons-rendered JPEG — or rejected.
+  function tiffPage(opts: { thumburl?: string; title?: string }) {
+    const imageinfo: Record<string, unknown> = {
+      url: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Great_Painting.tif',
+      descriptionurl: 'https://commons.wikimedia.org/wiki/File:Great_Painting.tif',
+      mime: 'image/tiff',
+      width: 9000,
+      height: 7000,
+      size: 350_000_000,
+      extmetadata: { License: { value: 'pd' }, ObjectName: { value: 'Great Painting' } },
+    };
+    if (opts.thumburl) {
+      imageinfo.thumburl = opts.thumburl;
+      imageinfo.thumbwidth = 2048;
+      imageinfo.thumbheight = 1593;
+    }
+    return {
+      query: {
+        pages: [
+          { pageid: 77000001, title: opts.title ?? 'File:Great_Painting.tif', imageinfo: [imageinfo] },
+        ],
+      },
+    };
+  }
+
+  it('uses the imageinfo thumburl (rendered JPEG) as `full`, routes the TIFF to `master`', () => {
+    const result = wikimediaFetcher.normalize(
+      tiffPage({
+        thumburl:
+          'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Great_Painting.tif/2048px-Great_Painting.tif.jpg',
+      }),
+    );
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    const iu = result.artwork.imageUrls;
+    // `full` is a rendered JPEG — never the raw .tif.
+    expect(iu.full).toContain('.jpg');
+    expect(iu.full).not.toMatch(/\.tif$/);
+    expect(iu.width).toBe(2048);
+    expect(iu.height).toBe(1593);
+    // master carries the full-resolution TIFF original, flagged as image/tiff.
+    expect(iu.master?.url).toMatch(/\.tif$/);
+    expect(iu.master?.format).toBe('image/tiff');
+    expect(iu.master?.width).toBe(9000);
+    expect(iu.master?.height).toBe(7000);
+    expect(iu.master?.byteSize).toBe(350_000_000);
+    // maxResolution reports the TRUE max (the master), not the 2048px derivative.
+    expect(iu.maxResolution).toEqual({ width: 9000, height: 7000 });
+  });
+
+  it('falls back to Special:FilePath?width= when no thumburl is published', () => {
+    const result = wikimediaFetcher.normalize(tiffPage({}));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    const iu = result.artwork.imageUrls;
+    expect(iu.full).toContain('Special:FilePath');
+    expect(iu.full).toContain('width=2048');
+    expect(iu.full).not.toMatch(/\.tif$/);
+    expect(iu.master?.format).toBe('image/tiff');
+    expect(iu.maxResolution).toEqual({ width: 9000, height: 7000 });
+  });
+
+  it('rejects a non-displayable original when no rendition can be produced (no thumburl, no title)', () => {
+    const result = wikimediaFetcher.normalize(tiffPage({ title: '' }));
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.reason).toMatch(/no browser-displayable rendition/);
+    expect(result.rejection.reason).toContain('image/tiff');
+  });
+
+  it('leaves a normal JPEG untouched: original is `full`, no master', () => {
+    const result = wikimediaFetcher.normalize(fixture('wikimedia-accepted-bruegel.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    const iu = result.artwork.imageUrls;
+    expect(iu.full).toContain('upload.wikimedia.org');
+    expect(iu.full).toMatch(/\.jpg$/i);
+    expect(iu.master).toBeUndefined();
+    expect(iu.maxResolution).toEqual({ width: 1246, height: 800 });
+  });
+});

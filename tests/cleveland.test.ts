@@ -127,3 +127,46 @@ describe('Cleveland adapter mediumCategory', () => {
     expect(result.artwork.mediumCategory).toBe('other');
   });
 });
+
+describe('Cleveland adapter image resolution (master/displayable split + maxResolution)', () => {
+  // Regression guard for the image-resolution miss: Cleveland's `_full.tif`
+  // master (11512×11476) was previously discarded; `full` served the 3400px
+  // `_print.jpg` and no true-max signal was exposed.
+  it('serves the print JPEG as the displayable `full`, with its dims', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const iu = result.artwork.imageUrls;
+    expect(iu.full).toContain('_print.jpg');
+    expect(iu.full).not.toContain('.tif'); // never a non-displayable TIFF in `full`
+    expect(iu.width).toBe(3400);
+    expect(iu.height).toBe(3389);
+  });
+
+  it('surfaces the `_full.tif` archival master with dims and an image/tiff format flag', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const m = result.artwork.imageUrls.master;
+    expect(m?.url).toContain('_full.tif');
+    expect(m?.width).toBe(11512);
+    expect(m?.height).toBe(11476);
+    expect(m?.format).toBe('image/tiff');
+  });
+
+  it('reports the TRUE maximum dimensions (the TIFF master, not the print derivative)', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.imageUrls.maxResolution).toEqual({ width: 11512, height: 11476 });
+  });
+
+  it('omits the master (and maxResolution falls back to print) when no `_full.tif` is published', () => {
+    const raw = structuredClone(fixture('cleveland-accepted.json')) as {
+      data: { images: Record<string, unknown> };
+    };
+    delete raw.data.images.full;
+    const result = clevelandFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const iu = result.artwork.imageUrls;
+    expect(iu.master).toBeUndefined();
+    expect(iu.maxResolution).toEqual({ width: 3400, height: 3389 });
+  });
+});
