@@ -1,6 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createColorExtractor, type SharpLike } from '../../src/color/extract.js';
+import { createColorExtractor, isAllowlistedImageHost, type SharpLike } from '../../src/color/extract.js';
 import type { Artwork } from '../../src/types.js';
+
+describe('isAllowlistedImageHost — CDN allowlist (exact hostname)', () => {
+  it('allows the Rijksmuseum Micrio IIIF host (OM-CR N1: colour facet no longer fails closed)', () => {
+    expect(isAllowlistedImageHost('https://iiif.micr.io/QkOGy/full/max/0/default.jpg')).toBe(true);
+  });
+  it('still rejects a look-alike host (no substring spoofing)', () => {
+    expect(isAllowlistedImageHost('https://iiif.micr.io.evil.com/x.jpg')).toBe(false);
+    expect(isAllowlistedImageHost('https://evil.com/?x=iiif.micr.io')).toBe(false);
+  });
+  it('keeps the existing hosts allowed', () => {
+    expect(isAllowlistedImageHost('https://ids.si.edu/ids/deliveryService?id=x')).toBe(true);
+    expect(isAllowlistedImageHost('https://images.metmuseum.org/full.jpg')).toBe(true);
+  });
+});
 
 function artwork(over: Partial<Artwork['imageUrls']> = {}): Artwork {
   return {
