@@ -361,6 +361,47 @@ export const validateSmithsonianLicense: LicenseValidator = (raw) => {
   );
 };
 
+// Walters Art Museum — the engine's first INGEST source. Unlike the live APIs,
+// the static CSV dump carries NO per-object rights field; the museum instead
+// declares the WHOLE released dataset CC0 (rights policy + repo README). We take
+// that as the affirmative grant but still apply a strict per-record gate as
+// defense in depth: a record is accepted only when its latest date is BEFORE the
+// copyright cutoff (1928) AND it carries an image. The build-time ingest already
+// excludes the 1928+/loaned/copyright-flagged tail, so this re-check is belt-and-
+// suspenders — but it means a malformed or out-of-policy record can never reach
+// the wire even if the bundle were tampered with. See README "Verification".
+const WALTERS_COPYRIGHT_CUTOFF_YEAR = 1928;
+export const validateWaltersLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('walters: record missing or not an object');
+  }
+  const rec = raw as Record<string, unknown>;
+  const endYear = typeof rec.b === 'number' && Number.isFinite(rec.b) ? rec.b : null;
+  const image = typeof rec.g === 'string' ? rec.g.trim() : '';
+  if (endYear === null) {
+    return reject('walters: no resolvable end-year — cannot confirm public domain (strict default reject)');
+  }
+  if (endYear >= WALTERS_COPYRIGHT_CUTOFF_YEAR) {
+    return reject(`walters: end-year ${endYear} >= ${WALTERS_COPYRIGHT_CUTOFF_YEAR} — possible live copyright (reject)`);
+  }
+  if (!image) {
+    return reject('walters: no image — out of the image-bearing CC0 subset (reject)');
+  }
+  return {
+    accepted: true,
+    license: {
+      type: 'CC0',
+      rawValue: 'CC0',
+      verificationSource: 'walters.dataset_cc0',
+      verifiedAt: nowIso(),
+      confidence: 'high',
+    },
+    imageOpenAccess: true,
+    metadataOpenAccess: true,
+    reason: `walters: CC0 dataset, pre-${WALTERS_COPYRIGHT_CUTOFF_YEAR} image-bearing record`,
+  };
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
@@ -368,6 +409,7 @@ const VALIDATORS: Record<string, LicenseValidator> = {
   wikimedia: validateWikimediaLicense,
   europeana: validateEuropeanaLicense,
   smithsonian: validateSmithsonianLicense,
+  walters: validateWaltersLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {
