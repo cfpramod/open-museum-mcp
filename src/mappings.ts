@@ -3,7 +3,7 @@ import regionsData from './data/regions.json' with { type: 'json' };
 const regionMap = regionsData as Record<string, string[]>;
 
 // Flatten every (canonical, alias) pair into a word-boundary regex, longest
-// alias first. Two reasons, mirroring the dynasty matcher in dateParser.ts:
+// alias first. Three reasons, mirroring the dynasty matcher in dateParser.ts:
 //   1. Word boundaries (`\b`) stop an alias matching a substring of an unrelated
 //      word. The old `includes()` mapped "Toledo"/"Macedonian" → japan (both
 //      contain "edo") and "Mustang" → china (contains "tang").
@@ -11,12 +11,18 @@ const regionMap = regionsData as Record<string, string[]>;
 //      specific one it is contained in: "roman renaissance" (→ italy) must be
 //      tested before "roman" (→ rome), or every Roman-Renaissance string would
 //      resolve to rome.
+//   3. An optional `(?:s|es)` plural suffix before the closing boundary, so a
+//      demonym alias also matches its plural — museum culture fields say
+//      "Iranians", "Koreans", "Thais", "Khmers", "Muslims" (the bare `\b` after
+//      "iranian" fails on the trailing "s"). The `-ese`/`-i`/`-ian` forms that a
+//      plural rule can't reach (Burmese, Nepali, Cambodian) are listed as
+//      explicit aliases instead.
 const REGION_MATCHERS: Array<{ canonical: string; re: RegExp }> = Object.entries(regionMap)
   .flatMap(([canonical, aliases]) => aliases.map((alias) => ({ canonical, alias })))
   .sort((a, b) => b.alias.length - a.alias.length)
   .map(({ canonical, alias }) => ({
     canonical,
-    re: new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),
+    re: new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:s|es)?\\b`, 'i'),
   }));
 
 export function normalizeRegion(input: string | null | undefined): string | null {

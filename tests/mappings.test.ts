@@ -15,7 +15,43 @@ describe('normalizeRegion', () => {
   it('matches an alias as a whole word inside a longer culture string', () => {
     expect(normalizeRegion('Tang dynasty')).toBe('china');
     expect(normalizeRegion('Edo period, Kyoto')).toBe('japan');
-    expect(normalizeRegion('Tibetan thangka')).toBe('china');
+    // Tibetan art is Himalayan, not Chinese — it has its own canonical now.
+    expect(normalizeRegion('Tibetan thangka')).toBe('himalaya');
+  });
+
+  it('facets non-Western cultures that previously fell to null (world-museum coverage)', () => {
+    // African nations/cities beyond the original yoruba/kongo/asante.
+    expect(normalizeRegion('Nigeria')).toBe('africa');
+    expect(normalizeRegion('Benin City')).toBe('africa');
+    expect(normalizeRegion('Togo')).toBe('africa');
+    // Southeast Asia — a new canonical (Indonesia, Cambodia, Burma, Thailand…).
+    expect(normalizeRegion('Javanese Batiks')).toBe('southeast asia');
+    expect(normalizeRegion('Khmer')).toBe('southeast asia');
+    expect(normalizeRegion('Burma (Myanmar)')).toBe('southeast asia');
+    expect(normalizeRegion('Thailand')).toBe('southeast asia');
+    // Himalaya — a new canonical (Nepal, Tibet, Bhutan).
+    expect(normalizeRegion('Nepalese')).toBe('himalaya');
+    expect(normalizeRegion('Himalayan peoples')).toBe('himalaya');
+    // Strengthened existing canonicals.
+    expect(normalizeRegion('Arts of the Islamic World')).toBe('islamic');
+    expect(normalizeRegion('South Asians')).toBe('india');
+  });
+
+  it('matches plural demonyms (the trailing -s that the bare \\b boundary dropped)', () => {
+    // Museum culture fields routinely pluralise: "Iranians", "Koreans",
+    // "Thais", "Khmers", "Muslims". The optional (?:s|es) suffix recovers them.
+    expect(normalizeRegion('Iranians')).toBe('iran');
+    expect(normalizeRegion('Koreans')).toBe('korea');
+    expect(normalizeRegion('Muslims')).toBe('islamic');
+    expect(normalizeRegion('Khmers')).toBe('southeast asia');
+  });
+
+  it('does not let the plural suffix create false matches', () => {
+    // "Somalis" must NOT match "mali" (africa) — the leading \\b still guards it.
+    expect(normalizeRegion('Somalis')).toBe(null);
+    // Topic/material words that look regional stay null.
+    expect(normalizeRegion('Anthropology')).toBe(null);
+    expect(normalizeRegion('Coins')).toBe(null);
   });
 
   it('does not match an alias that is only a substring of another word', () => {
