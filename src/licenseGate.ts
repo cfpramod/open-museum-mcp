@@ -437,6 +437,58 @@ export const validateSmkLicense: LicenseValidator = (raw) => {
   };
 };
 
+// Wellcome Collection expresses rights PER LOCATION: a work has multiple
+// `items[].locations[]`, and the digital IMAGE we surface is the `iiif-image`
+// location, which carries its OWN `license` ({id: 'cc0' | 'pdm' | 'cc-by' | …}).
+// We judge that specific location's licence (not the work, not a physical copy):
+// accept only `cc0` (CC0) or `pdm` (Public Domain Mark). `cc-by` and everything
+// else are rejected — the engine's gate does not yet carry attribution. A missing
+// image location or unrecognised licence is a strict reject.
+function wellcomeImageLicenseId(work: Record<string, unknown>): string | null {
+  const items = Array.isArray(work.items) ? work.items : [];
+  for (const it of items) {
+    if (!it || typeof it !== 'object') continue;
+    const locations = Array.isArray((it as Record<string, unknown>).locations)
+      ? ((it as Record<string, unknown>).locations as unknown[])
+      : [];
+    for (const loc of locations) {
+      if (!loc || typeof loc !== 'object') continue;
+      const l = loc as Record<string, unknown>;
+      const type =
+        l.locationType && typeof l.locationType === 'object'
+          ? (l.locationType as Record<string, unknown>).id
+          : undefined;
+      if (type !== 'iiif-image') continue;
+      const lic = l.license && typeof l.license === 'object' ? (l.license as Record<string, unknown>).id : undefined;
+      return typeof lic === 'string' ? lic : null;
+    }
+  }
+  return null;
+}
+
+export const validateWellcomeLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('wellcome: object missing or not an object');
+  }
+  const licId = wellcomeImageLicenseId(raw as Record<string, unknown>);
+  if (licId === 'cc0' || licId === 'pdm') {
+    return {
+      accepted: true,
+      license: {
+        type: licId === 'cc0' ? 'CC0' : 'PD',
+        rawValue: licId,
+        verificationSource: 'wellcome.iiif-image.license',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      reason: `wellcome: iiif-image license=${licId}`,
+    };
+  }
+  return reject(`wellcome: iiif-image license=${licId ?? 'none'} (need cc0/pdm; strict default reject)`);
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
@@ -446,6 +498,7 @@ const VALIDATORS: Record<string, LicenseValidator> = {
   smithsonian: validateSmithsonianLicense,
   walters: validateWaltersLicense,
   smk: validateSmkLicense,
+  wellcome: validateWellcomeLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {

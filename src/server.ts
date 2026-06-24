@@ -32,6 +32,7 @@ import { rijksmuseumFetcher } from './fetchers/rijksmuseum.js';
 import { smithsonianFetcher, smithsonianApiKey } from './fetchers/smithsonian.js';
 import { smkFetcher } from './fetchers/smk.js';
 import { waltersFetcher } from './fetchers/walters.js';
+import { wellcomeFetcher } from './fetchers/wellcome.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import type { Fetcher } from './fetchers/types.js';
 import { VERSION } from './version.js';
@@ -59,6 +60,9 @@ const FETCHERS: Record<string, Fetcher> = {
   // SMK (National Gallery of Denmark) — keyless REST API, ~39k public-domain
   // image-bearing works, print-grade IIIF JP2 + full-res native JPEG.
   [smkFetcher.code]: smkFetcher,
+  // Wellcome Collection — keyless Catalogue API, CC0/PDM "Pictures" via IIIF
+  // (library-heavy corpus curated to visual art).
+  [wellcomeFetcher.code]: wellcomeFetcher,
 };
 
 // Europeana requires a per-user API key (free tier, 10K req/day). Only
