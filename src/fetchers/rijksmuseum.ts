@@ -14,7 +14,7 @@
  * The VisualItem carries the IMAGE rights (the asset we actually sell), so that
  * is what the rights gate judges.
  */
-import { cleanArtistName, detectAttributionType } from '../mappings.js';
+import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import { isRightsUri, validateCommercialRights } from '../rights/commercialRights.js';
 import { fetchInfoJson, meetsPrintResolution } from '../iiif/client.js';
@@ -119,6 +119,69 @@ function pickImageRights(visualItem: Record<string, unknown> | undefined): strin
   return null;
 }
 
+/** First production-place reference URI from produced_by (or its parts). */
+function pickPlaceRef(object: Record<string, unknown>): string {
+  const produced = isObj(object.produced_by) ? object.produced_by : undefined;
+  if (!produced) return '';
+  for (const node of [produced, ...arr(produced.part).filter(isObj)]) {
+    for (const p of arr((node as Record<string, unknown>).took_place_at).filter(isObj)) {
+      const uri = str(p.id);
+      if (uri) return uri;
+    }
+  }
+  return '';
+}
+
+/** Primary name of a dereferenced Linked-Art Place. */
+function placeName(placeLd: unknown): string {
+  if (!isObj(placeLd)) return '';
+  const named = arr(placeLd.identified_by).filter(isObj).map((n) => str(n.content)).filter(Boolean);
+  return named[0] ?? str(placeLd._label);
+}
+
+// Rijks records production place as a CITY (Jingdezhen, Amsterdam, Java), not a
+// country/culture, so `normalizeRegion` — built for countries/demonyms — misses
+// most of them. This compact gazetteer maps the common Rijks places to a canonical
+// region; `normalizeRegion` is tried first (catches "China"/"Japan"/… directly),
+// this fills the city gap. (SE-Asia/Java also resolve once the region-map PR lands;
+// mapped here too so it works on `main` today.)
+const RIJKS_PLACE_REGION: Record<string, string> = {
+  amsterdam: 'netherlands', haarlem: 'netherlands', delft: 'netherlands', utrecht: 'netherlands',
+  leiden: 'netherlands', rotterdam: 'netherlands', 'the hague': 'netherlands', 'den haag': 'netherlands',
+  dordrecht: 'netherlands', deventer: 'netherlands', middelburg: 'netherlands',
+  jingdezhen: 'china', canton: 'china', guangzhou: 'china', dehua: 'china', nanjing: 'china',
+  arita: 'japan', kyoto: 'japan', edo: 'japan', nagasaki: 'japan', tokyo: 'japan',
+  java: 'southeast asia', batavia: 'southeast asia', bali: 'southeast asia', sumatra: 'southeast asia',
+  isfahan: 'iran', tabriz: 'iran', kashan: 'iran', iznik: 'islamic', istanbul: 'islamic',
+};
+
+/** Resolve a region from a Rijks production-place name (normalizeRegion, then the city map). */
+function regionFromPlace(name: string): string | null {
+  if (!name) return null;
+  return normalizeRegion(name) ?? RIJKS_PLACE_REGION[name.trim().toLowerCase()] ?? null;
+}
+
+const ORDINAL_SUFFIX: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' };
+/** Century label for a CE year (1601 -> "17th century"). */
+function centuryLabel(year: number): string {
+  const c = Math.floor((year - 1) / 100) + 1;
+  const suffix = c % 100 >= 11 && c % 100 <= 13 ? 'th' : (ORDINAL_SUFFIX[c % 10] ?? 'th');
+  return `${c}${suffix} century`;
+}
+
+/**
+ * Derive a period facet from the parsed year bounds — Rijks Linked-Art carries no
+ * named-period vocabulary, but a single-century span is a useful tradition tag
+ * (the date parser already gives the years). Null for BCE, missing, or
+ * century-crossing spans (where no single century is meaningful).
+ */
+function derivePeriod(yearStart: number | null, yearEnd: number | null): string | null {
+  if (yearStart === null || yearEnd === null || yearStart <= 0 || yearEnd <= 0) return null;
+  const cStart = Math.floor((yearStart - 1) / 100) + 1;
+  const cEnd = Math.floor((yearEnd - 1) / 100) + 1;
+  return cStart === cEnd ? centuryLabel(yearStart) : null;
+}
+
 /** Object-type label -> medium category (e.g. "painting"). */
 function pickMedium(object: Record<string, unknown>): string {
   return arr(object.classified_as)
@@ -201,7 +264,19 @@ export const rijksmuseumFetcher: Fetcher = {
         }
       }
     }
-    return { id, object, visualItem, image };
+    // Dereference the production-place reference (a bare {id,type} pointer) to its
+    // name, so normalize can facet the region. One extra LD fetch, only when a
+    // place is recorded (most Dutch works carry none); failures degrade to no place.
+    let place = '';
+    const placeRef = isObj(object) ? pickPlaceRef(object) : '';
+    if (placeRef) {
+      try {
+        place = placeName(await fetchLd(placeRef));
+      } catch {
+        /* place unavailable — region simply stays null */
+      }
+    }
+    return { id, object, visualItem, image, place };
   },
 
   normalize(raw: unknown): ValidationResult {
@@ -255,8 +330,8 @@ export const rijksmuseumFetcher: Fetcher = {
       yearEnd,
       medium: '',
       mediumCategory: normalizeMedium(pickMedium(object)),
-      region: null,
-      period: null,
+      region: regionFromPlace(str(raw.place)),
+      period: derivePeriod(yearStart, yearEnd),
       imageUrls: {
         full: str(image.fullUrl),
         thumbnail: undefined,
