@@ -151,7 +151,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           museum: {
             type: 'string',
             description:
-              'Optional museum code. Currently registered: met, cleveland, aic, wikimedia (Commons), europeana (federated European institutions; requires EUROPEANA_API_KEY env var).',
+              'Optional museum code. Always available: met, cleveland, aic, rijksmuseum, walters, smk, wellcome, wikimedia (Commons). Key-gated: europeana (EUROPEANA_API_KEY), smithsonian (SMITHSONIAN_API_KEY). Omit to search every registered source.',
           },
           has_image: {
             type: 'boolean',
@@ -240,7 +240,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           museum: {
             type: 'string',
-            description: 'Optional museum code to restrict to (met, cleveland, aic).',
+            description: 'Optional museum code to restrict to (e.g. met, rijksmuseum, smk, wellcome, walters).',
           },
         },
       },
