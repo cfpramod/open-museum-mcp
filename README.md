@@ -234,7 +234,7 @@ This is what "rights-verified" means here: validated against published museum me
 | Art Institute of Chicago | `aic` | none | ✅ v0.2 |
 | Wikimedia Commons | `wikimedia` | none | ✅ v0.3 |
 | Europeana | `europeana` | API key (free, per-user) | ✅ v0.4 |
-| Walters Art Museum | `walters` | none (bundled CC0 dataset) | ✅ v0.13 |
+| Walters Art Museum | `walters` | none (bundled CC0 dataset) | ✅ v0.14 |
 | SMK (National Gallery of Denmark) | `smk` | none | ✅ v0.14 |
 | Smithsonian Open Access | `si` | API key (free) | 📋 v2 |
 | Rijksmuseum | `rijks` | API key (free) | 📋 v2 |
