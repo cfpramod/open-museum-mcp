@@ -1,3 +1,4 @@
+import { isCc0RightsUri } from './rights/commercialRights.js';
 import type { ArtworkLicense } from './types.js';
 
 export interface LicenseDecision {
@@ -402,6 +403,40 @@ export const validateWaltersLicense: LicenseValidator = (raw) => {
   };
 };
 
+// SMK (Statens Museum for Kunst — National Gallery of Denmark) marks open records
+// with a `public_domain` boolean plus a `rights` URI. We accept ONLY when the
+// boolean is exactly true (Met-style per-object marker), and read the rights URI
+// to tier the license: a CC0 dedication vs the Public Domain Mark. Anything else
+// — false, missing, or a non-boolean — is a strict reject.
+export const validateSmkLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('smk: object missing or not an object');
+  }
+  const obj = raw as Record<string, unknown>;
+  if (obj.public_domain !== true) {
+    return reject(`smk: public_domain=${String(obj.public_domain)} (strict default reject)`);
+  }
+  const rightsUri = typeof obj.rights === 'string' ? obj.rights : '';
+  // Tier CC0 vs PD Mark by PARSING the rights URL (exact host + path segments),
+  // never a substring/regex on the URL — the rights gate is a security boundary
+  // (a host like `creativecommons.org.evil.com` must not be trusted). Reuses the
+  // audited parser shared with the commercial-POD gate.
+  const isCc0 = isCc0RightsUri(rightsUri);
+  return {
+    accepted: true,
+    license: {
+      type: isCc0 ? 'CC0' : 'PD',
+      rawValue: rightsUri || 'public_domain=true',
+      verificationSource: 'smk.public_domain',
+      verifiedAt: nowIso(),
+      confidence: 'high',
+    },
+    imageOpenAccess: true,
+    metadataOpenAccess: true,
+    reason: `smk: public_domain=true${rightsUri ? ` (${isCc0 ? 'CC0' : 'PDM'})` : ''}`,
+  };
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
@@ -410,6 +445,7 @@ const VALIDATORS: Record<string, LicenseValidator> = {
   europeana: validateEuropeanaLicense,
   smithsonian: validateSmithsonianLicense,
   walters: validateWaltersLicense,
+  smk: validateSmkLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {

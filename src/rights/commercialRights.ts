@@ -140,6 +140,23 @@ export function validateCommercialRights(
  * (creativecommons.org / rightsstatements.org or a subdomain). Used to pick the
  * rights classifier out of a record's metadata without substring spoofing.
  */
+/**
+ * True when `uri` is a CreativeCommons CC0 dedication (`/publicdomain/zero/...`),
+ * matched on the EXACT hostname + path segments via {@link parseRights} — never a
+ * substring of the URL. Used to tier a known-public-domain record as CC0 vs the
+ * Public Domain Mark without a spoofable `includes()`/regex check on the URL.
+ */
+export function isCc0RightsUri(uri: string | null | undefined): boolean {
+  if (typeof uri !== 'string' || uri.trim() === '') return false;
+  const parsed = parseRights(uri);
+  return (
+    parsed !== null &&
+    hostIs(parsed.host, 'creativecommons.org') &&
+    parsed.segments[0] === 'publicdomain' &&
+    parsed.segments[1] === 'zero'
+  );
+}
+
 export function isRightsUri(uri: string): boolean {
   const parsed = parseRights(uri);
   return parsed !== null && (hostIs(parsed.host, 'creativecommons.org') || hostIs(parsed.host, 'rightsstatements.org'));
