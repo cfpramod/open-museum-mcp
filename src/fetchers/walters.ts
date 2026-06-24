@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { parseDisplayDate } from '../dateParser.js';
 import { validateWaltersLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
@@ -62,15 +64,19 @@ function normalizeText(s: string): string {
     .trim();
 }
 
-/** Lazily load + index the bundle. The 5MB JSON is parsed only on first Walters
- *  use (dynamic import), so processes that never query Walters pay nothing. */
+// Bundle path resolved relative to this module (dist/fetchers -> dist/data after
+// build; the build step copies src/data/walters.json into dist/data).
+const BUNDLE_PATH = fileURLToPath(new URL('../data/walters.json', import.meta.url));
+
+/** Lazily load + index the bundle. The ~5MB JSON is read + parsed only on first
+ *  Walters use (native readFileSync + JSON.parse — NOT a bundler-transformed JSON
+ *  import, which is pathologically slow on a file this size), so processes that
+ *  never query Walters pay nothing. */
 async function loadIndex(): Promise<LoadedIndex> {
   if (!indexPromise) {
     indexPromise = (async () => {
-      const mod = (await import('../data/walters.json', { with: { type: 'json' } })) as {
-        default: WaltersBundle;
-      };
-      const objects = mod.default.objects ?? [];
+      const bundle = JSON.parse(readFileSync(BUNDLE_PATH, 'utf-8')) as WaltersBundle;
+      const objects = bundle.objects ?? [];
       const byId = new Map<string, WaltersRecord>();
       const blobs: string[] = [];
       for (const r of objects) {
