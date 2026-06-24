@@ -1,0 +1,296 @@
+{
+  "id": "1170013073_object",
+  "created": "2020-03-21T10:58:15Z",
+  "modified": "2025-07-11T17:32:00Z",
+  "responsible_department": "Den Kongelige Maleri- og Skulptursamling",
+  "current_location_name": "Sal 227",
+  "current_location_date": "2025-04-07T00:00:00Z",
+  "acquisition_date": "1916-01-01T00:00:00Z",
+  "acquisition_date_precision": "1916-12-31",
+  "content_person": [
+    "Hammershøi, Ida"
+  ],
+  "content_person_full": [
+    {
+      "name": "Hammershøi, Ida",
+      "full_name": "Ida Hammershøi",
+      "forename": "Ida",
+      "surname": "Hammershøi",
+      "gender": "UNKNOWN"
+    }
+  ],
+  "dimensions": [
+    {
+      "notes": "910 x 735 mm",
+      "part": "Netto",
+      "type": "højde",
+      "unit": "centimeter",
+      "value": "91"
+    },
+    {
+      "notes": "910 x 735 mm",
+      "part": "Netto",
+      "type": "bredde",
+      "unit": "centimeter",
+      "value": "73.5"
+    },
+    {
+      "part": "Brutto",
+      "type": "højde",
+      "unit": "centimeter",
+      "value": "94"
+    },
+    {
+      "part": "Brutto",
+      "type": "bredde",
+      "unit": "centimeter",
+      "value": "76"
+    },
+    {
+      "part": "Brutto",
+      "type": "dybde",
+      "unit": "centimeter",
+      "value": "4.2"
+    }
+  ],
+  "documentation": [
+    {
+      "title": "Intérieur: Vilhelm Hammershøi",
+      "author": "Philippe Delerm",
+      "notes": "afb. p. 42 (f)",
+      "shelfmark": "2002-056",
+      "year_of_publication": "2001"
+    },
+    {
+      "title": "Afstandens mellemværende: iscenesættelsens udtryksformer hos Ingeborg og Viggo Stuckenberg og hos Vilhelm Hammershøi",
+      "author": "Malene Rehr",
+      "notes": "afb. 141, omt. pp. 140-142",
+      "shelfmark": "2002-460",
+      "year_of_publication": "2001"
+    },
+    {
+      "title": "Hammershøi: værk og liv",
+      "author": "Poul Vad",
+      "notes": "afb. p. 331 og omt. p. 330f",
+      "shelfmark": "2003-519",
+      "year_of_publication": "2003"
+    },
+    {
+      "title": "Dansk kunst: tusind års kunsthistorie",
+      "author": "Hans Edvard Nørregård-Nielsen",
+      "notes": "afb. p. 389 og omt. 387ff",
+      "shelfmark": "2003-520",
+      "year_of_publication": "2003"
+    },
+    {
+      "title": "Nyt lys over 1800-tallets danske maleri",
+      "author": "Patricia G. Berman",
+      "notes": "ill. p. 229, omt. p. 231",
+      "shelfmark": "C 39042",
+      "year_of_publication": "2007"
+    },
+    {
+      "title": "In another light: Danish painting in the nineteenth century",
+      "author": "Patricia G. Berman",
+      "notes": "afb. p. 229 (fig. 185) og omt. p. 231: sammenlign b.la. med C. Hansens \"Portræt af en lille pige\"",
+      "shelfmark": "C 39045",
+      "year_of_publication": "2007"
+    },
+    {
+      "title": "Tolkninger af det intime: udvalgte interiørbilleder i dansk litteratur og malerkunst 1885 - 1910",
+      "author": "Malene Rehr",
+      "notes": "fig. nr. 14",
+      "shelfmark": "C 42054",
+      "year_of_publication": "2007"
+    },
+    {
+      "title": "Vilhelm Hammershøi: Kunstneren og hans Værk",
+      "author": "Alfred Bramsen & S.Michaëlis",
+      "notes": "kat.nr. 298",
+      "year_of_publication": "1918"
+    },
+    {
+      "title": "Hammershøi: Værk og liv",
+      "author": "Poul Vad",
+      "notes": "afb. 288, omtalt pp. 287-292",
+      "year_of_publication": "1988"
+    },
+    {
+      "title": "Vilhelm Hammershøi",
+      "author": "Lena Boethius",
+      "notes": "p. 128 kat. 43 (billedet betragtes som et studie til Aarhus Kunstmuseums portræt), afb (f) p. 129",
+      "shelfmark": "ka2000-867",
+      "year_of_publication": "1999"
+    },
+    {
+      "title": "Vilhelm Hammershøi: Mesterværker af Vilhelm Hammershøi fra SMK",
+      "author": "Cecilie Høgsbro",
+      "notes": "afb. p. 26, 119, omt. p. 24",
+      "year_of_publication": "2015"
+    },
+    {
+      "title": "Vilhelm Hammershøi: På sporet af det åbne billede",
+      "author": "Annette Rosenvold Hvidt",
+      "notes": "afb. pp. 452, 527",
+      "year_of_publication": "2018"
+    },
+    {
+      "title": "Hammershøi – e i pittori del silenzio tra il Nord Europa e l'Italia",
+      "author": "Paolo Bolpagni",
+      "notes": "afb. 57, omt. 55",
+      "year_of_publication": "2025"
+    }
+  ],
+  "exhibitions": [
+    {
+      "exhibition": "Painting Tranquility: Masterworks by Vilhelm Hammershøi from SMK - The National Gallery of Denmark",
+      "date_start": "2015-10-16T00:00:00.000Z",
+      "date_end": "2016-02-26T00:00:00.000Z",
+      "venue": "The American-Scandinavian Foundation, New York"
+    },
+    {
+      "exhibition": "Painting Tranquility: Masterworks by Vilhelm Hammershøi from SMK - The National Gallery of Denmark",
+      "date_start": "2016-04-15T00:00:00.000Z",
+      "date_end": "2016-06-25T00:00:00.000Z",
+      "venue": "AGO Art Gallery of Ontario, Toronto"
+    },
+    {
+      "exhibition": "Painting Tranquility: Masterworks by Vilhelm Hammershøi from SMK - The National Gallery of Denmark",
+      "date_start": "2016-07-15T00:00:00.000Z",
+      "date_end": "2016-09-22T00:00:00.000Z",
+      "venue": "Frye Art Museum, Seattle"
+    },
+    {
+      "exhibition": "Sol og Sjæl: Vitalisme og symbolisme fra SMKs samling",
+      "date_start": "2019-04-26T00:00:00.000Z",
+      "date_end": "2019-09-14T00:00:00.000Z",
+      "venue": "SMK København"
+    },
+    {
+      "exhibition": "Hammershøi og Europa",
+      "date_start": "2012-02-03T00:00:00.000Z",
+      "date_end": "2012-05-19T00:00:00.000Z",
+      "venue": "SMK København"
+    },
+    {
+      "exhibition": "Hammershøi og Europa",
+      "date_start": "2012-06-14T00:00:00.000Z",
+      "date_end": "2012-09-16T00:00:00.000Z",
+      "venue": "Kunsthalle der Hypo-Kulturstiftung"
+    }
+  ],
+  "materials": [
+    "Lærred"
+  ],
+  "object_names": [
+    {
+      "name": "Maleri"
+    }
+  ],
+  "production": [
+    {
+      "creator": "Hammershøi, Vilhelm",
+      "creator_forename": "Vilhelm",
+      "creator_surname": "Hammershøi",
+      "creator_date_of_birth": "1864-05-15T00:00:00.000Z",
+      "creator_date_of_death": "1916-02-13T00:00:00.000Z",
+      "creator_nationality": "Dansk",
+      "creator_gender": "MALE",
+      "creator_history": "Vilhelm Hammerhøis sjældne talent skaffede ham allerede i hans levetid en plads i verdenskunsten. Hans værker fængslede centrale kulturpersonligheder som Serge Diaghilev, Auguste Renoir, Théodore Duret og Rainer Maria Rilke. Som sidstnævnte formulerede det, måtte han se og gense H.s arbejder for at høre ham \"tale og tie\", en beskrivelse, der både er rammende, hvad angår kunstnerens psyke og hans værk. Med sit forfinede og indesluttede temperament skabte H. et æstetisk maleri af næsten abstrakt prægnans, hvor tiden og stedet blev indhyllet i en drømmende, ofte melankolsk, metafysisk stemning. Netop fordi H. ikke afbildede det moderne livs fart, men tværtimod konsekvent lukkede sig om et absolut, selvoplevet billedunivers, kan hans værk placeres inden for symbolismen. I harmoni hermed omfattede motivkredsen typisk hjemmet, moderen, søsteren, hustruen, de københavnske huse og pladser, ligesom roen blev understreget af blide, suggestive farver, der var domineret af gråt, og spændte over blålige, grønlige, rosa og sorte toner. Det er betegnende, at H.s lærer, naturalisten Krøyer, studsede over hans mærkeligt stramme og monokrome malemåde, der allerede i 1885 viste sig i debutarbejdet af søsteren siddende. Fortsættelsen ses i billede af søsteren syende. Det blev i 1888 refuseret på Charlottenborgudstillingen, hvilket skal have ført til, at en kreds af unge kunstnere omkring H. tog initiativet til dannelsen af Den frie Udstilling i 1891. Nu blev motivkredsen udvidet, og fremragende eksempler er det psykisk stærke portræt af Krøyers lærerkollega, Kristian Zahrtmann, samt et modelbillede i hvidt, gråt og sort, der bærer præg af barrieren mellem subjektet og objektet (begge 1889). Denne er anderledes overskredet i halvfigursportrættet af hans forlovede Ida Ilsted med de rosa kinder og læber. Omkring århundredeskiftet kulminerede kvaliteten og subjektiviteten i H.s malerier fra de sjællandske landskaber og hans christianshavnske hjem. Mere og mere bevidst skabte han et stramt billedrum af former, farver, linier, flader og tomrum, præget af en stilhed, som blev tragisk, da H. og hustruen efterhånden blev grebet af sygdom. Man behøver blot betragte det deprimerende maleri af Ida i sort med en kop foran sig (1907) eller billederne fra landstedet Spurveskjul (1911). Her var der tale om afvigelser fra de mere entydigt æstetiske stemninger, nutiden først og fremmest søger og finder i H.s billeder af støvkornenes dans i lyset. Lige så indadvendt H. var, lige så lidt har han sagt om sine stilistiske lån, og under alle omstændigheder manifesterede de sig på meget selvstændig maner. Udgangspunktet i den danske guldalder er tydeligt. Ligeledes har fotografiet hjulpet H., og muligvis har han også været interesseret i Krøyers tidlige valørmaleri. Grunden til, at H.s første udenlandsrejse gik til Holland og Belgien i 1887, var uden tvivl interessen for Jan Vermeer van Delft, hvis billedunivers er præget af en beslægtet sans for afskæringer, overlapninger, tomme partier samt en restriktiv farveskala. Disse træk blev yderligere intensiveret gennem H.s kendskab til værker af James MacNeill Whistler, der viste inspiration fra japansk kunst. Denne japonisme vandt indpas i Danmark i løbet af 1880erne i H.s kreds, omkring Karl Madsen og Thorvald Bindesbøll. Den lærte H. at se virkeligheden i et nyt og anderledes perspektiv og betjene sig af usædvanlige afskæringer, hvilket ses i portrættet af moderen siddende i profil (1886). Kulminationen er det store gruppeportræt af vennekredsen fra 1902, et andet eksempel er portrættet af Daniel Jacobson Salter, der på en gang ligner en italiensk renæssancefyrste og en japansk samurai i sort. Vi mangler stadig en dybere tolkning af H.s oeuvre, såvel i dets psykologiske, som kultur- og kunsthistoriske kontekst. Det gælder ikke mindst den store figurkomposition, Artemis (1894), hvis stilistiske inspiration fra ældre egyptisk, græsk og italiensk kunst ganske vist er nogenlunde fastlagt, men ikke forbundet med den åndelige sammenhæng. Derfor er H. og hans værk fortsat en gåde.",
+      "creator_lref": "180_person"
+    }
+  ],
+  "production_date": [
+    {
+      "start": "1907-01-01T00:00:00.000Z",
+      "end": "1907-12-31T00:00:00.000Z",
+      "period": "1907"
+    }
+  ],
+  "techniques": [
+    "Olie på lærred"
+  ],
+  "titles": [
+    {
+      "title": "Kunstnerens hustru Ida Hammershøi med en tekop",
+      "type": "museumstitel",
+      "language": "dansk"
+    },
+    {
+      "title": "Ida Hammershøi, f. Ilsted, kunstnerens hustru",
+      "notes": "Tidligere titel",
+      "type": "tidligere titel",
+      "language": "dansk"
+    }
+  ],
+  "number_of_parts": 1,
+  "object_number": "KMS3352",
+  "object_url": "https://api.smk.dk/api/v1/art?object_number=KMS3352",
+  "frontend_url": "https://open.smk.dk/artwork/image/KMS3352",
+  "iiif_manifest": "https://api.smk.dk/api/v1/iiif/manifest?id=KMS3352",
+  "enrichment_url": "https://enrichment.api.smk.dk/api/enrichment/KMS3352",
+  "similar_images_url": "https://similar.api.smk.dk/similar/?object_number=KMS3352",
+  "production_dates_notes": [
+    "Værkdatering: (1907)",
+    "Datering if. Bramsen og Michaëlis 1918"
+  ],
+  "public_domain": true,
+  "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+  "on_display": true,
+  "alternative_images": [
+    {
+      "mime_type": "image/tiff",
+      "iiif_id": "https://iip.smk.dk/iiif/jp2/x059c810g_KMS3352.tif.jp2",
+      "iiif_info": "https://iip.smk.dk/iiif/jp2/x059c810g_KMS3352.tif.jp2/info.json",
+      "width": 6691,
+      "height": 8036,
+      "size": 55633445.51724138,
+      "thumbnail": "https://iip-thumb.smk.dk/iiif/jp2/x059c810g_KMS3352.tif.jp2/full/!1024,/0/default.jpg",
+      "native": "https://iip.smk.dk/iiif/jp2/x059c810g_KMS3352.tif.jp2/full/full/0/native.jpg",
+      "orientation": "portrait"
+    },
+    {
+      "mime_type": "image/tiff",
+      "iiif_id": "https://iip.smk.dk/iiif/jp2/d504rp36m_KMS3352.tif.reconstructed.tif.jp2",
+      "iiif_info": "https://iip.smk.dk/iiif/jp2/d504rp36m_KMS3352.tif.reconstructed.tif.jp2/info.json",
+      "width": 5935,
+      "height": 7326,
+      "size": 26463495.172413792,
+      "thumbnail": "https://iip-thumb.smk.dk/iiif/jp2/d504rp36m_KMS3352.tif.reconstructed.tif.jp2/full/!1024,/0/default.jpg",
+      "native": "https://iip.smk.dk/iiif/jp2/d504rp36m_KMS3352.tif.reconstructed.tif.jp2/full/full/0/native.jpg",
+      "cropped": [
+        "true"
+      ],
+      "orientation": "portrait"
+    }
+  ],
+  "image_mime_type": "image/tiff",
+  "image_iiif_id": "https://iip.smk.dk/iiif/jp2/pn89d956v_KMS3352-cropped.tif.jp2",
+  "image_iiif_info": "https://iip.smk.dk/iiif/jp2/pn89d956v_KMS3352-cropped.tif.jp2/info.json",
+  "image_width": 5750,
+  "image_height": 7229,
+  "image_size": 43009191,
+  "image_thumbnail": "https://iip-thumb.smk.dk/iiif/jp2/pn89d956v_KMS3352-cropped.tif.jp2/full/!1024,/0/default.jpg",
+  "image_native": "https://api.smk.dk/api/v1/download/W3siaW1nX3VybCI6Imh0dHBzOi8vaWlwLnNtay5kay9paWlmL2pwMi9wbjg5ZDk1NnZfS01TMzM1Mi1jcm9wcGVkLnRpZi5qcDIvZnVsbC9mdWxsLzAvbmF0aXZlLmpwZyIsInB1YmxpY19kb21haW4iOnRydWUsIm9iamVjdF9udW1iZXIiOiJLTVMzMzUyIiwibnVtIjoiIn1d/KMS3352.jpg",
+  "image_orientation": "portrait",
+  "image_hq": true,
+  "has_3d_file": false,
+  "has_image": true,
+  "colors": [
+    "#111111",
+    "#444444",
+    "#777777",
+    "#555555"
+  ],
+  "suggested_bg_color": [
+    "#777777"
+  ],
+  "entropy": 9.690349,
+  "contrast": 2.1076024,
+  "saturation": 1.8658755,
+  "colortemp": 3.6551962,
+  "brightness": 4.0295815,
+  "artist": [
+    "Vilhelm Hammershøi"
+  ]
+}

@@ -39,7 +39,8 @@
     "smoke:curation": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-curation.ts",
     "smoke:rijksmuseum": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-rijksmuseum.ts",
     "typecheck": "tsc --noEmit",
-    "smoke:walters": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-walters.ts"
+    "smoke:walters": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-walters.ts",
+    "smoke:smk": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-smk.ts"
   },
   "keywords": [
     "mcp",
