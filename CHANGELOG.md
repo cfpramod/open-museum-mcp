@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] — 2026-06-24
+
+### Added
+
+- **Walters Art Museum (`walters`) — the engine's first INGEST source.** The Walters v1 REST API closed in 2023; the collection is published only as static CSVs under a blanket CC0 license. A build-time script (`scripts/build-walters-index.ts`) fetches the CSVs, applies the rights gate, and writes a committed bundle (`src/data/walters.json`, 20,483 records) that ships in the package — so it works offline with no API key. Rights: the dataset is declared CC0, and the gate defensively keeps only pre-1928, image-bearing records (the 1928+/loaned/copyright tail is excluded). Deep Islamic/Persian manuscripts, Mamluk Qur'ans, and Ethiopian material — one of the cleanest non-Western open sources. (#111)
+- **SMK — National Gallery of Denmark (`smk`).** Keyless REST API (`api.smk.dk`) over ~39k public-domain, image-bearing works served as IIIF JP2 masters + a full-resolution `image_native` JPEG (print-grade; dimensions surfaced via `maxResolution`). Rights: a per-object `public_domain` boolean + a `rights` URI that tiers CC0 vs the Public Domain Mark — parsed by exact hostname (never a substring), reusing the audited shared rights parser. (#114)
+- **Rijksmuseum region + period faceting.** Rijksmuseum-direct records previously returned `region: null` and `period: null`, making them invisible to faceting. Period is now derived from the parsed year bounds (single-century spans → a tradition tag), and region from the dereferenced production-place reference via `normalizeRegion` + a compact place gazetteer (Rijks records cities like Jingdezhen/Java/Amsterdam) — so Chinese/Japanese/Indonesian Rijks works become facetable. (#115)
+
+### Fixed
+
+- **Walters bundle loads via `readFileSync` instead of a dynamic JSON import.** The lazy `import()` of the 5MB bundle was pathologically slow under the bundler transform (a test warm-up hook timed out at 30s and starved the worker pool). Loading with native `readFileSync` + `JSON.parse` is ~100ms; a post-build step (`scripts/copy-data-assets.mjs`) copies the bundle into `dist/data` so it still ships. (#116)
+
 ## [0.13.0] — 2026-06-24
 
 ### Added
