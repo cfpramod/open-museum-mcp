@@ -30,6 +30,35 @@ describe('Rijksmuseum direct (Linked-Art + Micrio IIIF) normalization', () => {
     expect(a.imageUrls.full).toBe('https://iiif.micr.io/QkOGy/full/max/0/default.jpg');
     expect(a.imageUrls.width).toBe(4649);
     expect(a.imageUrls.height).toBe(5177);
+    // Faceting: period is derived from the parsed years; The Milkmaid carries no
+    // production place, so region is honestly null.
+    expect(a.period).toBe('17th century');
+    expect(a.region).toBeNull();
+  });
+
+  it('facets region from the dereferenced production place (normalizeRegion + city gazetteer)', () => {
+    for (const [place, region] of [
+      ['China', 'china'], // normalizeRegion direct
+      ['Jingdezhen', 'china'], // city gazetteer
+      ['Amsterdam', 'netherlands'],
+      ['Java', 'southeast asia'],
+      ['Arita', 'japan'],
+      ['Isfahan', 'iran'],
+    ] as const) {
+      const b = clone(fixture());
+      b.place = place;
+      const r = rijksmuseumFetcher.normalize(b);
+      if (r.status !== 'accepted') throw new Error(`expected accepted for ${place}`);
+      expect(r.artwork.region, place).toBe(region);
+    }
+  });
+
+  it('leaves region null for an unmapped place rather than guessing', () => {
+    const b = clone(fixture());
+    b.place = 'Someplace Unmapped';
+    const r = rijksmuseumFetcher.normalize(b);
+    if (r.status !== 'accepted') throw new Error('expected accepted');
+    expect(r.artwork.region).toBeNull();
   });
 
   it('REJECTS when image rights are NonCommercial (commercial-POD gate)', () => {
