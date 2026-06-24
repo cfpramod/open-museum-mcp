@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] — 2026-06-24
+
+### Added
+
+- **True-maximum image resolution + a master/displayable split.** `ArtworkImages` gains `maxResolution` (`{width, height}`) — the true maximum pixels available for a work, the single field consumers should rank image quality on — and `master` (`{url, width, height, format, byteSize}`), the print/archival original surfaced only when it is strictly larger than the displayable `full` (e.g. Cleveland's `_full.tif`). `full` is now contractually a browser-displayable derivative. Populated for Cleveland, Smithsonian, Wikimedia, and Rijksmuseum; absent where a source publishes no pixel dimensions, rather than guessed. (#105)
+- **Smithsonian non-Western recall deepened (unit-aware curation).** The curation gate now accepts a record when EITHER its unit is a dedicated art/design museum (`NMAA`/`FSG`, `NMAfA`, `SAAM`, `NPG`, `HMSG`, `CHNDM`) OR an object_type names an art form — with the form list expanded for non-Western art (netsuke, masks, manuscripts, Qur'ans, lacquer, celadon vessels, …). Collision-prone short forms (`box`, `fan`, `rug`, `bowl`, `urn`, `icon`, `screen`) are word-anchored so they don't admit `boxing gloves` / `Drugs` / `Bowling`. Natural-history specimen departments stay excluded. Measured: 34 → 112 accepted across non-Western queries, zero new false positives. (#107)
+- **Non-Western region faceting.** New canonical regions `southeast asia` (Indonesia/Java, Cambodia/Khmer, Burma/Myanmar, Thailand, Vietnam) and `himalaya` (Nepal, Tibet, Bhutan; Tibet moves out of `china`), plus strengthened `africa` (Nigeria, Benin City, Togo, Ghana, Mali…), `islamic` (bare `islamic`, `muslim`, Turkey, Seljuk, Timurid, Iznik), and `india` (South Asia, Deccan, Pahari, Gandhara, Bengal). The region matcher now also resolves plural demonyms (`Iranians`, `Koreans`, `Khmers`, `Muslims`) while still guarding substring collisions. ~25% of non-Western works previously fell to `region: null`. (#109)
+
+### Fixed
+
+- **Wikimedia non-displayable originals no longer land in `full`.** A Commons TIFF art scan passes the `image/` MIME prefix but does not render in a browser; it is now routed to `master` (format-flagged) with `full` set to a Commons-rendered JPEG (imageinfo `thumburl`, falling back to `Special:FilePath?width=`), or rejected when no rendition is producible — honouring the new "`full` is always displayable" contract. (#105)
+
+### Changed
+
+- **Dependency bumps.** `@types/node` → 26.0.0 (#104) and `actions/checkout` → v7 (#103) via Dependabot.
+
 ## [0.12.0] — 2026-06-21
 
 ### Added

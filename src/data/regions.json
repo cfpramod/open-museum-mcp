@@ -1,10 +1,12 @@
 {
   "japan": ["japan", "japanese", "edo", "kyoto", "tokyo", "osaka"],
-  "china": ["china", "chinese", "tang", "song", "ming", "qing", "tibet", "tibetan"],
+  "china": ["china", "chinese", "tang", "song", "ming", "qing"],
   "korea": ["korea", "korean", "joseon", "goryeo"],
   "iran": ["iran", "iranian", "persian", "persia", "safavid", "qajar"],
-  "india": ["india", "indian", "mughal", "rajasthani", "punjabi"],
-  "islamic": ["islamic art", "ottoman", "mamluk", "fatimid"],
+  "india": ["india", "indian", "mughal", "rajasthani", "punjabi", "south asia", "south asian", "deccan", "deccani", "pahari", "gandhara", "bengal", "bengali", "gujarat", "tamil", "sri lanka", "sri lankan", "sinhalese"],
+  "southeast asia": ["southeast asia", "southeast asian", "indonesia", "indonesian", "java", "javanese", "bali", "balinese", "sumatra", "sumatran", "cambodia", "cambodian", "khmer", "angkor", "burma", "burmese", "myanmar", "thailand", "thai", "siam", "siamese", "vietnam", "vietnamese", "laos", "lao", "laotian", "malaysia", "malay", "philippines", "filipino"],
+  "himalaya": ["himalaya", "himalayan", "nepal", "nepalese", "nepali", "tibet", "tibetan", "bhutan", "bhutanese", "gurkha", "sherpa", "newari", "kathmandu", "lhasa"],
+  "islamic": ["islamic", "islamic art", "islamic world", "muslim", "ottoman", "mamluk", "fatimid", "seljuk", "timurid", "turkey", "turkish", "iznik", "near east"],
   "egypt": ["egypt", "egyptian", "ptolemaic"],
   "greece": ["greece", "greek", "hellenistic", "attic"],
   "rome": ["rome", "roman", "roman empire"],
@@ -16,6 +18,6 @@
   "spain": ["spain", "spanish", "andalusian", "catalan"],
   "england": ["england", "english", "british", "great britain"],
   "americas": ["united states", "american", "mexican", "peruvian"],
-  "africa": ["africa", "african", "yoruba", "kongo", "asante"],
+  "africa": ["africa", "african", "yoruba", "kongo", "asante", "ashanti", "nigeria", "nigerian", "benin", "benin city", "igbo", "togo", "ilorin", "lome", "ghana", "ghanaian", "mali", "malian", "senegal", "senegalese", "ethiopia", "ethiopian"],
   "oceania": ["oceania", "polynesian", "maori", "papua"]
 }
