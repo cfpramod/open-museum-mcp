@@ -30,6 +30,7 @@ import { europeanaFetcher } from './fetchers/europeana.js';
 import { metFetcher } from './fetchers/met.js';
 import { rijksmuseumFetcher } from './fetchers/rijksmuseum.js';
 import { smithsonianFetcher, smithsonianApiKey } from './fetchers/smithsonian.js';
+import { waltersFetcher } from './fetchers/walters.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import type { Fetcher } from './fetchers/types.js';
 import { VERSION } from './version.js';
@@ -51,6 +52,9 @@ const FETCHERS: Record<string, Fetcher> = {
   // Rijksmuseum DIRECT (keyless Data Services + Micrio IIIF) — supersedes the
   // Europeana-mediated Rijks path with richer metadata + true print pixels.
   [rijksmuseumFetcher.code]: rijksmuseumFetcher,
+  // Walters Art Museum — INGEST: a committed CC0 bundle ships in the package, so
+  // it needs no API key and is always available (no live API exists since 2023).
+  [waltersFetcher.code]: waltersFetcher,
 };
 
 // Europeana requires a per-user API key (free tier, 10K req/day). Only
