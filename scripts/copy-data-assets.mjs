@@ -6,7 +6,7 @@ import { copyFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = new URL('..', import.meta.url);
-const ASSETS = ['walters.json'];
+const ASSETS = ['walters.json', 'nga.json.gz'];
 
 mkdirSync(fileURLToPath(new URL('dist/data/', root)), { recursive: true });
 for (const name of ASSETS) {

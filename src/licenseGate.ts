@@ -489,6 +489,37 @@ export const validateWellcomeLicense: LicenseValidator = (raw) => {
   return reject(`wellcome: iiif-image license=${licId ?? 'none'} (need cc0/pdm; strict default reject)`);
 };
 
+// National Gallery of Art (Washington) — INGEST. The committed bundle holds only
+// records whose primary image is flagged `openaccess=1` in NGA's CSV dump, which
+// is NGA's CC0 open-access programme (images of works it has released for any use).
+// We bake that flag onto each bundled record as `o:1`; the validator re-checks it
+// (defense in depth) and requires an image — a record without both is rejected.
+export const validateNgaLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('nga: record missing or not an object');
+  }
+  const rec = raw as Record<string, unknown>;
+  if (rec.o !== 1) {
+    return reject(`nga: open-access flag o=${String(rec.o)} (need 1; strict default reject)`);
+  }
+  if (typeof rec.g !== 'string' || rec.g.trim() === '') {
+    return reject('nga: no IIIF image (reject)');
+  }
+  return {
+    accepted: true,
+    license: {
+      type: 'CC0',
+      rawValue: 'openaccess',
+      verificationSource: 'nga.published_images.openaccess',
+      verifiedAt: nowIso(),
+      confidence: 'high',
+    },
+    imageOpenAccess: true,
+    metadataOpenAccess: true,
+    reason: 'nga: open-access (CC0) image-bearing record',
+  };
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
@@ -499,6 +530,7 @@ const VALIDATORS: Record<string, LicenseValidator> = {
   walters: validateWaltersLicense,
   smk: validateSmkLicense,
   wellcome: validateWellcomeLicense,
+  nga: validateNgaLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {
