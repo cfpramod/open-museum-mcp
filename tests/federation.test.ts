@@ -298,6 +298,24 @@ describe('createFederation.getArtwork', () => {
     expect(second.ok).toBe(true);
     expect(getRawSpy).not.toHaveBeenCalled();
   });
+
+  it('NEVER caches a no-cache source and re-fetches it live every time (Harvard ToS)', async () => {
+    const t = fakeFetcher('hv', { ids: ['hv:1'], accept: new Set(['hv:1']) });
+    (t.fetcher as { noCache?: boolean }).noCache = true;
+    const { store, objects } = memoryCache();
+    const fed = createFederation({ fetchers: { hv: t.fetcher }, cache: store });
+    const getRawSpy = vi.spyOn(t.fetcher, 'getRaw');
+
+    const first = await fed.getArtwork('hv:1');
+    expect(first.ok).toBe(true);
+    // The record was returned but NOT written to the object cache.
+    expect(objects.has('hv:1')).toBe(false);
+
+    const second = await fed.getArtwork('hv:1');
+    expect(second.ok).toBe(true);
+    // No cached copy → fetched live again.
+    expect(getRawSpy).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('createFederation.cite', () => {

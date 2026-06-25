@@ -1,0 +1,376 @@
+{
+ "id": 299918,
+ "objectid": 299918,
+ "objectnumber": "1968.47",
+ "accessionyear": 1968,
+ "dated": "c. 1635",
+ "datebegin": 1630,
+ "dateend": 1640,
+ "classification": "Albums",
+ "classificationid": 384,
+ "medium": "Opaque watercolor and gold on paper",
+ "technique": null,
+ "techniqueid": null,
+ "period": "Mughal period",
+ "periodid": 1522,
+ "century": "17th century",
+ "culture": "Indian",
+ "style": null,
+ "signed": null,
+ "state": null,
+ "edition": null,
+ "standardreferencenumber": null,
+ "dimensions": "actual: 36.7 x 25.1 cm (14 7/16 x 9 7/8 in.)",
+ "copyright": null,
+ "creditline": "Harvard Art Museums/Arthur M. Sackler Museum, Gift of Eric Schroeder in honor of John Coolidge",
+ "department": "Department of Islamic & Later Indian Art",
+ "division": "Asian and Mediterranean Art",
+ "contact": "am_asianmediterranean@harvard.edu",
+ "description": null,
+ "provenance": null,
+ "commentary": null,
+ "labeltext": null,
+ "imagecount": 2,
+ "mediacount": 0,
+ "colorcount": 8,
+ "markscount": 0,
+ "peoplecount": 1,
+ "titlescount": 2,
+ "publicationcount": 6,
+ "exhibitioncount": 4,
+ "contextualtextcount": 0,
+ "groupcount": 2,
+ "relatedcount": 0,
+ "totalpageviews": 1477,
+ "totaluniquepageviews": 1234,
+ "dateoffirstpageview": "2009-06-14",
+ "dateoflastpageview": "2026-06-21",
+ "verificationlevel": 2,
+ "verificationleveldescription": "Adequate. Object is adequately described but information may not be vetted",
+ "imagepermissionlevel": 1,
+ "lendingpermissionlevel": 0,
+ "accesslevel": 1,
+ "accessionmethod": "Gift",
+ "rank": 254,
+ "url": "https://www.harvardartmuseums.org/collections/object/299918",
+ "createdate": "2002-06-03T00:00:00-04:00",
+ "lastupdate": "2026-06-25T04:57:13-04:00",
+ "colors": [
+  {
+   "color": "#af967d",
+   "spectrum": "#c25687",
+   "hue": "Brown",
+   "percent": 0.4948666666666667,
+   "css3": "#bc8f8f"
+  },
+  {
+   "color": "#c8af96",
+   "spectrum": "#e66c64",
+   "hue": "Brown",
+   "percent": 0.20226666666666668,
+   "css3": "#d2b48c"
+  },
+  {
+   "color": "#967d64",
+   "spectrum": "#b65590",
+   "hue": "Brown",
+   "percent": 0.19006666666666666,
+   "css3": "#808080"
+  },
+  {
+   "color": "#7d644b",
+   "spectrum": "#b25593",
+   "hue": "Yellow",
+   "percent": 0.0916,
+   "css3": "#696969"
+  },
+  {
+   "color": "#4b4b4b",
+   "spectrum": "#3db657",
+   "hue": "Grey",
+   "percent": 0.011866666666666666,
+   "css3": "#2f4f4f"
+  },
+  {
+   "color": "#c8c8c8",
+   "spectrum": "#8c5fa8",
+   "hue": "Grey",
+   "percent": 0.007066666666666666,
+   "css3": "#c0c0c0"
+  },
+  {
+   "color": "#c8af4b",
+   "spectrum": "#b0d136",
+   "hue": "Yellow",
+   "percent": 0.0014,
+   "css3": "#bdb76b"
+  },
+  {
+   "color": "#323232",
+   "spectrum": "#2eb45d",
+   "hue": "Grey",
+   "percent": 0.0008666666666666666,
+   "css3": "#2f4f4f"
+  }
+ ],
+ "exhibitions": [
+  {
+   "begindate": "1983-12-09",
+   "enddate": "1984-02-01",
+   "citation": "<em>Portraiture in Iran and India</em>, Fogg Art Museum, Cambridge, 12/09/1983 - 02/01/1984",
+   "exhibitionid": 1857,
+   "title": "Portraiture in Iran and India"
+  },
+  {
+   "begindate": "1999-01-16",
+   "enddate": "1999-03-29",
+   "citation": "<em>Divinely Inspired: Images of Mystics and Mendicants</em>, Harvard University Art Museums, Cambridge, 01/16/1999 - 03/29/1999",
+   "exhibitionid": 1917,
+   "title": "Divinely Inspired: Images of Mystics and Mendicants"
+  },
+  {
+   "begindate": "2009-08-06",
+   "enddate": "2010-01-03",
+   "citation": "<em>Re-View: S231 (Islamic rotation: 3)  Sacred Spaces: The World of Dervishes, Fakirs and Sufis</em>, Harvard Art Museums/Arthur M. Sackler Museum, Cambridge, 08/06/2009 - 01/03/2010",
+   "exhibitionid": 3780,
+   "title": "Re-View: S231 (Islamic rotation: 3)  Sacred Spaces: The World of Dervishes, Fakirs and Sufis"
+  },
+  {
+   "begindate": "2014-11-16",
+   "enddate": "2050-01-01",
+   "citation": "<em>32Q: 2590 South and Southeast Asia</em>, Harvard Art Museums, Cambridge, 11/02/2016 - 04/26/2017",
+   "exhibitionid": 4681,
+   "title": "32Q: 2590 South and Southeast Asia"
+  }
+ ],
+ "groupings": [
+  {
+   "groupid": 2040174,
+   "name": "Google Art Project"
+  },
+  {
+   "groupid": 2039923,
+   "name": "Collection Highlights"
+  }
+ ],
+ "images": [
+  {
+   "date": "2007-02-07",
+   "copyright": "President and Fellows of Harvard College",
+   "imageid": 217855,
+   "format": "image/jpeg",
+   "description": null,
+   "technique": null,
+   "renditionnumber": "DDC101136",
+   "displayorder": 1,
+   "baseimageurl": "https://nrs.harvard.edu/urn-3:HUAM:DDC101136_dynmc",
+   "alttext": null,
+   "width": 1710,
+   "publiccaption": "recto",
+   "height": 2550
+  },
+  {
+   "date": "2015-07-10",
+   "copyright": "President and Fellows of Harvard College",
+   "imageid": 454406,
+   "format": "image/jpeg",
+   "description": null,
+   "technique": "Make:Sinar Photography AG;Model:Sinar CMV/ Sinarback eVolution 86H;Orientation:1;Software:Adobe Photoshop CS6 (Macintosh);",
+   "renditionnumber": "758515",
+   "displayorder": 2,
+   "baseimageurl": "https://nrs.harvard.edu/urn-3:HUAM:758515",
+   "alttext": null,
+   "width": 1685,
+   "publiccaption": null,
+   "height": 2550
+  }
+ ],
+ "primaryimageurl": "https://nrs.harvard.edu/urn-3:HUAM:DDC101136_dynmc",
+ "people": [
+  {
+   "role": "Artist",
+   "birthplace": null,
+   "gender": "unknown",
+   "displaydate": "active mid-17th century",
+   "prefix": "Attributed to",
+   "culture": "Indian",
+   "displayname": "Attributed to Payag",
+   "alphasort": "Payag",
+   "name": "Payag",
+   "personid": 28007,
+   "deathplace": null,
+   "displayorder": 1
+  }
+ ],
+ "places": [
+  {
+   "displayname": "South Asia, India, Uttar Pradesh, Agra?",
+   "confidence": null,
+   "placeid": 2028371,
+   "type": "Creation Place"
+  }
+ ],
+ "publications": [
+  {
+   "publicationplace": "Williamstown, MA",
+   "volumetitle": null,
+   "citation": "Milo Cleveland Beach and Stuart Cary Welch, <em>The Grand Mogul: Imperial Painting in India, 1600-1660</em>, exh. cat., Sterling and Francine Clark Art Institute (Williamstown, MA, 1978)",
+   "publicationyear": 1978,
+   "citationremarks": null,
+   "pagenumbers": "Page 166-167/Figure 63",
+   "format": "Exhibition Catalogue",
+   "publicationid": 8517,
+   "title": "The Grand Mogul: Imperial Painting in India, 1600-1660",
+   "volumenumber": null,
+   "publicationdate": "1978"
+  },
+  {
+   "publicationplace": "Cambridge and New York",
+   "volumetitle": null,
+   "citation": "Kristin A. Mortimer and William G. Klingelhofer, <em>Harvard University Art Museums: A Guide to the Collections</em>, Harvard University Art Museums and Abbeville Press (Cambridge and New York, 1986)",
+   "publicationyear": 1986,
+   "citationremarks": null,
+   "pagenumbers": "page 90/figure 97",
+   "format": "Book",
+   "publicationid": 9088,
+   "title": "Harvard University Art Museums: A Guide to the Collections",
+   "volumenumber": null,
+   "publicationdate": "1986"
+  },
+  {
+   "publicationplace": "South Fallsburg, NY",
+   "volumetitle": "Speak The Truth",
+   "citation": "\"Darshan: In the Company of the Saints\", <em>Speak The Truth</em>, ed. David Mc Mullen, Darshan 86 (South Fallsburg, NY, May 1994)",
+   "publicationyear": 1994,
+   "citationremarks": null,
+   "pagenumbers": "page 6",
+   "format": "Article/Essay",
+   "publicationid": 4978,
+   "title": "\"Darshan: In the Company of the Saints\"",
+   "volumenumber": null,
+   "publicationdate": "May 1994"
+  },
+  {
+   "publicationplace": "Cambridge, MA",
+   "volumetitle": null,
+   "citation": "James Cuno, Alvin L. Clark, Jr., Ivan Gaskell, and William W. Robinson, <em>Harvard's Art Museums: 100 Years of Collecting</em>, ed. James Cuno, Harvard University Art Museums and Harry N. Abrams, Inc. (Cambridge, MA, 1996)",
+   "publicationyear": 1996,
+   "citationremarks": null,
+   "pagenumbers": "page 146-147",
+   "format": "Book",
+   "publicationid": 11699,
+   "title": "Harvard's Art Museums: 100 Years of Collecting",
+   "volumenumber": null,
+   "publicationdate": "1996"
+  },
+  {
+   "publicationplace": "Alameda, Calif. : Digital Arts & Sciences",
+   "volumetitle": null,
+   "citation": "<em>Masterpieces of world art : Fogg Art Museum, Arthur M. Sackler Museum, Busch-Reisinger Museum</em>, 1997",
+   "publicationyear": 1997,
+   "citationremarks": "Artist:Payag, perhaps byArtist Dates:1580-1655, circaTitle:Dara Shikoh with SagesDate of Work:1635, circaCulture:Indian, Agra(?)Medium:Opaque watercolor and gold on paperImage Number:3IS10Description:20.3 x 9.8 cm (image)Gift of Eric Schroeder in honor of John Coolidge, 1968.47Mughals delighted in conversation, especially in gardens, but almost anywhere in the cool of the evening. Set in a panoramic landscape, this assemblage appears to be serious. Although the participants are so small in scale as to be difficult to recognize, the princely young man appears to be Shah Jahan’s favorite son, Crown Prince Dara Shikoh, who liked nothing better than discussions of theological niceties with sages. Copies of his instructive books can be found in most university libraries, catalogued under ‘Comparative Religions.’ Like his grandfather, Akbar, this sympathetic intellectual was religiously tolerant, and a lover of painting. Entirely to his taste was the great Hindu painter Govardhan, who shared Dara’s enthusiasm for wise men and ascetics, and painted a series of studies showing them singly or together in appropriate settings. This one, however excellent, must be assigned to another hand, perhaps Payag, working under Govardhan’s influence. Despite the subjects’ distance from us and the artist, the painting provides a full account of Dara’s party. Gestures and facial expressions as well as clothing are precisely noted, as though by a highly sensitive photographer. In comparison to the courtiers in Mir Sayyid-‘Ali’s Safavid “Nighttime in a Palace” (image IS05), these talkative gentlemen might seem inelegantly graceless, even dour. But in compensation, their exchanges with one another are as credible as they are profound. During the reign of Shah Jahan (r. 1628–57), imperial album paintings far outnumbered manuscript illustrations by leading court artists. Although few of these albums survived intact, each possessed its own character. Rarely did subjects transgress the formalities of imperial Mughal custom, which became increasingly orthodox and formal from decade to decade until the death in 1707 of Shah Jahan’s son, Emperor Aurangzeb. Although Emperor Jahangir’s albums contained surprisingly personal pictures, such as depictions of wish-fulfilling dreams and revelations of his excessive devotion to wine and women, Shah Jahan’s never offer insightful peeps around the curtain; nor did paintings or drawings associated with Prince Dara, whose most extreme passages show holy men meditating or musicians serenading tame parrots. Sadly, Prince Dara’s religious tolerance was at odds with the ethos of his time. After being defeated in battle, hounded across India, caught, and imprisoned by his younger brother Aurangzeb (r. 1658–1707), he was tried for heresy and executed. —Stuart Cary Welch\r\n",
+   "pagenumbers": null,
+   "format": "Film/Video",
+   "publicationid": 24519,
+   "title": "Masterpieces of world art : Fogg Art Museum, Arthur M. Sackler Museum, Busch-Reisinger Museum",
+   "volumenumber": null,
+   "publicationdate": "1997"
+  },
+  {
+   "publicationplace": "Cambridge, MA",
+   "volumetitle": null,
+   "citation": "<em>Studies In Islamic and Later Indian Art From the Arthur M. Sackler Museum, Harvard University Art Museums</em>, Harvard University Art Museums (Cambridge, MA, 2002)",
+   "publicationyear": 2002,
+   "citationremarks": null,
+   "pagenumbers": "page 32/figure 7",
+   "format": "Book",
+   "publicationid": 6261,
+   "title": "Studies In Islamic and Later Indian Art From the Arthur M. Sackler Museum, Harvard University Art Museums",
+   "volumenumber": null,
+   "publicationdate": "2002"
+  }
+ ],
+ "terms": {
+  "century": [
+   {
+    "name": "17th century",
+    "id": 37525788
+   }
+  ],
+  "culture": [
+   {
+    "name": "Indian",
+    "id": 37527678
+   }
+  ],
+  "medium": [
+   {
+    "name": "Opaque watercolor and gold",
+    "id": 2028362
+   }
+  ],
+  "place": [
+   {
+    "name": "South Asia",
+    "id": 2028358
+   },
+   {
+    "name": "India",
+    "id": 2028369
+   },
+   {
+    "name": "Uttar Pradesh",
+    "id": 2028370
+   },
+   {
+    "name": "Agra?",
+    "id": 2028371
+   }
+  ],
+  "support": [
+   {
+    "name": "paper",
+    "id": 2028173
+   }
+  ],
+  "topic": [
+   {
+    "name": "Artstor Digital Library",
+    "id": 2040173
+   },
+   {
+    "name": "Google Art Project",
+    "id": 2040174
+   }
+  ]
+ },
+ "titles": [
+  {
+   "titletype": "Title",
+   "titleid": 490652,
+   "displayorder": 1,
+   "title": "Dara Shikoh with Sages"
+  },
+  {
+   "titletype": "Alternate Title",
+   "titleid": 328021,
+   "displayorder": 2,
+   "title": "Prince Dara Shikoh Conversing with Sages"
+  }
+ ],
+ "title": "Dara Shikoh with Sages",
+ "worktypes": [
+  {
+   "worktypeid": "8",
+   "worktype": "album folio"
+  }
+ ],
+ "seeAlso": [
+  {
+   "id": "https://iiif.harvardartmuseums.org/manifests/object/299918",
+   "type": "IIIF Manifest",
+   "format": "application/json",
+   "profile": "http://iiif.io/api/presentation/2/context.json"
+  }
+ ]
+}
