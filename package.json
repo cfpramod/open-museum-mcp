@@ -1,7 +1,7 @@
 {
   "name": "open-museum-mcp",
   "version": "0.14.0",
-  "description": "MCP server for license-verified search across open-access museum collections (The Met, Cleveland, AIC, Wikimedia Commons, Europeana).",
+  "description": "MCP server for license-verified search across open-access museum collections (The Met, Rijksmuseum, Smithsonian, Cleveland, AIC, SMK, Walters, Wellcome, Wikimedia Commons, Europeana, and growing).",
   "type": "module",
   "main": "dist/server.js",
   "exports": {
@@ -40,7 +40,8 @@
     "smoke:rijksmuseum": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-rijksmuseum.ts",
     "typecheck": "tsc --noEmit",
     "smoke:walters": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-walters.ts",
-    "smoke:smk": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-smk.ts"
+    "smoke:smk": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-smk.ts",
+    "smoke:wellcome": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-wellcome.ts"
   },
   "keywords": [
     "mcp",

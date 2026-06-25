@@ -32,6 +32,7 @@ import { rijksmuseumFetcher } from './fetchers/rijksmuseum.js';
 import { smithsonianFetcher, smithsonianApiKey } from './fetchers/smithsonian.js';
 import { smkFetcher } from './fetchers/smk.js';
 import { waltersFetcher } from './fetchers/walters.js';
+import { wellcomeFetcher } from './fetchers/wellcome.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import type { Fetcher } from './fetchers/types.js';
 import { VERSION } from './version.js';
@@ -59,6 +60,9 @@ const FETCHERS: Record<string, Fetcher> = {
   // SMK (National Gallery of Denmark) — keyless REST API, ~39k public-domain
   // image-bearing works, print-grade IIIF JP2 + full-res native JPEG.
   [smkFetcher.code]: smkFetcher,
+  // Wellcome Collection — keyless Catalogue API, CC0/PDM "Pictures" via IIIF
+  // (library-heavy corpus curated to visual art).
+  [wellcomeFetcher.code]: wellcomeFetcher,
 };
 
 // Europeana requires a per-user API key (free tier, 10K req/day). Only
@@ -147,7 +151,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           museum: {
             type: 'string',
             description:
-              'Optional museum code. Currently registered: met, cleveland, aic, wikimedia (Commons), europeana (federated European institutions; requires EUROPEANA_API_KEY env var).',
+              'Optional museum code. Always available: met, cleveland, aic, rijksmuseum, walters, smk, wellcome, wikimedia (Commons). Key-gated: europeana (EUROPEANA_API_KEY), smithsonian (SMITHSONIAN_API_KEY). Omit to search every registered source.',
           },
           has_image: {
             type: 'boolean',
@@ -236,7 +240,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           museum: {
             type: 'string',
-            description: 'Optional museum code to restrict to (met, cleveland, aic).',
+            description: 'Optional museum code to restrict to (e.g. met, rijksmuseum, smk, wellcome, walters).',
           },
         },
       },

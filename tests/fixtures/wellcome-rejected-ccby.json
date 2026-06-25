@@ -1,0 +1,147 @@
+{
+ "work": {
+  "production": [
+   {
+    "label": "1633",
+    "agents": [],
+    "dates": [
+     {
+      "label": "1633",
+      "type": "Period"
+     }
+    ],
+    "type": "ProductionEvent",
+    "places": [
+     {
+      "label": "England",
+      "type": "Place"
+     }
+    ]
+   }
+  ],
+  "physicalDescription": "1 print",
+  "description": "<p>Top, God represented by the Tetragrammaton. Top row, left and right: Ceres and Pomona, with the garden of Eden between them. Middle row, left and right: Theophrastus and Dioscorides. Bottom row, left and right: an urn of flowers in a landscape, with the portrait of John Gerard between them</p>",
+  "items": [
+   {
+    "id": "rxtkvec2",
+    "locations": [
+     {
+      "locationType": {
+       "id": "closed-stores",
+       "type": "LocationType",
+       "label": "Closed stores"
+      },
+      "accessConditions": [
+       {
+        "method": {
+         "id": "online-request",
+         "type": "AccessMethod",
+         "label": "Online request"
+        },
+        "status": {
+         "id": "open",
+         "type": "AccessStatus",
+         "label": "Open"
+        },
+        "type": "AccessCondition"
+       }
+      ],
+      "label": "Closed stores",
+      "type": "PhysicalLocation"
+     },
+     {
+      "url": "https://iiif.wellcomecollection.org/image/V0002221/info.json",
+      "credit": "Wellcome Collection",
+      "license": {
+       "id": "cc-by",
+       "label": "CC BY"
+      },
+      "accessConditions": [
+       {
+        "method": {
+         "id": "view-online",
+         "type": "AccessMethod",
+         "label": "View online"
+        },
+        "status": {
+         "id": "open",
+         "type": "AccessStatus",
+         "label": "Open"
+        },
+        "type": "AccessCondition"
+       }
+      ],
+      "locationType": {
+       "id": "iiif-image",
+       "type": "LocationType",
+       "label": "IIIF Image API"
+      },
+      "type": "DigitalLocation"
+     }
+    ],
+    "type": "Item"
+   }
+  ],
+  "workType": {
+   "id": "k",
+   "type": "Format",
+   "label": "Pictures"
+  },
+  "thumbnail": {
+   "url": "https://iiif.wellcomecollection.org/image/V0002221/full/300,/0/default.jpg",
+   "license": {
+    "id": "pdm",
+    "type": "License",
+    "label": "Public Domain Mark",
+    "url": "https://creativecommons.org/share-your-work/public-domain/pdm/"
+   },
+   "accessConditions": [],
+   "locationType": {
+    "id": "thumbnail-image",
+    "type": "LocationType",
+    "label": "Thumbnail image"
+   },
+   "type": "DigitalLocation"
+  },
+  "alternativeTitles": [],
+  "id": "t2wgxnxy",
+  "lettering": "The herball or generall historie of plantes. Gathered by John Gerarde of London master in chirurgerie very much enlarged and amended by Thomas Johnson citizen ad apothecarye of London. Io. Payne sculps.\n\nLettering to the garden of Eden: Ecce dedi vobis omnes herbas sementantes semen, quae sunt. Gen. I.29. Excideret ne tibi divini muneris author / Praesentem monstrat quaelibet herba Deum.",
+  "title": "John Gerard: portrait and botanical motifs. Line engraving by J. Payne, 1633.",
+  "type": "Work",
+  "contributors": [
+   {
+    "agent": {
+     "id": "kv4yw9k8",
+     "label": "John Payne",
+     "type": "Person"
+    },
+    "roles": [
+     {
+      "label": "engraver",
+      "type": "ContributionRole"
+     }
+    ],
+    "primary": false,
+    "type": "Contributor"
+   }
+  ],
+  "availabilities": [
+   {
+    "id": "closed-stores",
+    "type": "Availability",
+    "label": "Closed stores"
+   },
+   {
+    "id": "online",
+    "type": "Availability",
+    "label": "Online"
+   }
+  ],
+  "referenceNumber": "3488i"
+ },
+ "image": {
+  "fullUrl": "https://iiif.wellcomecollection.org/image/V0002221/full/full/0/default.jpg",
+  "width": 2250,
+  "height": 3480
+ }
+}
