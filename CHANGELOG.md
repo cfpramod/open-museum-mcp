@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] — 2026-06-26
+
+### Added
+
+- **National Gallery of Art, Washington (`nga`) — gzipped INGEST.** NGA has no live query API; it publishes its collection as CC0 CSVs (`github.com/NationalGalleryOfArt/opendata`). A build-time script (`scripts/build-nga-index.ts`) joins `objects.csv ⨝ published_images.csv` on `depictstmsobjectid = objectid`, keeps only PRIMARY images flagged `openaccess=1` (NGA's CC0 open-access programme), and writes a **gzipped** committed bundle (`src/data/nga.json.gz`, ~63k works) that ships in the package. The adapter decompresses + indexes it lazily; search/getRaw run in-memory, no key. Print-grade IIIF images. (#120)
+
 ## [0.14.0] — 2026-06-24
 
 ### Added

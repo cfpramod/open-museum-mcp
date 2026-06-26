@@ -28,6 +28,7 @@ import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
 import { europeanaFetcher } from './fetchers/europeana.js';
 import { metFetcher } from './fetchers/met.js';
+import { ngaFetcher } from './fetchers/nga.js';
 import { rijksmuseumFetcher } from './fetchers/rijksmuseum.js';
 import { smithsonianFetcher, smithsonianApiKey } from './fetchers/smithsonian.js';
 import { smkFetcher } from './fetchers/smk.js';
@@ -63,6 +64,9 @@ const FETCHERS: Record<string, Fetcher> = {
   // Wellcome Collection — keyless Catalogue API, CC0/PDM "Pictures" via IIIF
   // (library-heavy corpus curated to visual art).
   [wellcomeFetcher.code]: wellcomeFetcher,
+  // National Gallery of Art (Washington) — INGEST: a committed gzipped CC0 bundle
+  // (~63k open-access works) ships in the package; keyless, no live API.
+  [ngaFetcher.code]: ngaFetcher,
 };
 
 // Europeana requires a per-user API key (free tier, 10K req/day). Only

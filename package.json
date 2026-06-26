@@ -41,7 +41,8 @@
     "typecheck": "tsc --noEmit",
     "smoke:walters": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-walters.ts",
     "smoke:smk": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-smk.ts",
-    "smoke:wellcome": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-wellcome.ts"
+    "smoke:wellcome": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-wellcome.ts",
+    "smoke:nga": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-nga.ts"
   },
   "keywords": [
     "mcp",
