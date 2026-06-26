@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **National Gallery of Art, Washington (`nga`) — gzipped INGEST.** NGA has no live query API; it publishes its collection as CC0 CSVs (`github.com/NationalGalleryOfArt/opendata`). A build-time script (`scripts/build-nga-index.ts`) joins `objects.csv ⨝ published_images.csv` on `depictstmsobjectid = objectid`, keeps only PRIMARY images flagged `openaccess=1` (NGA's CC0 open-access programme), and writes a **gzipped** committed bundle (`src/data/nga.json.gz`, ~63k works) that ships in the package. The adapter decompresses + indexes it lazily; search/getRaw run in-memory, no key. Print-grade IIIF images. (#120)
+- **Harvard Art Museums (`harvard`) — open access via Open Clearance.** Key-gated FEDERATE (`HARVARD_API_KEY`). Harvard publishes no CC0/PD declaration; its per-object signal is `imagepermissionlevel` (`0` = open access). Per the Open Clearance model — surface the rights faithfully; if it's open-access, use it — level 0 is accepted and surfaced honestly as license type `OTHER` with `imageOpenAccess: true`, not promoted to CC0/PD; levels 1/2 are rejected. Harvard's terms forbid caching records beyond two weeks, so the engine gains a per-fetcher `noCache` flag (no-cache sources are fetched live and never written to the object cache). Notably deep in Mughal/Indian + Islamic material. (#122)
 
 ## [0.14.0] — 2026-06-24
 

@@ -27,6 +27,7 @@ import { buildSeedQueryFromConstraints } from './discoverSeed.js';
 import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
 import { europeanaFetcher } from './fetchers/europeana.js';
+import { harvardFetcher } from './fetchers/harvard.js';
 import { metFetcher } from './fetchers/met.js';
 import { ngaFetcher } from './fetchers/nga.js';
 import { rijksmuseumFetcher } from './fetchers/rijksmuseum.js';
@@ -89,6 +90,17 @@ if (smithsonianApiKey()) {
 } else {
   console.error(
     '[open-museum-mcp] SMITHSONIAN_API_KEY not set; Smithsonian fetcher disabled. Set it (or the SI_API_KEY alias) in ~/.open-museum-mcp/.env or your shell to enable.',
+  );
+}
+
+// Harvard Art Museums requires a free API key. Its terms forbid caching records
+// beyond two weeks, so the fetcher is no-cache (live every time) and rights are
+// surfaced as open-access (imagepermissionlevel=0), not as CC0/PD.
+if (process.env.HARVARD_API_KEY) {
+  FETCHERS[harvardFetcher.code] = harvardFetcher;
+} else {
+  console.error(
+    '[open-museum-mcp] HARVARD_API_KEY not set; Harvard Art Museums fetcher disabled. Set it in ~/.open-museum-mcp/.env or your shell to enable.',
   );
 }
 

@@ -311,19 +311,27 @@ export function createFederation(opts: FederationOptions): Federation {
       return { ok: false, reason: `invalid artwork id: ${id}` };
     }
 
-    const cached = await cache.getObject(id);
-    if (cached) {
-      // Backfill colour onto a record cached before it had any — a pre-v0.8b row
-      // still within the 90-day TTL, or one written by a sharp-less/Workers
-      // process. Without this, such rows would stay colourless until natural
-      // expiry and silently under-return from colour search/facets.
-      if (await enrichColor(cached)) await cache.upsertObject(cached);
-      return { ok: true, artwork: cached };
-    }
-
     // ID_REGEX guarantees a non-empty `[a-z]+` segment before ':'.
     const code = id.slice(0, id.indexOf(':'));
     const fetcher = fetchers[code];
+
+    // Some sources' terms forbid caching their records (e.g. Harvard Art Museums:
+    // no caching beyond two weeks). Those fetchers set `noCache`, so we never read
+    // or write their full records to the object cache — they're fetched live every
+    // time. (The query-cache holds only object IDs, not the copyrighted records.)
+    // A cached record whose fetcher is no longer registered is still served.
+    if (!fetcher?.noCache) {
+      const cached = await cache.getObject(id);
+      if (cached) {
+        // Backfill colour onto a record cached before it had any — a pre-v0.8b row
+        // still within the 90-day TTL, or one written by a sharp-less/Workers
+        // process. Without this, such rows would stay colourless until natural
+        // expiry and silently under-return from colour search/facets.
+        if (await enrichColor(cached)) await cache.upsertObject(cached);
+        return { ok: true, artwork: cached };
+      }
+    }
+
     if (!fetcher) return { ok: false, reason: `unknown museum code: ${code}` };
 
     const raw = await fetcher.getRaw(id);
@@ -334,7 +342,7 @@ export function createFederation(opts: FederationOptions): Federation {
     }
 
     await enrichColor(result.artwork);
-    await cache.upsertObject(result.artwork);
+    if (!fetcher.noCache) await cache.upsertObject(result.artwork);
     return { ok: true, artwork: result.artwork };
   }
 

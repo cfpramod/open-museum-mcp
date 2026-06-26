@@ -520,6 +520,37 @@ export const validateNgaLicense: LicenseValidator = (raw) => {
   };
 };
 
+// Harvard Art Museums exposes an `imagepermissionlevel` per object:
+//   0 = the image may be used freely (Harvard's open-access tier — public-domain
+//       works and works Harvard has cleared for open use),
+//   1 = display-only / restricted, 2 = private.
+// Harvard does NOT publish a CC0/PD declaration, so — per the Open Clearance model
+// (surface the rights faithfully; if it's open-access, use it) — we accept level 0
+// as OPEN ACCESS and surface it honestly as `OTHER` (not over-claimed as CC0/PD),
+// with the source + the per-object permission recorded. Levels 1/2 are rejected.
+export const validateHarvardLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('harvard: object missing or not an object');
+  }
+  const obj = raw as Record<string, unknown>;
+  if (obj.imagepermissionlevel === 0) {
+    return {
+      accepted: true,
+      license: {
+        type: 'OTHER',
+        rawValue: 'imagepermissionlevel=0 (open access, Harvard Art Museums)',
+        verificationSource: 'harvard.imagepermissionlevel',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      reason: 'harvard: imagepermissionlevel=0 (open access)',
+    };
+  }
+  return reject(`harvard: imagepermissionlevel=${String(obj.imagepermissionlevel)} (need 0/open access; reject)`);
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
@@ -531,6 +562,7 @@ const VALIDATORS: Record<string, LicenseValidator> = {
   smk: validateSmkLicense,
   wellcome: validateWellcomeLicense,
   nga: validateNgaLicense,
+  harvard: validateHarvardLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {
