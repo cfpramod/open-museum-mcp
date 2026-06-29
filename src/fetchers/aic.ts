@@ -34,6 +34,7 @@ const AIC_FIELDS = [
   'medium_display',
   'classification_title',
   'image_id',
+  'thumbnail',
 ].join(',');
 
 const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
@@ -153,15 +154,20 @@ export const aicFetcher: Fetcher = {
 
     const imageId = asString(r.image_id);
     // AIC publishes through IIIF Image API 2.x. `/full/843,/` is AIC's standard
-    // public-DISPLAY size — but the source holds the full scan at 3.5–4× that
-    // (e.g. a Tokaido plate is 843px wide via this size and ~3500px via `max`).
-    // `/full/max/` returns the largest the IIIF server will produce (AIC's level-2
-    // profile supports it; `max` was added in Image API 2.1 and AIC honors it),
-    // so we ask for the true maximum here and keep 200px as the thumbnail tier.
-    // AIC's data API publishes no PIXEL dimensions (only physical cm), so
-    // `width`/`height`/`maxResolution` stay unset rather than carrying a guess.
+    // public-DISPLAY size — but the source holds the full scan at 3.5–4× that.
+    // `/full/max/` returns the largest the IIIF server will produce. However,
+    // www.artic.edu/iiif/2 is behind Cloudflare WAF: server/cloud/CLI environments
+    // get a CF challenge (effectively 403). `hotlinkRestricted: true` flags this
+    // so surfaces skip SSR embedding and link to source.pageUrl instead.
     const fullImage = imageId ? `${AIC_IIIF}/${imageId}/full/max/0/default.jpg` : '';
-    const thumbnail = imageId ? `${AIC_IIIF}/${imageId}/full/200,/0/default.jpg` : undefined;
+    const thumbnailUrl = imageId ? `${AIC_IIIF}/${imageId}/full/200,/0/default.jpg` : undefined;
+
+    // AIC's `thumbnail` API field carries the full scan pixel dimensions.
+    const thumbObj = r.thumbnail && typeof r.thumbnail === 'object' ? (r.thumbnail as Record<string, unknown>) : null;
+    const thumbW = thumbObj ? asFiniteNumber(thumbObj.width) : null;
+    const thumbH = thumbObj ? asFiniteNumber(thumbObj.height) : null;
+    const maxResolution =
+      thumbW !== null && thumbH !== null ? { width: thumbW, height: thumbH } : undefined;
 
     const artwork: Artwork = {
       id,
@@ -186,7 +192,9 @@ export const aicFetcher: Fetcher = {
       period: null,
       imageUrls: {
         full: fullImage,
-        thumbnail,
+        thumbnail: thumbnailUrl,
+        ...(maxResolution ? { width: maxResolution.width, height: maxResolution.height, maxResolution } : {}),
+        hotlinkRestricted: true,
       },
       imageOpenAccess: decision.imageOpenAccess,
       metadataOpenAccess: decision.metadataOpenAccess,
