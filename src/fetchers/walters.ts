@@ -97,6 +97,7 @@ const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationRes
 export const waltersFetcher: Fetcher = {
   code: 'walters',
   name: 'Walters Art Museum',
+  hotlinkRestricted: true,
 
   // Local keyword search over the bundled index (no live API exists). OR-ranked:
   // a record qualifies if it matches ANY query token, and is ranked first by how

@@ -75,10 +75,11 @@ export interface ArtworkImages {
   /**
    * When `true`, the `full` / `thumbnail` URLs are hotlink-restricted by the
    * museum's CDN and will 403 from server / cloud / CLI environments — browser
-   * context only (Cloudflare WAF challenge). Surfaces must NOT embed these URLs
-   * in SSR-rendered `<img>` tags or use them in server-side image pipelines.
-   * Link to `source.pageUrl` instead, or route through OMA's image proxy once
-   * available. Currently set for AIC only.
+   * context only. Surfaces must NOT embed these URLs in SSR-rendered `<img>`
+   * tags or use them in server-side image pipelines. Link to `source.pageUrl`
+   * instead, or route through OMA's image proxy once available.
+   * Set centrally by the federation when `Fetcher.hotlinkRestricted = true`.
+   * Confirmed: AIC (Cloudflare WAF), Walters, Smithsonian.
    */
   hotlinkRestricted?: boolean;
 }

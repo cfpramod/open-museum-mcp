@@ -43,8 +43,9 @@ describe('AIC adapter normalization', () => {
     );
     expect(a.imageUrls.full).not.toContain('/full/843,/');
     expect(a.imageUrls.thumbnail).toContain('/full/200,/');
-    // AIC IIIF is behind Cloudflare WAF — 403 from server/cloud/CLI contexts.
-    expect(a.imageUrls.hotlinkRestricted).toBe(true);
+    // hotlinkRestricted is applied centrally by the federation (aicFetcher.hotlinkRestricted = true),
+    // not by normalize — so it is absent on the raw normalize output.
+    expect(a.imageUrls.hotlinkRestricted).toBeUndefined();
     // AIC thumbnail field carries full scan pixel dims — exposed as maxResolution.
     expect(a.imageUrls.maxResolution).toEqual({ width: 1024, height: 768 });
     expect(a.imageUrls.width).toBe(1024);
@@ -131,17 +132,16 @@ describe('AIC adapter normalization', () => {
     if (result.status !== 'accepted') return;
     expect(result.artwork.imageUrls.full).toBe('');
     expect(result.artwork.imageUrls.thumbnail).toBeUndefined();
-    // hotlinkRestricted applies regardless — the CDN restricts AIC's IIIF endpoint.
-    expect(result.artwork.imageUrls.hotlinkRestricted).toBe(true);
+    // hotlinkRestricted is applied by the federation, not by normalize.
+    expect(result.artwork.imageUrls.hotlinkRestricted).toBeUndefined();
   });
 
-  it('sets hotlinkRestricted without maxResolution when thumbnail dims are absent', () => {
+  it('omits maxResolution when thumbnail dims are absent', () => {
     const baseline = fixture('aic-accepted.json') as { data: Record<string, unknown> };
     const noThumb = { data: { ...baseline.data, thumbnail: null } };
     const result = aicFetcher.normalize(noThumb);
     expect(result.status).toBe('accepted');
     if (result.status !== 'accepted') return;
-    expect(result.artwork.imageUrls.hotlinkRestricted).toBe(true);
     expect(result.artwork.imageUrls.maxResolution).toBeUndefined();
     expect(result.artwork.imageUrls.width).toBeUndefined();
     expect(result.artwork.imageUrls.height).toBeUndefined();

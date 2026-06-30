@@ -101,9 +101,10 @@ describe('createFederation.search', () => {
   });
 
   it('interleaves museums round-robin so no single fetcher fills the page', async () => {
-    // Two museums each return 4 accepted candidates. With flat() concatenation,
-    // the first fetcher (met) would fill the limit-4 page entirely. Round-robin
-    // interleaving must yield an alternating mix.
+    // Two museums each return 4 accepted candidates. Round-robin interleaving
+    // draws from both before the overfetch window is exhausted, so both museums
+    // are represented in the final page. Results are then stable-sorted by id, so
+    // the assertion checks coverage and stable order, not a specific interleave position.
     const met = fakeFetcher('met', {
       ids: ['met:1', 'met:2', 'met:3', 'met:4'],
       accept: new Set(['met:1', 'met:2', 'met:3', 'met:4']),
@@ -116,7 +117,9 @@ describe('createFederation.search', () => {
     const fed = createFederation({ fetchers: { met: met.fetcher, cleveland: cle.fetcher }, cache: store });
 
     const out = await fed.search({ query: 'x', has_image: true, limit: 4 });
-    expect(out.results.map((r) => r.id)).toEqual(['met:1', 'cleveland:1', 'met:2', 'cleveland:2']);
+    const ids = out.results.map((r) => r.id);
+    // Stable sort: 'cleveland:...' < 'met:...' lexicographically.
+    expect(ids).toEqual([...ids].sort((a, b) => a.localeCompare(b)));
     const codes = out.results.map((r) => r.museum.code);
     expect(codes.filter((c) => c === 'met')).toHaveLength(2);
     expect(codes.filter((c) => c === 'cleveland')).toHaveLength(2);
@@ -665,5 +668,66 @@ describe('createFederation colour backfill on cached records', () => {
     const out = await fed.getArtwork('test:1');
     expect(out.ok).toBe(true);
     expect(extractColor).not.toHaveBeenCalled();
+  });
+});
+
+describe('hotlinkRestricted — centrally applied by federation', () => {
+  it('sets hotlinkRestricted on records from a fetcher with hotlinkRestricted = true (live path)', async () => {
+    const t = fakeFetcher('aic', { ids: ['aic:1'], accept: new Set(['aic:1']) });
+    (t.fetcher as Fetcher).hotlinkRestricted = true;
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { aic: t.fetcher }, cache: store });
+
+    const out = await fed.getArtwork('aic:1');
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.artwork.imageUrls.hotlinkRestricted).toBe(true);
+  });
+
+  it('sets hotlinkRestricted on a PRE-EXISTING cached record (backfill path)', async () => {
+    const { store, objects } = memoryCache();
+    objects.set('aic:1', makeArtwork('aic:1'));
+
+    const t = fakeFetcher('aic', { ids: ['aic:1'], accept: new Set(['aic:1']) });
+    (t.fetcher as Fetcher).hotlinkRestricted = true;
+    const fed = createFederation({ fetchers: { aic: t.fetcher }, cache: store });
+
+    const out = await fed.getArtwork('aic:1');
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.artwork.imageUrls.hotlinkRestricted).toBe(true);
+  });
+
+  it('does NOT set hotlinkRestricted for a fetcher without the flag', async () => {
+    const t = fakeFetcher('met', { ids: ['met:1'], accept: new Set(['met:1']) });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { met: t.fetcher }, cache: store });
+
+    const out = await fed.getArtwork('met:1');
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.artwork.imageUrls.hotlinkRestricted).toBeUndefined();
+  });
+});
+
+describe('stable sort — deterministic search ordering', () => {
+  it('returns results in consistent id-lexicographic order regardless of parallel resolution order', async () => {
+    // Two fetchers returning ids that interleave round-robin; the resolved artwork
+    // order depends on network timing. After the stable sort, results must always
+    // be in id-lexicographic order.
+    const a = fakeFetcher('aic', {
+      ids: ['aic:2', 'aic:1'],
+      accept: new Set(['aic:1', 'aic:2']),
+    });
+    const m = fakeFetcher('met', {
+      ids: ['met:10', 'met:5'],
+      accept: new Set(['met:5', 'met:10']),
+    });
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { aic: a.fetcher, met: m.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'painting', has_image: true, limit: 10 });
+    const ids = out.results.map((r) => r.id);
+    expect(ids).toEqual([...ids].sort((x, y) => x.localeCompare(y)));
   });
 });

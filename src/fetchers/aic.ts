@@ -66,6 +66,7 @@ function parseArtistDisplay(display: string): { nationality?: string; lifespan?:
 export const aicFetcher: Fetcher = {
   code: 'aic',
   name: 'Art Institute of Chicago',
+  hotlinkRestricted: true,
 
   async search(query: string, limit: number, options: SearchOptions = {}): Promise<string[]> {
     const url = new URL(`${AIC_API}/artworks/search`);
@@ -155,10 +156,8 @@ export const aicFetcher: Fetcher = {
     const imageId = asString(r.image_id);
     // AIC publishes through IIIF Image API 2.x. `/full/843,/` is AIC's standard
     // public-DISPLAY size — but the source holds the full scan at 3.5–4× that.
-    // `/full/max/` returns the largest the IIIF server will produce. However,
-    // www.artic.edu/iiif/2 is behind Cloudflare WAF: server/cloud/CLI environments
-    // get a CF challenge (effectively 403). `hotlinkRestricted: true` flags this
-    // so surfaces skip SSR embedding and link to source.pageUrl instead.
+    // `/full/max/` returns the largest the IIIF server will produce. hotlinkRestricted
+    // is applied centrally by the federation (aicFetcher.hotlinkRestricted = true).
     const fullImage = imageId ? `${AIC_IIIF}/${imageId}/full/max/0/default.jpg` : '';
     const thumbnailUrl = imageId ? `${AIC_IIIF}/${imageId}/full/200,/0/default.jpg` : undefined;
 
@@ -194,7 +193,6 @@ export const aicFetcher: Fetcher = {
         full: fullImage,
         thumbnail: thumbnailUrl,
         ...(maxResolution ? { width: maxResolution.width, height: maxResolution.height, maxResolution } : {}),
-        hotlinkRestricted: true,
       },
       imageOpenAccess: decision.imageOpenAccess,
       metadataOpenAccess: decision.metadataOpenAccess,
