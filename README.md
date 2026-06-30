@@ -234,7 +234,7 @@ This is what "rights-verified" means here: validated against published museum me
 |---|---|---|---|
 | The Metropolitan Museum of Art | `met` | none | ✅ v0.1 |
 | Cleveland Museum of Art | `cleveland` | none | ✅ v0.2 |
-| Art Institute of Chicago | `aic` | none | ✅ v0.2 |
+| Art Institute of Chicago | `aic` | none | ✅ v0.2 — `imageUrls.hotlinkRestricted: true` (IIIF CDN is browser-only; use `source.pageUrl` in server contexts) |
 | Wikimedia Commons | `wikimedia` | none | ✅ v0.3 |
 | Europeana | `europeana` | API key (free, per-user) | ✅ v0.4 |
 | Walters Art Museum | `walters` | none (bundled CC0 dataset) | ✅ v0.14 |

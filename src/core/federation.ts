@@ -328,6 +328,8 @@ export function createFederation(opts: FederationOptions): Federation {
         // process. Without this, such rows would stay colourless until natural
         // expiry and silently under-return from colour search/facets.
         if (await enrichColor(cached)) await cache.upsertObject(cached);
+        // Backfill hotlinkRestricted onto records cached before v0.16 added it.
+        if (fetcher?.hotlinkRestricted) cached.imageUrls.hotlinkRestricted = true;
         return { ok: true, artwork: cached };
       }
     }
@@ -340,6 +342,9 @@ export function createFederation(opts: FederationOptions): Federation {
       onReject?.(id, result.rejection.reason);
       return { ok: false, reason: result.rejection.reason };
     }
+
+    // Apply per-fetcher hotlink flag centrally so every adapter stays flag-free.
+    if (fetcher.hotlinkRestricted) result.artwork.imageUrls.hotlinkRestricted = true;
 
     await enrichColor(result.artwork);
     if (!fetcher.noCache) await cache.upsertObject(result.artwork);
@@ -452,7 +457,11 @@ export function createFederation(opts: FederationOptions): Federation {
         .map((x) => x.a);
     }
 
-    const results = ordered.slice(0, params.limit);
+    // Stable-sort the final page by id when no ranking override (colour) is active.
+    // Colour ranking is already deterministic by CIEDE2000 distance. For plain
+    // searches, this guarantees the same query always returns the same ordered set.
+    const page = ordered.slice(0, params.limit);
+    const results = params.color ? page : page.sort((a, b) => a.id.localeCompare(b.id));
 
     return { count: results.length, results };
   }
