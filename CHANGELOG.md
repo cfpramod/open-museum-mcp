@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **The registry, increment 1: an accretive, provenance-stamped enrichment layer (engine-side, dark by default).** New `src/core/registry/` module implements the four primitives from `docs/plans/catalogue-raisonne-increment-1.md`: `WorkIdentity` (per-source identity, with a reserved-not-built fingerprint field for future cross-source linkage), `Assertion`+`Evidence` (typed claims about a work, each with its own evidence and dispute status), `RightsPosture` (what the registry itself may do with a piece of evidence, distinct from 2D image rights), and `TrustState` (contributor-credential tier vs. record evidence-grade, kept as two separate axes, never a single confidence score). Ships with a resumable Cleveland CC0 harvest pipeline (`runClevelandHarvest`, reusing the existing `clevelandFetcher.getRaw`/`normalize` unmodified) and a write-back-on-extraction seam (`proposeWriteBack`). `Federation` gains an optional `registryStore` (mirrors the `CacheStore` injection pattern; `/core` carries no storage of its own); `Artwork` gains an optional `enrichment` field, `search_artworks` gains `has_enrichment`, and a new `registry_stats` MCP tool reports present-state counts. **Additive and dark by default**: no deployment configures a concrete `registryStore` yet (OMA's store build is sequenced after the go-live wave), so this ships with zero behavior change until one is wired in. Framing discipline: never "the catalogue" or a completeness claim, everywhere this is surfaced (code comments, tool descriptions, this entry).
+
 ## [0.17.0] — 2026-07-02
 
 ### Added
