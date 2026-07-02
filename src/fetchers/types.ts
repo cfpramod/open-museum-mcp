@@ -18,8 +18,10 @@ export interface Fetcher {
   noCache?: boolean;
   /**
    * When true, ALL image URLs from this fetcher are hotlink-restricted: they 403
-   * (or serve a bot-challenge page) from server / cloud / CLI environments and are
-   * only reliably loadable in a browser. The federation sets
+   * (or serve a bot-challenge page) from server / cloud / CLI environments, and
+   * also from a browser when embedded cross-origin (e.g. an `<img>` on another
+   * site's page) — only a direct, same-origin visit to the source museum's own
+   * page loads reliably. The federation sets
    * `imageUrls.hotlinkRestricted = true` centrally on every record from this
    * fetcher — no per-record logic needed in adapters. Adding a new blocking source
    * is a one-line change here; no normalize changes required.
