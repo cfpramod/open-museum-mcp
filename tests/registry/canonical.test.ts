@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalStatus } from '../../src/core/registry/index.js';
+import { canonicalStatus, PENDING_OC_TIER } from '../../src/core/registry/index.js';
 import type { Assertion } from '../../src/core/registry/index.js';
 
 function assertion(over: Partial<Assertion> = {}): Assertion {
@@ -10,7 +10,7 @@ function assertion(over: Partial<Assertion> = {}): Assertion {
     value: 'Test',
     evidence: [{ type: 'museum-record', citation: 'c', retrievedAt: '2026-01-01T00:00:00.000Z' }],
     disputeStatus: 'undisputed',
-    assertedBy: { contributorId: 'system', ocmTier: 0 },
+    assertedBy: { contributorId: 'system', ocmTier: PENDING_OC_TIER },
     assertedAt: '2026-01-01T00:00:00.000Z',
     ...over,
   };

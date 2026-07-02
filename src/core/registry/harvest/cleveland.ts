@@ -3,6 +3,7 @@ import { httpGet } from '../../../fetchers/helpers.js';
 import type { Artwork } from '../../../types.js';
 import type { Awaitable } from '../../cache.js';
 import { canonicalStatus } from '../canonical.js';
+import { PENDING_OC_TIER } from '../types.js';
 import type { Assertion, AssertionField, Evidence, RegistryEntry, WorkIdentity } from '../types.js';
 import type { RegistryStore } from '../store.js';
 
@@ -111,7 +112,7 @@ export function stampClevelandEntry(art: Artwork, now: string): RegistryEntry {
       value,
       evidence: [baseEvidence],
       disputeStatus: 'undisputed',
-      assertedBy: { contributorId: 'system:cleveland-harvest', ocmTier: 0 },
+      assertedBy: { contributorId: 'system:cleveland-harvest', ocmTier: PENDING_OC_TIER },
       assertedAt: now,
     });
   };
@@ -132,7 +133,7 @@ export function stampClevelandEntry(art: Artwork, now: string): RegistryEntry {
       basis: 'Cleveland Museum of Art Open Access: metadata is CC0.',
       determinedAt: now,
     },
-    trust: { contributorCredentialTier: 0, evidenceGrade: 'source-linked' },
+    trust: { contributorCredentialTier: PENDING_OC_TIER, evidenceGrade: 'source-linked' },
     canonicalStatus: canonicalStatus(assertions),
     createdAt: now,
     updatedAt: now,

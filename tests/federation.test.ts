@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createFederation, UnknownMuseumError } from '../src/core/index.js';
+import { createFederation, PENDING_OC_TIER, UnknownMuseumError } from '../src/core/index.js';
 import type { CacheStore, RegistryEntry } from '../src/core/index.js';
 import type { Fetcher } from '../src/fetchers/types.js';
 import type { Artwork, ValidationResult } from '../src/types.js';
@@ -17,12 +17,12 @@ function registryEntry(registryId: string, over: Partial<RegistryEntry> = {}): R
         value: 'Test',
         evidence: [{ type: 'museum-record', citation: 'c', retrievedAt: now }],
         disputeStatus: 'undisputed',
-        assertedBy: { contributorId: 'system', ocmTier: 0 },
+        assertedBy: { contributorId: 'system', ocmTier: PENDING_OC_TIER },
         assertedAt: now,
       },
     ],
     rightsPosture: { posture: 'can_store_and_republish', basis: 'CC0', determinedAt: now },
-    trust: { contributorCredentialTier: 0, evidenceGrade: 'source-linked' },
+    trust: { contributorCredentialTier: PENDING_OC_TIER, evidenceGrade: 'source-linked' },
     canonicalStatus: 'canonical',
     createdAt: now,
     updatedAt: now,

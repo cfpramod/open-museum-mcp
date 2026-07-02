@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   proposeWriteBack,
   validateWriteBackRequest,
+  PENDING_OC_TIER,
   type RegistryEntry,
   type WriteBackRequest,
 } from '../../src/core/registry/index.js';
@@ -19,17 +20,22 @@ function baseEntry(registryId: string): RegistryEntry {
         value: 'Test Work',
         evidence: [{ type: 'museum-record', citation: 'c', retrievedAt: now }],
         disputeStatus: 'undisputed',
-        assertedBy: { contributorId: 'system:cleveland-harvest', ocmTier: 0 },
+        assertedBy: { contributorId: 'system:cleveland-harvest', ocmTier: PENDING_OC_TIER },
         assertedAt: now,
       },
     ],
     rightsPosture: { posture: 'can_store_and_republish', basis: 'CC0', determinedAt: now },
-    trust: { contributorCredentialTier: 0, evidenceGrade: 'source-linked' },
+    trust: { contributorCredentialTier: PENDING_OC_TIER, evidenceGrade: 'source-linked' },
     canonicalStatus: 'canonical',
     createdAt: now,
     updatedAt: now,
   };
 }
+
+// A non-system caller (e.g. a fleet lane's write-back) stamps its own tier
+// identifier: opaque, per ContributorCredentialTier's OM-C-owned-pending
+// value space; this repo never branches on the concrete string.
+const INTERNAL_LANE_TIER = 'internal-fleet-lane';
 
 function validRequest(over: Partial<WriteBackRequest> = {}): WriteBackRequest {
   return {
@@ -39,7 +45,7 @@ function validRequest(over: Partial<WriteBackRequest> = {}): WriteBackRequest {
       value: 'Musée d’Orsay, 2019',
       evidence: [{ type: 'catalogue-entry', citation: 'Exhibition catalogue p.42', retrievedAt: '2026-07-02T00:00:00.000Z' }],
       disputeStatus: 'undisputed',
-      assertedBy: { contributorId: 'om-ed', ocmTier: 3 },
+      assertedBy: { contributorId: 'om-ed', ocmTier: INTERNAL_LANE_TIER },
     },
     ...over,
   };

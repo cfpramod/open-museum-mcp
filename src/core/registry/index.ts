@@ -22,6 +22,7 @@ export type {
   RegistryEntry,
   ArtworkEnrichment,
 } from './types.js';
+export { PENDING_OC_TIER } from './types.js';
 export { canonicalStatus } from './canonical.js';
 export type { RegistryStore } from './store.js';
 export {

@@ -7,6 +7,7 @@ import {
   harvestClevelandBatch,
   runClevelandHarvest,
   stampClevelandEntry,
+  PENDING_OC_TIER,
 } from '../../src/core/registry/index.js';
 import { clevelandFetcher } from '../../src/fetchers/cleveland.js';
 import { memoryRegistryStore } from './helpers.js';
@@ -80,7 +81,7 @@ describe('stampClevelandEntry', () => {
     }
 
     expect(entry.rightsPosture.posture).toBe('can_store_and_republish');
-    expect(entry.trust).toEqual({ contributorCredentialTier: 0, evidenceGrade: 'source-linked' });
+    expect(entry.trust).toEqual({ contributorCredentialTier: PENDING_OC_TIER, evidenceGrade: 'source-linked' });
     expect(entry.canonicalStatus).toBe('canonical'); // museum-record evidence is external
   });
 

@@ -47,6 +47,7 @@ export { clearanceForLicense, type ClearanceDecision, type ClearanceBasis } from
 // a completeness claim; present-state only, everywhere this is surfaced.
 export {
   canonicalStatus,
+  PENDING_OC_TIER,
   proposeWriteBack,
   validateWriteBackRequest,
   enumerateClevelandIds,

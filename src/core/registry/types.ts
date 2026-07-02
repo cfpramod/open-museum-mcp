@@ -100,7 +100,7 @@ export interface Assertion {
   assertedBy: {
     contributorId: string;
     /** openclearance OCM tier of WHO is asserting. See {@link ContributorCredentialTier}. */
-    ocmTier: number;
+    ocmTier: ContributorCredentialTier;
   };
   assertedAt: string;
 }
@@ -129,12 +129,27 @@ export interface RightsPostureRecord {
 // --- Primitive 4: Trust ---
 
 /**
- * (a) WHO is asserting, external, owned by openclearance. Increment 1's
- * harvest-only source only ever stamps tier 0 (system harvest); higher tiers
- * are populated once the write-back seam gates untrusted callers (later
- * phase, wired by OM-C).
+ * (a) WHO is asserting, external, owned by openclearance. VALUE SPACE IS
+ * OM-C-OWNED-PENDING (OM-CR CHANGES, 2026-07-03): openclearance's shipped
+ * `VerificationState` is a 3-valued enum (per OM-C's W-6 roadmap work);
+ * credential-tier semantics here MUST adopt OM-C's ruling verbatim once it
+ * lands, never diverge from it with an independently invented range. Until
+ * then this is an OPAQUE STRING placeholder: never parsed, ordered, or
+ * compared numerically anywhere in this repo. The one sentinel this repo
+ * mints pre-ruling is {@link PENDING_OC_TIER}; every other value is reserved
+ * for OM-C's future ruling to define.
  */
-export type ContributorCredentialTier = 0 | 1 | 2 | 3;
+export type ContributorCredentialTier = string;
+
+/**
+ * Sentinel for "no credential-tier ruling has landed yet." The ONLY
+ * `ContributorCredentialTier` value this repo mints until OM-C's Tier-2/
+ * credential semantics are ruled (see {@link ContributorCredentialTier}).
+ * Increment 1's system harvest and every current write-back caller stamp
+ * this value; it carries no ordering or comparison meaning beyond "not yet
+ * rated," and must never be branched on as if it were a real tier.
+ */
+export const PENDING_OC_TIER: ContributorCredentialTier = 'pending-oc-ruling';
 
 /**
  * (b) HOW WELL-EVIDENCED the record is. A grade, never a numeric confidence
