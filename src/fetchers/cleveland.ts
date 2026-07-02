@@ -1,8 +1,8 @@
 import { parseDisplayDate } from '../dateParser.js';
-import { validateClevelandLicense } from '../licenseGate.js';
+import { validateCleveland3DLicense, validateClevelandLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
-import type { Artwork, ValidationResult } from '../types.js';
+import type { Artwork, Model3D, ValidationResult } from '../types.js';
 import {
   asFiniteNumber,
   asOptionalString,
@@ -163,6 +163,24 @@ export const clevelandFetcher: Fetcher = {
       { width: displayWidth, height: displayHeight },
     );
 
+    // Cleveland's Open Access initiative extends to 3D scans they digitized
+    // and host on Sketchfab (see validateCleveland3DLicense). Gated per-scan,
+    // independent of the 2D imageOpenAccess/metadataOpenAccess above — never
+    // inherited. Absent (not an empty array) when no scan exists or the gate
+    // rejects it, matching every other optional Artwork field's convention.
+    const sketchfabUrl = asOptionalString(r.sketchfab_url);
+    let models3d: Model3D[] | undefined;
+    const model3dDecision = validateCleveland3DLicense(inner);
+    if (model3dDecision.accepted && model3dDecision.license && sketchfabUrl) {
+      models3d = [
+        {
+          url: sketchfabUrl,
+          source: 'sketchfab',
+          licence: model3dDecision.license,
+        },
+      ];
+    }
+
     const artwork: Artwork = {
       id,
       museum: {
@@ -201,6 +219,7 @@ export const clevelandFetcher: Fetcher = {
         pageUrl: asString(r.url),
       },
       description: asOptionalString(r.accession_number),
+      ...(models3d ? { models3d } : {}),
     };
 
     return { status: 'accepted', artwork };

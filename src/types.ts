@@ -103,6 +103,27 @@ export interface MuseumRef {
   url: string;
 }
 
+/**
+ * An openly-licensed 3D scan of the artwork. Rights are verified per scan —
+ * the 3D licence is often DIFFERENT from the 2D image licence (e.g. a CC0 image
+ * may have a CC BY-NC-SA scan on Scan the World). Never inherit the 2D verdict.
+ */
+export interface Model3D {
+  /** Canonical URL for the 3D model (Sketchfab page URL, Smithsonian 3D URL, etc.). */
+  url: string;
+  /** Hosting platform or catalogue: 'sketchfab', 'smithsonian-3d', etc. */
+  source: string;
+  /** Verified licence of the scan itself. Independently checked; never derived from the 2D licence. */
+  licence: ArtworkLicense;
+  /**
+   * Format identifiers available for download, e.g. ['glb', 'gltf'] or ['stl'].
+   * Absent when the source's API doesn't publish a format list (e.g. Cleveland's
+   * API surfaces `sketchfab_id` but not the model's download formats) — never
+   * guessed from the hosting platform's typical defaults.
+   */
+  format?: string[];
+}
+
 export interface Artwork {
   id: string;
   museum: MuseumRef;
@@ -140,6 +161,12 @@ export interface Artwork {
   colorFamily?: ColorFamily;
   /** Reserved for v1.0 artist-obscurity scoring across the federated corpus. Not yet populated by any fetcher. */
   obscurityScore?: number;
+  /**
+   * Openly-licensed 3D scans of the work, each rights-verified independently.
+   * Empty array or absent when no open 3D asset is known. Currently populated
+   * by the Cleveland adapter (Sketchfab via `sketchfab_id`); Smithsonian 3D next.
+   */
+  models3d?: Model3D[];
 }
 
 /**

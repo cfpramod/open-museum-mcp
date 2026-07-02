@@ -202,6 +202,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             description:
               'Optional coarse colour-family filter (red, orange, yellow, green, blue, purple, pink, brown, neutral, black, white). Post-fetch over the bounded window, so a rare family may return fewer than `limit`. Use the facets tool to see which families are present.',
           },
+          has_3d: {
+            type: 'boolean',
+            description:
+              'Optional filter for records with at least one openly-licensed 3D scan (Cleveland Museum of Art via Sketchfab, currently the only source). Post-fetch over the bounded window, so this may return fewer than `limit`.',
+          },
         },
         required: ['query'],
       },

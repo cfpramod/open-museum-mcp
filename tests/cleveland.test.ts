@@ -170,3 +170,42 @@ describe('Cleveland adapter image resolution (master/displayable split + maxReso
     expect(iu.maxResolution).toEqual({ width: 3400, height: 3389 });
   });
 });
+
+describe('Cleveland adapter 3D models (Sketchfab, Open Access in 3-D)', () => {
+  // Real record (cleveland:108312, Portrait Bust of the Empress Claudia Octavia),
+  // Cleveland's own Sketchfab upload, verified live 2026-07-02 against both
+  // Cleveland's API and Sketchfab's own public API (license.slug: 'cc0').
+  it('surfaces a gate-verified 3D scan when sketchfab_id is present and CC0', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted-3d.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+
+    expect(result.artwork.models3d).toHaveLength(1);
+    const model = result.artwork.models3d?.[0];
+    expect(model?.url).toBe('https://sketchfab.com/models/9b2fbfe552ac4107a3623e19c1ddb4e4');
+    expect(model?.source).toBe('sketchfab');
+    expect(model?.licence.type).toBe('CC0');
+    expect(model?.licence.confidence).toBe('high');
+    expect(model?.licence.verificationSource).toBe('cleveland.share_license_status+sketchfab_id');
+    // 2D and 3D rights are checked independently, never inherited from one another.
+    expect(result.artwork.imageOpenAccess).toBe(true);
+  });
+
+  it('omits models3d entirely when no sketchfab_id is published (the common case)', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.models3d).toBeUndefined();
+  });
+
+  it('omits models3d when sketchfab_id is present but sketchfab_url is missing', () => {
+    const raw = structuredClone(fixture('cleveland-accepted-3d.json')) as {
+      data: Record<string, unknown>;
+    };
+    delete raw.data.sketchfab_url;
+    const result = clevelandFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.models3d).toBeUndefined();
+  });
+});

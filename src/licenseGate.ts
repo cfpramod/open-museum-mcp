@@ -84,6 +84,52 @@ export const validateClevelandLicense: LicenseValidator = (raw) => {
   );
 };
 
+// Cleveland's Open Access initiative explicitly extends to 3D: their own
+// published policy ("Open Access in 3-D", clevelandart.org/open-access) states
+// the museum's open-access declaration covers 3D scans of public-domain works
+// that THEY digitized and host on Sketchfab, not just the 2D image. Verified
+// live against Sketchfab's own public API (2026-07-02): the CMA's Sketchfab
+// upload for `sketchfab_id=9b2fbfe552ac4107a3623e19c1ddb4e4` independently
+// reports `license.slug: 'cc0'`, corroborating Cleveland's declaration.
+// `share_license_status` is Cleveland's single per-record rights field — it
+// covers the whole record, 2D and 3D alike, so this validator necessarily
+// reads the same field as `validateClevelandLicense`. It is kept as its own
+// function (rather than reusing the 2D decision object) so the *gate* is
+// structurally per-scan: if Cleveland ever introduces a distinct 3D-specific
+// field, only this function needs to change, and nothing here assumes the 2D
+// verdict. This does NOT extend to third-party 3D platforms (Scan the World,
+// user Sketchfab uploads) — those carry independently-set licences that must
+// never be inferred from a museum's 2D declaration.
+export const validateCleveland3DLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('cleveland-3d: object missing or not an object');
+  }
+  const obj = raw as Record<string, unknown>;
+  const sketchfabId = obj.sketchfab_id;
+  if (typeof sketchfabId !== 'string' || sketchfabId.trim() === '') {
+    return reject('cleveland-3d: no sketchfab_id (no 3D scan for this record)');
+  }
+  const status = obj.share_license_status;
+  if (typeof status === 'string' && status.toUpperCase() === 'CC0') {
+    return {
+      accepted: true,
+      license: {
+        type: 'CC0',
+        rawValue: status,
+        verificationSource: 'cleveland.share_license_status+sketchfab_id',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      reason: 'cleveland-3d: share_license_status=CC0, sketchfab_id present',
+    };
+  }
+  return reject(
+    `cleveland-3d: share_license_status=${typeof status === 'string' ? status : 'missing'} (strict default reject)`,
+  );
+};
+
 // The Art Institute of Chicago's API returns is_public_domain as a per-object
 // boolean. AIC's documentation explicitly notes that the API's CC0 framing
 // covers the catalog data, while image reuse rights are described separately
