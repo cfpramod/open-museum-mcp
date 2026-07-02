@@ -1,0 +1,38 @@
+{
+  "data": {
+    "id": 108312,
+    "accession_number": "1925.943",
+    "share_license_status": "CC0",
+    "title": "Portrait Bust of the Empress Claudia Octavia",
+    "creation_date": "50–70 CE",
+    "creation_date_earliest": 1,
+    "creation_date_latest": 99,
+    "culture": ["Italy, Roman"],
+    "technique": "marble",
+    "type": "Sculpture",
+    "url": "https://clevelandart.org/art/1925.943",
+    "images": {
+      "web": {
+        "url": "https://openaccess-cdn.clevelandart.org/1925.943/1925.943_web.jpg",
+        "width": "651",
+        "height": "893",
+        "filesize": "319549"
+      },
+      "print": {
+        "url": "https://openaccess-cdn.clevelandart.org/1925.943/1925.943_print.jpg",
+        "width": "2479",
+        "height": "3400",
+        "filesize": "4559469"
+      },
+      "full": {
+        "url": "https://openaccess-cdn.clevelandart.org/1925.943/1925.943_full.tif",
+        "width": "4471",
+        "height": "6133",
+        "filesize": "82292744"
+      }
+    },
+    "creators": [],
+    "sketchfab_id": "9b2fbfe552ac4107a3623e19c1ddb4e4",
+    "sketchfab_url": "https://sketchfab.com/models/9b2fbfe552ac4107a3623e19c1ddb4e4"
+  }
+}

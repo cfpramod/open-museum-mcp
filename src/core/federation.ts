@@ -66,6 +66,8 @@ export const SearchParamsSchema = z.object({
     .optional(),
   /** Coarse colour-family filter (one of the controlled bins). */
   color_family: z.enum(COLOR_FAMILY_NAMES).optional(),
+  /** When true, restrict to records with at least one openly-licensed 3D scan. */
+  has_3d: z.boolean().optional(),
 });
 export type SearchParams = z.infer<typeof SearchParamsSchema>;
 
@@ -444,13 +446,20 @@ export function createFederation(opts: FederationOptions): Federation {
       ? byMedium.filter((a) => a.colorFamily === params.color_family)
       : byMedium;
 
+    // has_3d is a post-fetch filter (like medium/color_family); only records
+    // with at least one gate-verified 3D scan match. Currently populated by
+    // the Cleveland adapter only.
+    const by3d = params.has_3d
+      ? byFamily.filter((a) => Array.isArray(a.models3d) && a.models3d.length > 0)
+      : byFamily;
+
     // `color` re-orders the survivors by CIEDE2000 nearness to the query colour.
     // Colourless records can't be ranked by colour, so they're dropped from a
     // colour-ranked search.
-    let ordered = byFamily;
+    let ordered = by3d;
     if (params.color) {
       const queryLab = hexToLab(params.color);
-      ordered = byFamily
+      ordered = by3d
         .filter((a): a is Artwork & { dominantColor: string } => Boolean(a.dominantColor))
         .map((a) => ({ a, d: ciede2000(queryLab, hexToLab(a.dominantColor)) }))
         .sort((x, y) => x.d - y.d)

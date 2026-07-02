@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] — 2026-07-02
+
+### Added
+
+- **`models3d` — openly-licensed 3D scans, first source: Cleveland via Sketchfab.** `Artwork` gains an optional `models3d: Model3D[]` field (`{url, source, licence, format?}`) surfacing 3D scans that are independently rights-verified per scan — never inherited from the 2D image licence. Cleveland's "Open Access in 3-D" policy (`clevelandart.org/open-access`) explicitly extends their open-access declaration to 3D scans they digitized and host on Sketchfab; a new `validateCleveland3DLicense` gate checks `sketchfab_id` + `share_license_status` independently of the 2D decision (verified live against Sketchfab's own public API, which corroborates the CC0 licence). `format` is omitted rather than guessed, since Cleveland's API doesn't publish a download-format list. A new `has_3d` filter on `search_artworks` restricts results to records with at least one gate-verified scan.
+
 ## [0.16.0] — 2026-06-30
 
 ### Added

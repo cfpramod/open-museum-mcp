@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   validateAicLicense,
+  validateCleveland3DLicense,
   validateClevelandLicense,
   validateLicense,
   validateMetLicense,
@@ -48,6 +49,38 @@ describe('licenseGate', () => {
     it('rejects missing field (strict default)', () => {
       const r = validateClevelandLicense({});
       expect(r.accepted).toBe(false);
+    });
+  });
+
+  describe('Cleveland 3D validator', () => {
+    it('accepts sketchfab_id + share_license_status=CC0', () => {
+      const r = validateCleveland3DLicense({
+        sketchfab_id: '9b2fbfe552ac4107a3623e19c1ddb4e4',
+        share_license_status: 'CC0',
+      });
+      expect(r.accepted).toBe(true);
+      expect(r.license?.type).toBe('CC0');
+      expect(r.license?.verificationSource).toBe('cleveland.share_license_status+sketchfab_id');
+    });
+
+    it('rejects when no sketchfab_id is present (no 3D scan) even if the record is CC0', () => {
+      const r = validateCleveland3DLicense({ share_license_status: 'CC0' });
+      expect(r.accepted).toBe(false);
+      expect(r.reason).toContain('no sketchfab_id');
+    });
+
+    it('rejects sketchfab_id present but non-CC0 status (never inherits an open 2D verdict)', () => {
+      const r = validateCleveland3DLicense({
+        sketchfab_id: 'some-id',
+        share_license_status: 'Copyrighted',
+      });
+      expect(r.accepted).toBe(false);
+      expect(r.reason).toContain('strict default reject');
+    });
+
+    it('rejects malformed input', () => {
+      expect(validateCleveland3DLicense(null).accepted).toBe(false);
+      expect(validateCleveland3DLicense('not an object').accepted).toBe(false);
     });
   });
 

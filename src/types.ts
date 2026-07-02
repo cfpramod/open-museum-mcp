@@ -115,8 +115,13 @@ export interface Model3D {
   source: string;
   /** Verified licence of the scan itself. Independently checked; never derived from the 2D licence. */
   licence: ArtworkLicense;
-  /** Format identifiers available for download, e.g. ['glb', 'gltf'] or ['stl']. */
-  format: string[];
+  /**
+   * Format identifiers available for download, e.g. ['glb', 'gltf'] or ['stl'].
+   * Absent when the source's API doesn't publish a format list (e.g. Cleveland's
+   * API surfaces `sketchfab_id` but not the model's download formats) — never
+   * guessed from the hosting platform's typical defaults.
+   */
+  format?: string[];
 }
 
 export interface Artwork {

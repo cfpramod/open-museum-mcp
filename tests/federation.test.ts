@@ -602,6 +602,52 @@ describe('createFederation.search colour', () => {
   });
 });
 
+describe('createFederation.search has_3d', () => {
+  function models3dFetcher() {
+    const over: Record<string, Partial<Artwork>> = {
+      'test:1': {
+        models3d: [
+          {
+            url: 'https://sketchfab.com/models/abc',
+            source: 'sketchfab',
+            licence: {
+              type: 'CC0',
+              rawValue: 'CC0',
+              verificationSource: 'cleveland.share_license_status+sketchfab_id',
+              verifiedAt: '2026-01-01T00:00:00.000Z',
+              confidence: 'high',
+            },
+          },
+        ],
+      },
+      'test:2': {}, // no 3D scan
+    };
+    return fakeFetcher('test', {
+      ids: ['test:1', 'test:2'],
+      accept: new Set(['test:1', 'test:2']),
+      over,
+    });
+  }
+
+  it('restricts to records with at least one 3D scan when has_3d is true', async () => {
+    const t = models3dFetcher();
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 10, has_3d: true });
+    expect(out.results.map((r) => r.id)).toEqual(['test:1']);
+  });
+
+  it('returns all records when has_3d is omitted', async () => {
+    const t = models3dFetcher();
+    const { store } = memoryCache();
+    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
+
+    const out = await fed.search({ query: 'x', has_image: true, limit: 10 });
+    expect(out.results.map((r) => r.id)).toEqual(['test:1', 'test:2']);
+  });
+});
+
 describe('createFederation.facets colour', () => {
   it('aggregates a colorFamily bucket over the sample (skipping colourless)', async () => {
     const t = fakeFetcher('test', {
