@@ -164,7 +164,7 @@ interface Assertion {
   supersedes?: string; // assertion id
   assertedBy: {
     contributorId: string;
-    ocmTier: number; // openclearance OCM tier of WHO is asserting, see Trust axis (a)
+    ocmTier: ContributorCredentialTier; // OM-C-owned-pending value space, see Trust axis (a)
   };
   assertedAt: string;
 }
@@ -209,8 +209,18 @@ strongest evidence has a stricter posture) is a later-phase concern once evidenc
 Two **separate axes**, never conflated (per the locked drive doc's explicit guardian call):
 
 ```ts
-/** (a) WHO is asserting, external, from openclearance. Increment 1 only ever sees tier 0 (system harvest). */
-type ContributorCredentialTier = 0 | 1 | 2 | 3; // openclearance OCM tiers; owned by OM-C, not redefined here
+/**
+ * (a) WHO is asserting, external, from openclearance. VALUE SPACE IS
+ * OM-C-OWNED-PENDING (OM-CR CHANGES, 2026-07-03): openclearance's shipped
+ * `VerificationState` is a 3-valued enum (per OM-C's W-6 roadmap work);
+ * credential-tier semantics here MUST adopt OM-C's ruling verbatim once it
+ * lands rather than diverge from it with an independently invented range.
+ * Until then this is an OPAQUE STRING placeholder, never parsed, ordered, or
+ * compared numerically by this repo. The single sentinel this repo mints
+ * pre-ruling is `PENDING_OC_TIER` ('pending-oc-ruling'); every other value
+ * is reserved for OM-C's future ruling to define.
+ */
+type ContributorCredentialTier = string;
 
 /** (b) HOW WELL-EVIDENCED the record is. A grade, never a numeric confidence score: a single number
  * launders uncertainty; the assertion/evidence/dispute structure above is what carries trust legibly. */
@@ -274,7 +284,7 @@ gate.
 3. GATE       -> normalize() already ran the rights gate; rejected records are logged, never stored
 4. STAMP      -> wrap the accepted Artwork as an increment-1 registry entry (Identity + baseline
                  Assertion set + RightsPosture 'can_store_and_republish' + Trust
-                 {contributorTier: 0, evidenceGrade: 'source-linked'})
+                 {contributorCredentialTier: PENDING_OC_TIER, evidenceGrade: 'source-linked'})
 5. WRITE      -> RegistryStore.upsertEntry(entry)   [OMA-implemented; see MCP read shape]
 6. CHECKPOINT -> persist the last completed id so a restart resumes, not restarts
 ```
@@ -417,10 +427,13 @@ style hint `list_traditions` uses on an empty cache; never a bare error, never s
 
 ## Cross-lane consequences (not decided here)
 
-- **OM-C** co-designs the attestation-graph semantics (self-attestation to counter-signature to
-  domain-attested institution) referenced in Trust above. This doc only reserves the shape
-  (`ContributorCredentialTier`, `EvidenceGrade`, `canonicalStatus`); it does not define the OCM tier
-  numbers or the attestation-graph verification logic. Queued separately per the locked drive doc.
+- **OM-C** owns the `ContributorCredentialTier` value space outright (OM-CR CHANGES, 2026-07-03):
+  this doc only reserves the shape (`ContributorCredentialTier`, `EvidenceGrade`, `canonicalStatus`)
+  as an opaque string pending OM-C's ruling; it does not bake a numeric range or define the
+  attestation-graph verification logic. Once OM-C's version-roadmap work (tying credential tiers to
+  openclearance's shipped 3-valued `VerificationState`) lands, this repo adopts it verbatim, not an
+  independently invented range. Queued separately per the locked drive doc; this doc is a named
+  waiting consumer of that ruling.
 - **OM-A/OMA** owns the actual `RegistryStore` implementation (D1/R2/PG, OMA's call) and the harvest
   job's runtime home, sequenced after the go-live wave.
 - If registry data ever needs to appear *inside* a Clearance Manifest payload (a provenance-stamp
