@@ -366,6 +366,7 @@ function apiKey(): string {
 export const smithsonianFetcher: Fetcher = {
   code: 'smithsonian',
   name: 'Smithsonian Institution',
+  hotlinkRestricted: true,
 
   async search(query: string, limit: number, options: SearchOptions = {}): Promise<string[]> {
     const url = new URL(`${SI_API}/search`);

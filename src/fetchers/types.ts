@@ -16,4 +16,16 @@ export interface Fetcher {
    * terms forbid caching (e.g. Harvard Art Museums: no caching beyond two weeks).
    */
   noCache?: boolean;
+  /**
+   * When true, ALL image URLs from this fetcher are hotlink-restricted: they 403
+   * (or serve a bot-challenge page) from server / cloud / CLI environments and are
+   * only reliably loadable in a browser. The federation sets
+   * `imageUrls.hotlinkRestricted = true` centrally on every record from this
+   * fetcher — no per-record logic needed in adapters. Adding a new blocking source
+   * is a one-line change here; no normalize changes required.
+   *
+   * Confirmed blocking sources: AIC (Cloudflare WAF on iiif/2),
+   * Walters (art.thewalters.org), Smithsonian (ids.si.edu).
+   */
+  hotlinkRestricted?: true;
 }

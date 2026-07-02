@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] — 2026-06-30
+
+### Added
+
+- **`imageUrls.hotlinkRestricted` — engine-level signal for CDN-blocked image URLs.** Three sources return 403 (or a Cloudflare WAF bot-challenge) from server / cloud / CLI environments; their image URLs are browser-only. A new `hotlinkRestricted?: boolean` field on `ArtworkImages` surfaces this for surfaces to handle gracefully — link to `source.pageUrl` instead of embedding, or route through OMA's image proxy once available. Applied centrally by the federation via a one-line `Fetcher.hotlinkRestricted = true` property; no per-record adapter logic needed. Confirmed blocking sources: **AIC** (Cloudflare WAF on `www.artic.edu/iiif/2`), **Walters** (`art.thewalters.org`), **Smithsonian** (`ids.si.edu`). Adding a new blocking source requires a single-line change to its fetcher. Also backfills records already in the object cache on the next access.
+- **Stable-sort / deterministic federation ordering.** Search results previously varied run-to-run because the federation fires museum API calls in parallel and whichever returned first led the page. All `search_artworks` results are now sorted by `id` lexicographically after gathering, so the same query always returns the same ordered set regardless of API timing.
+- **AIC pixel dimensions from `thumbnail` API field.** AIC's data API carries full scan pixel dimensions in the `thumbnail.width` / `thumbnail.height` sub-object — a field we weren't requesting. Adding it to `AIC_FIELDS` surfaces these as `imageUrls.width`, `.height`, and `.maxResolution`, removing the previous "AIC has no pixel dimensions" limitation.
+
 ## [0.15.0] — 2026-06-26
 
 ### Added
