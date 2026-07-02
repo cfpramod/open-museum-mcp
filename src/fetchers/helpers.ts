@@ -102,6 +102,28 @@ export function isValidPositiveInt(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v > 0;
 }
 
+const ORDINAL_SUFFIX: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' };
+/** Century label for a CE year (1601 -> "17th century"). */
+function centuryLabel(year: number): string {
+  const c = Math.floor((year - 1) / 100) + 1;
+  const suffix = c % 100 >= 11 && c % 100 <= 13 ? 'th' : (ORDINAL_SUFFIX[c % 10] ?? 'th');
+  return `${c}${suffix} century`;
+}
+
+/**
+ * Derive a period facet from parsed year bounds, for sources whose API
+ * carries no named-period vocabulary of its own (Rijksmuseum, Getty) — a
+ * single-century span is still a useful tradition tag, and the date parser
+ * already gives the years. Null for BCE, missing, or century-crossing spans
+ * (where no single century is meaningful).
+ */
+export function derivePeriodFromYears(yearStart: number | null, yearEnd: number | null): string | null {
+  if (yearStart === null || yearEnd === null || yearStart <= 0 || yearEnd <= 0) return null;
+  const cStart = Math.floor((yearStart - 1) / 100) + 1;
+  const cEnd = Math.floor((yearEnd - 1) / 100) + 1;
+  return cStart === cEnd ? centuryLabel(yearStart) : null;
+}
+
 /**
  * Build a rejection `ValidationResult` with consistent shape across
  * fetchers. Replaces three identical 6-line factories that used to live

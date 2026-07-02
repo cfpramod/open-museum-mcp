@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] — 2026-07-03
+
+### Added
+
+- **J. Paul Getty Museum (`getty`) — FEDERATE via SPARQL, no live REST search exists.** Getty publishes its ~250k-object collection as Linked.Art (CIDOC-CRM) JSON-LD; per Getty's own docs there is no keyword-search or bulk-list REST endpoint, only fetch-by-known-ID and a public SPARQL endpoint. The adapter searches via SPARQL (title + producer-name text matching, filtered to objects with an image when `has_image` is set) and hydrates each surfaced result over REST — one object fetch plus one primary-image media-entity fetch, the same per-result cost model as the Met's per-object fan-out, never a full-collection crawl (a single object record can be 400KB+ of RDF-shaped JSON; there is no bulk dump). Rights are genuinely two-tier and verified independently at each level, never assumed blanket: collection metadata (title, artist, date) is CC0 across the dataset (`validateGettyLicense`, checked per-record from the object's own `subject_to`), but each image is separately rights-checked against its own media entity (`validateGettyImageLicense`) — Getty's Open Content Program covers roughly 91,000 of the museum's ~168,000 objects' images, confirmed live during development that these two levels do diverge on real records. A metadata-open/image-restricted record is accepted (not rejected) with `imageOpenAccess: false` and no `imageUrls.full`, per the project's two-tier-source convention. `period` is derived from the parsed year bounds (single-century spans), via a `derivePeriodFromYears` helper extracted from the Rijksmuseum adapter and now shared by both.
+
 ## [0.17.0] — 2026-07-02
 
 ### Added

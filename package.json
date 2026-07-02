@@ -1,7 +1,7 @@
 {
   "name": "open-museum-mcp",
-  "version": "0.17.0",
-  "description": "MCP server for license-verified search across open-access museum collections (The Met, Rijksmuseum, Smithsonian, Cleveland, AIC, SMK, Walters, Wellcome, National Gallery of Art, Harvard, Wikimedia Commons, Europeana, and growing).",
+  "version": "0.18.0",
+  "description": "MCP server for license-verified search across open-access museum collections (The Met, Rijksmuseum, Smithsonian, Cleveland, AIC, SMK, Walters, Wellcome, National Gallery of Art, Harvard, Getty, Wikimedia Commons, Europeana, and growing).",
   "type": "module",
   "main": "dist/server.js",
   "exports": {

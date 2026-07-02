@@ -1,0 +1,49 @@
+{
+  "id": "https://data.getty.edu/museum/collection/object/00000000-0000-0000-0000-000000000001",
+  "type": "HumanMadeObject",
+  "_label": "A Recent Acquisition (9999.001)",
+  "classified_as": [
+    {
+      "id": "http://vocab.getty.edu/aat/300133025",
+      "type": "Type",
+      "_label": "Artwork"
+    }
+  ],
+  "identified_by": [
+    {
+      "id": "https://data.getty.edu/museum/collection/object/00000000-0000-0000-0000-000000000001/name/1",
+      "type": "Name",
+      "_label": "Primary Title",
+      "classified_as": [
+        {
+          "id": "https://data.getty.edu/local/thesaurus/object-title-primary",
+          "type": "Type",
+          "_label": "Primary Title"
+        }
+      ],
+      "content": "A Recent Acquisition"
+    }
+  ],
+  "made_of": [],
+  "shows": [],
+  "subject_to": [
+    {
+      "id": "https://data.getty.edu/museum/collection/object/00000000-0000-0000-0000-000000000001/licensing",
+      "type": "Right",
+      "_label": "License for Collection Metadata",
+      "classified_as": [
+        {
+          "id": "https://data.getty.edu/local/thesaurus/rights-statement",
+          "type": "Type",
+          "_label": "Rights Statement"
+        },
+        {
+          "id": "https://creativecommons.org/licenses/by/4.0/",
+          "type": "Type",
+          "_label": "Attribution 4.0 International (CC BY 4.0)"
+        }
+      ]
+    }
+  ],
+  "subject_of": []
+}

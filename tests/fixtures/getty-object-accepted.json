@@ -1,0 +1,361 @@
+{
+  "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb",
+  "type": "HumanMadeObject",
+  "_label": "Irises (90.PA.20)",
+  "classified_as": [
+    {
+      "id": "http://vocab.getty.edu/aat/300133025",
+      "type": "Type",
+      "_label": "Artwork"
+    },
+    {
+      "id": "http://vocab.getty.edu/aat/300033618",
+      "type": "Type",
+      "_label": "Paintings",
+      "classified_as": [
+        {
+          "id": "http://vocab.getty.edu/aat/300435444",
+          "type": "Type",
+          "_label": "Classification (Category)"
+        }
+      ]
+    },
+    {
+      "id": "https://data.getty.edu/local/thesaurus/object-record-structure-whole",
+      "type": "Type",
+      "_label": "Object Record Structure: Whole",
+      "classified_as": [
+        {
+          "id": "https://data.getty.edu/local/thesaurus/object-record-structure-type",
+          "type": "Type",
+          "_label": "Object Record Structure Type"
+        }
+      ]
+    }
+  ],
+  "identified_by": [
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/identifier/aebd4e22-5f4b-516d-b259-e90cda01ecc1",
+      "type": "Identifier",
+      "_label": "Accession Number",
+      "classified_as": [
+        {
+          "id": "http://vocab.getty.edu/aat/300404626",
+          "type": "Type",
+          "_label": "Identification Number"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300312355",
+          "type": "Type",
+          "_label": "Accession Number"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300404670",
+          "type": "Type",
+          "_label": "Preferred Term"
+        }
+      ],
+      "content": "90.PA.20"
+    },
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/name/adcc09a2-87fe-5072-8b48-64e728f52d40",
+      "type": "Name",
+      "_label": "Alternate Title",
+      "classified_as": [
+        {
+          "id": "http://vocab.getty.edu/aat/300417193",
+          "type": "Type",
+          "_label": "Titles (General, Names)"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300417227",
+          "type": "Type",
+          "_label": "Alternate Title"
+        },
+        {
+          "id": "https://data.getty.edu/museum/ontology/linked-data/tms/object/titles/primary",
+          "type": "Type",
+          "_label": "Primary Title",
+          "deprecated": {
+            "reason": "Migration to unified `data.getty.edu/local/thesaurus` URLs for custom terms.",
+            "replacement": "Filter on the `https://data.getty.edu/local/thesaurus/object-title-*` terms instead.",
+            "since": "2020-11-11"
+          }
+        },
+        {
+          "id": "https://data.getty.edu/local/thesaurus/object-title-primary",
+          "type": "Type",
+          "_label": "Primary Title"
+        }
+      ],
+      "content": "Irises",
+      "language": [
+        {
+          "id": "http://vocab.getty.edu/aat/300388277",
+          "type": "Language",
+          "_label": "English (language)"
+        }
+      ]
+    }
+  ],
+  "made_of": [
+    {
+      "id": "http://vocab.getty.edu/aat/300015050",
+      "type": "Material",
+      "_label": "Oil Paint (Paint)"
+    },
+    {
+      "id": "http://vocab.getty.edu/aat/300014078",
+      "type": "Material",
+      "_label": "Canvas (Textile Material)"
+    }
+  ],
+  "shows": [
+    {
+      "id": "https://data.getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade",
+      "type": "VisualItem"
+    },
+    {
+      "id": "https://data.getty.edu/media/image/7f6b7611-9124-54ea-9e43-6c16372414f7",
+      "type": "VisualItem"
+    },
+    {
+      "id": "https://data.getty.edu/media/image/992737b0-32c4-5088-8f0b-e04f291320e0",
+      "type": "VisualItem"
+    }
+  ],
+  "produced_by": {
+    "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/production",
+    "type": "Production",
+    "referred_to_by": [
+      {
+        "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/production/6e459d27-4bf5-5705-b6cc-ce9ee4a0a931/producer-description",
+        "type": "LinguisticObject",
+        "_label": "Artist/Maker (Producer) Description",
+        "classified_as": [
+          {
+            "id": "https://data.getty.edu/museum/ontology/linked-data/tms/object/producer-description",
+            "type": "Type",
+            "_label": "Producer Description",
+            "deprecated": {
+              "reason": "Migration to unified `data.getty.edu/local/thesaurus` URLs for custom terms.",
+              "replacement": "Filter on `Producer Description` (https://data.getty.edu/local/thesaurus/producer-description) instead.",
+              "since": "2020-11-10"
+            }
+          },
+          {
+            "id": "https://data.getty.edu/local/thesaurus/producer-description",
+            "type": "Type",
+            "_label": "Producer Description"
+          },
+          {
+            "id": "http://vocab.getty.edu/aat/300418049",
+            "type": "Type",
+            "_label": "Brief Text"
+          }
+        ],
+        "content": "Vincent van Gogh (Dutch, 1853 - 1890)"
+      },
+      {
+        "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/production/6e459d27-4bf5-5705-b6cc-ce9ee4a0a931/producer-name",
+        "type": "LinguisticObject",
+        "_label": "Artist/Maker (Producer) Name",
+        "classified_as": [
+          {
+            "id": "https://data.getty.edu/local/thesaurus/producer-name",
+            "type": "Type",
+            "_label": "Producer Name"
+          },
+          {
+            "id": "http://vocab.getty.edu/aat/300418049",
+            "type": "Type",
+            "_label": "Brief Text"
+          }
+        ],
+        "content": "Vincent van Gogh"
+      },
+      {
+        "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/production/6e459d27-4bf5-5705-b6cc-ce9ee4a0a931/producer-nationality-and-dates",
+        "type": "LinguisticObject",
+        "_label": "Artist/Maker (Producer) Nationality & Dates",
+        "classified_as": [
+          {
+            "id": "https://data.getty.edu/local/thesaurus/nationality-and-dates",
+            "type": "Type",
+            "_label": "Producer Nationality & Dates"
+          },
+          {
+            "id": "http://vocab.getty.edu/aat/300418049",
+            "type": "Type",
+            "_label": "Brief Text"
+          }
+        ],
+        "content": "Dutch, 1853 - 1890"
+      }
+    ],
+    "timespan": {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/production/timespan",
+      "type": "TimeSpan",
+      "identified_by": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/production/timespan/display",
+          "type": "Name",
+          "_label": "Dates",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300458798",
+              "type": "Type",
+              "_label": "Display Names"
+            }
+          ],
+          "content": "1889"
+        }
+      ],
+      "begin_of_the_begin": "1889-01-01T00:00:00",
+      "end_of_the_end": "1889-12-31T23:59:59"
+    }
+  },
+  "subject_to": [
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/licensing",
+      "type": "Right",
+      "_label": "License for Collection Metadata",
+      "classified_as": [
+        {
+          "id": "https://data.getty.edu/local/thesaurus/rights-statement",
+          "type": "Type",
+          "_label": "Rights Statement"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300417696",
+          "type": "Type",
+          "_label": "Rights (Legal Concept)"
+        },
+        {
+          "id": "http://creativecommons.org/publicdomain/zero/1.0/",
+          "type": "Type",
+          "_label": "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+        }
+      ],
+      "identified_by": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/licensing/display-name",
+          "type": "Name",
+          "_label": "License Display Name",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300458798",
+              "type": "Type",
+              "_label": "Display Name"
+            }
+          ],
+          "content": "Public Domain"
+        }
+      ],
+      "referred_to_by": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/licensing/description",
+          "type": "LinguisticObject",
+          "_label": "License Description",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300418049",
+              "type": "Type",
+              "_label": "Brief Text"
+            }
+          ],
+          "content": "No Copyright"
+        }
+      ],
+      "possessed_by": [
+        {
+          "id": "https://data.getty.edu/museum/collection/group/c496a7b4-6087-4deb-a1ac-0f21bd3fd87b",
+          "type": "Group",
+          "_label": "J. Paul Getty Museum, Los Angeles, California",
+          "member_of": [
+            {
+              "id": "http://vocab.getty.edu/ulan/500115987",
+              "type": "Group",
+              "_label": "The J. Paul Getty Trust, Los Angeles, California",
+              "classified_as": [
+                {
+                  "id": "http://vocab.getty.edu/ulan/500000003",
+                  "type": "Type",
+                  "_label": "Corporate Bodies"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "representation": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/licensing/display-icon",
+          "type": "VisualItem",
+          "_label": "License Display Icon",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300266210",
+              "type": "Type",
+              "_label": "Display Icon"
+            },
+            {
+              "id": "http://vocab.getty.edu/aat/300215302",
+              "type": "Type",
+              "_label": "Digital Image"
+            }
+          ],
+          "format": "image/svg",
+          "digitally_shown_by": [
+            {
+              "type": "DigitalObject",
+              "_label": "License Display Icon",
+              "access_point": [
+                {
+                  "id": "https://rightsstatements.org/files/icons/NoC.Icon-Only.dark.svg",
+                  "type": "DigitalObject",
+                  "_label": "License Display Icon URL"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "subject_of": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/licensing/acknowledgements",
+          "type": "LinguisticObject",
+          "_label": "Acknowledgements for Collection Metadata",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300026687",
+              "type": "Type",
+              "_label": "Acknowledgements"
+            }
+          ],
+          "content": "Collection metadata provided by the J. Paul Getty Museum. Licensed under CC0 1.0 (http://creativecommons.org/publicdomain/zero/1.0/)."
+        }
+      ]
+    }
+  ],
+  "subject_of": [
+    {
+      "id": "https://www.getty.edu/art/collection/object/103JNH",
+      "type": "LinguisticObject",
+      "_label": "Homepage for Irises (90.PA.20) (HumanMadeObject)",
+      "classified_as": [
+        {
+          "id": "http://vocab.getty.edu/aat/300264578",
+          "type": "Type",
+          "_label": "Web Page"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300404670",
+          "type": "Type",
+          "_label": "Primary"
+        }
+      ],
+      "format": "text/html"
+    }
+  ]
+}
