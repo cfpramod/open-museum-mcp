@@ -40,6 +40,44 @@ export {
 } from './clearance/manifest.js';
 export { clearanceForLicense, type ClearanceDecision, type ClearanceBasis } from './clearance/licenseMap.js';
 
+// The registry: an accretive, provenance-stamped enrichment layer over the
+// federated corpus (increment 1: Cleveland harvest + write-back seam + the
+// `Federation.getArtwork`/`registryStats` read surface). See
+// `docs/plans/catalogue-raisonne-increment-1.md`. Never "the catalogue," never
+// a completeness claim; present-state only, everywhere this is surfaced.
+export {
+  canonicalStatus,
+  PENDING_OC_TIER,
+  proposeWriteBack,
+  validateWriteBackRequest,
+  enumerateClevelandIds,
+  stampClevelandEntry,
+  harvestClevelandBatch,
+  runClevelandHarvest,
+  type WorkIdentity,
+  type AssertionField,
+  type EvidenceType,
+  type Evidence,
+  type DisputeStatus,
+  type Assertion,
+  type RightsPosture,
+  type RightsPostureRecord,
+  type ContributorCredentialTier,
+  type EvidenceGrade,
+  type TrustState,
+  type CanonicalStatus,
+  type RegistryEntry,
+  type ArtworkEnrichment,
+  type RegistryStore,
+  type WriteBackRequest,
+  type WriteBackOptions,
+  type WriteBackOutcome,
+  type HarvestCheckpointStore,
+  type HarvestOptions,
+  type HarvestBatchResult,
+  type HarvestRunResult,
+} from './registry/index.js';
+
 // Tier-1 delegated-attestor envelope/format library — KEYLESS. `prepareTier1`
 // emits a keyless signing request (the only thing the OMA service signs);
 // `verifyTier1` is the fail-closed, public-key-only verifier. The COSE primitives
