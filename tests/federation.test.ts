@@ -1,34 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createFederation, PENDING_OC_TIER, UnknownMuseumError } from '../src/core/index.js';
-import type { CacheStore, RegistryEntry } from '../src/core/index.js';
+import { createFederation, UnknownMuseumError } from '../src/core/index.js';
+import type { CacheStore } from '../src/core/index.js';
 import type { Fetcher } from '../src/fetchers/types.js';
 import type { Artwork, ValidationResult } from '../src/types.js';
-import { memoryRegistryStore } from './registry/helpers.js';
-
-function registryEntry(registryId: string, over: Partial<RegistryEntry> = {}): RegistryEntry {
-  const now = '2026-01-01T00:00:00.000Z';
-  return {
-    identity: { registryId, sourceRefs: [{ source: registryId.split(':')[0], id: registryId, role: 'primary' }], createdAt: now },
-    assertions: [
-      {
-        id: `${registryId}:1`,
-        subject: registryId,
-        field: 'title',
-        value: 'Test',
-        evidence: [{ type: 'museum-record', citation: 'c', retrievedAt: now }],
-        disputeStatus: 'undisputed',
-        assertedBy: { contributorId: 'system', ocmTier: PENDING_OC_TIER },
-        assertedAt: now,
-      },
-    ],
-    rightsPosture: { posture: 'can_store_and_republish', basis: 'CC0', determinedAt: now },
-    trust: { contributorCredentialTier: PENDING_OC_TIER, evidenceGrade: 'source-linked' },
-    canonicalStatus: 'canonical',
-    createdAt: now,
-    updatedAt: now,
-    ...over,
-  };
-}
 
 function makeArtwork(id: string, over: Partial<Artwork> = {}): Artwork {
   const code = id.slice(0, id.indexOf(':'));
@@ -63,14 +37,7 @@ function memoryCache() {
   const objects = new Map<string, Artwork>();
   const queries = new Map<string, string[]>();
   const store: CacheStore = {
-    // Mirrors the real `Cache.getObject` (db.ts), which JSON.parses a fresh
-    // copy from `full_record` on every read; a caller mutating the returned
-    // artwork in memory (hotlinkRestricted backfill, registry enrichment
-    // attach) never silently mutates the stored row.
-    getObject: (id) => {
-      const a = objects.get(id);
-      return a ? (JSON.parse(JSON.stringify(a)) as Artwork) : null;
-    },
+    getObject: (id) => objects.get(id) ?? null,
     upsertObject: (a) => {
       objects.set(a.id, a);
     },
@@ -808,90 +775,5 @@ describe('stable sort — deterministic search ordering', () => {
     const out = await fed.search({ query: 'painting', has_image: true, limit: 10 });
     const ids = out.results.map((r) => r.id);
     expect(ids).toEqual([...ids].sort((x, y) => x.localeCompare(y)));
-  });
-});
-
-describe('createFederation registry (provenance-enrichment) wiring', () => {
-  it('leaves enrichment unset when no registryStore is configured (every current deployment)', async () => {
-    const t = fakeFetcher('test', { ids: ['test:1'], accept: new Set(['test:1']) });
-    const { store } = memoryCache();
-    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
-
-    const out = await fed.getArtwork('test:1');
-    expect(out.ok).toBe(true);
-    if (out.ok) expect(out.artwork.enrichment).toBeUndefined();
-  });
-
-  it('attaches enrichment on a fresh fetch when a resolving registry entry exists', async () => {
-    const t = fakeFetcher('test', { ids: ['test:1'], accept: new Set(['test:1']) });
-    const { store } = memoryCache();
-    const { store: registryStore, entries } = memoryRegistryStore();
-    entries.set('test:1', registryEntry('test:1'));
-    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store, registryStore });
-
-    const out = await fed.getArtwork('test:1');
-    expect(out.ok).toBe(true);
-    if (!out.ok) return;
-    expect(out.artwork.enrichment).toEqual({
-      registryId: 'test:1',
-      canonicalStatus: 'canonical',
-      evidenceGrade: 'source-linked',
-      assertionCount: 1,
-    });
-  });
-
-  it('attaches enrichment on a cache-hit path too, without persisting it into the object cache', async () => {
-    const t = fakeFetcher('test', { ids: ['test:1'], accept: new Set(['test:1']) });
-    const { store, objects } = memoryCache();
-    const { store: registryStore, entries } = memoryRegistryStore();
-    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store, registryStore });
-
-    // First call: no registry entry yet.
-    const first = await fed.getArtwork('test:1');
-    expect(first.ok).toBe(true);
-    if (first.ok) expect(first.artwork.enrichment).toBeUndefined();
-    // The cached copy stored during the fresh fetch carries no enrichment either.
-    expect(objects.get('test:1')?.enrichment).toBeUndefined();
-
-    // A registry entry now exists (e.g. a harvest ran); no re-fetch, served from cache.
-    entries.set('test:1', registryEntry('test:1'));
-    const getRawSpy = vi.spyOn(t.fetcher, 'getRaw');
-    const second = await fed.getArtwork('test:1');
-    expect(getRawSpy).not.toHaveBeenCalled();
-    expect(second.ok).toBe(true);
-    if (second.ok) expect(second.artwork.enrichment?.registryId).toBe('test:1');
-    // Still not persisted into the object cache; enrichment is looked up live.
-    expect(objects.get('test:1')?.enrichment).toBeUndefined();
-  });
-
-  it('has_enrichment filters to only records with a resolving registry entry', async () => {
-    const t = fakeFetcher('test', { ids: ['test:1', 'test:2'], accept: new Set(['test:1', 'test:2']) });
-    const { store } = memoryCache();
-    const { store: registryStore, entries } = memoryRegistryStore();
-    entries.set('test:1', registryEntry('test:1'));
-    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store, registryStore });
-
-    const out = await fed.search({ query: 'x', has_image: true, limit: 10, has_enrichment: true });
-    expect(out.results.map((r) => r.id)).toEqual(['test:1']);
-  });
-
-  it('has_enrichment returns an empty page (not an error) when no registryStore is configured', async () => {
-    const t = fakeFetcher('test', { ids: ['test:1'], accept: new Set(['test:1']) });
-    const { store } = memoryCache();
-    const fed = createFederation({ fetchers: { test: t.fetcher }, cache: store });
-
-    const out = await fed.search({ query: 'x', has_image: true, limit: 10, has_enrichment: true });
-    expect(out.results).toEqual([]);
-  });
-
-  it('registryStats returns null when unconfigured, and live counts when configured', async () => {
-    const { store } = memoryCache();
-    const unconfigured = createFederation({ fetchers: {}, cache: store });
-    expect(await unconfigured.registryStats()).toBeNull();
-
-    const { store: registryStore, entries } = memoryRegistryStore();
-    entries.set('test:1', registryEntry('test:1'));
-    const configured = createFederation({ fetchers: {}, cache: store, registryStore });
-    expect(await configured.registryStats()).toEqual({ entryCount: 1, withEnrichmentCount: 0 });
   });
 });

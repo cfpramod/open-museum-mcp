@@ -1,8 +1,7 @@
 import type { ColorFamily, PaletteEntry } from './color/colorMath.js';
 import type { MediumCategory } from './medium.js';
-import type { ArtworkEnrichment } from './core/registry/types.js';
 
-export type { ColorFamily, MediumCategory, PaletteEntry, ArtworkEnrichment };
+export type { ColorFamily, MediumCategory, PaletteEntry };
 
 export type LicenseType = 'CC0' | 'PD' | 'CC-BY' | 'CC-BY-SA' | 'OTHER' | 'UNKNOWN';
 
@@ -168,14 +167,6 @@ export interface Artwork {
    * by the Cleveland adapter (Sketchfab via `sketchfab_id`); Smithsonian 3D next.
    */
   models3d?: Model3D[];
-  /**
-   * Provenance-enrichment summary from the registry layer, present only when
-   * a `registryStore` is configured (OMA's future store, not built into any
-   * current deployment) and a registry entry resolves for this id. Absent
-   * (not `null`) otherwise: "no registry entry yet," never a completeness
-   * signal about the work itself. See `docs/plans/catalogue-raisonne-increment-1.md`.
-   */
-  enrichment?: ArtworkEnrichment;
 }
 
 /**

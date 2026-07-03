@@ -14,7 +14,6 @@ import { filterByYearRange } from '../yearFilter.js';
 import type { CacheStore } from './cache.js';
 import { wrapTier0, type Tier0Envelope } from './clearance/envelope.js';
 import { buildClearancePayload } from './clearance/manifest.js';
-import type { RegistryStore } from './registry/store.js';
 
 // Museum IDs follow `<code>:<segment>(/<segment>)*`. Each segment is
 // alphanumeric, underscore, or hyphen. The four numeric-ID museums (Met,
@@ -69,13 +68,6 @@ export const SearchParamsSchema = z.object({
   color_family: z.enum(COLOR_FAMILY_NAMES).optional(),
   /** When true, restrict to records with at least one openly-licensed 3D scan. */
   has_3d: z.boolean().optional(),
-  /**
-   * When true, restrict to records with a resolving registry (provenance-
-   * enrichment) entry. Only meaningful when a `registryStore` is configured;
-   * with none configured, no record ever carries `enrichment` and this
-   * filter returns an empty page rather than erroring.
-   */
-  has_enrichment: z.boolean().optional(),
 });
 export type SearchParams = z.infer<typeof SearchParamsSchema>;
 
@@ -166,15 +158,6 @@ export interface FederationOptions {
    * not a gate). The MCP server wires in `createColorExtractor()`.
    */
   extractColor?: (artwork: Artwork) => Promise<ColorData | null>;
-  /**
-   * The registry (provenance-enrichment) store. OPTIONAL and ADDITIVE: when
-   * absent (every current deployment, OMA's concrete store doesn't exist
-   * yet), registry features are simply not surfaced; no error, no behavior
-   * change from before this field existed. Mirrors the `CacheStore`
-   * injection pattern: `/core` carries no storage of its own. See
-   * `docs/plans/catalogue-raisonne-increment-1.md`.
-   */
-  registryStore?: RegistryStore;
 }
 
 export interface Federation {
@@ -196,11 +179,6 @@ export interface Federation {
    * error: a deny is a valid answer.
    */
   clearanceManifest(id: string): Promise<Tier0Envelope>;
-  /**
-   * Present-state counts from the registry store, or `null` when none is
-   * configured. Never described as complete: growing, not exhaustive.
-   */
-  registryStats(): Promise<{ entryCount: number; withEnrichmentCount: number } | null>;
 }
 
 async function withConcurrency<T, R>(
@@ -329,26 +307,6 @@ export function createFederation(opts: FederationOptions): Federation {
   const engineVersion = opts.engineVersion ?? '0.0.0';
   const clock = opts.clock ?? (() => new Date().toISOString());
   const extractColor = opts.extractColor;
-  const registryStore = opts.registryStore;
-
-  // Looks up the registry entry (when a store is configured) and attaches an
-  // `enrichment` summary to the artwork IN MEMORY ONLY, deliberately never
-  // persisted into the object cache. Enrichment grows via write-back over
-  // time; baking a snapshot into a 90-day cached row would go stale well
-  // before the row expires, contradicting the "present state, never stale
-  // completeness" discipline. A no-op when no store is configured (every
-  // current deployment) or no entry resolves for this id.
-  async function attachEnrichment(artwork: Artwork): Promise<void> {
-    if (!registryStore) return;
-    const entry = await registryStore.getEntry(artwork.id);
-    if (!entry) return;
-    artwork.enrichment = {
-      registryId: entry.identity.registryId,
-      canonicalStatus: entry.canonicalStatus,
-      evidenceGrade: entry.trust.evidenceGrade,
-      assertionCount: entry.assertions.length,
-    };
-  }
 
   async function getArtwork(id: string): Promise<FetchOutcome> {
     if (!ID_REGEX.test(id)) {
@@ -374,7 +332,6 @@ export function createFederation(opts: FederationOptions): Federation {
         if (await enrichColor(cached)) await cache.upsertObject(cached);
         // Backfill hotlinkRestricted onto records cached before v0.16 added it.
         if (fetcher?.hotlinkRestricted) cached.imageUrls.hotlinkRestricted = true;
-        await attachEnrichment(cached);
         return { ok: true, artwork: cached };
       }
     }
@@ -393,9 +350,6 @@ export function createFederation(opts: FederationOptions): Federation {
 
     await enrichColor(result.artwork);
     if (!fetcher.noCache) await cache.upsertObject(result.artwork);
-    // Attached AFTER the cache write, deliberately: see `attachEnrichment`'s
-    // comment on why enrichment is never persisted into the object cache.
-    await attachEnrichment(result.artwork);
     return { ok: true, artwork: result.artwork };
   }
 
@@ -499,18 +453,13 @@ export function createFederation(opts: FederationOptions): Federation {
       ? byFamily.filter((a) => Array.isArray(a.models3d) && a.models3d.length > 0)
       : byFamily;
 
-    // has_enrichment is a post-fetch filter (like has_3d); only records with a
-    // resolving registry entry match. `enrichment` is attached by getArtwork
-    // per candidate above, so this needs no extra store round-trip here.
-    const byEnrichment = params.has_enrichment ? by3d.filter((a) => Boolean(a.enrichment)) : by3d;
-
     // `color` re-orders the survivors by CIEDE2000 nearness to the query colour.
     // Colourless records can't be ranked by colour, so they're dropped from a
     // colour-ranked search.
-    let ordered = byEnrichment;
+    let ordered = by3d;
     if (params.color) {
       const queryLab = hexToLab(params.color);
-      ordered = byEnrichment
+      ordered = by3d
         .filter((a): a is Artwork & { dominantColor: string } => Boolean(a.dominantColor))
         .map((a) => ({ a, d: ciede2000(queryLab, hexToLab(a.dominantColor)) }))
         .sort((x, y) => x.d - y.d)
@@ -571,10 +520,5 @@ export function createFederation(opts: FederationOptions): Federation {
     return wrapTier0(buildClearancePayload(result, buildOpts));
   }
 
-  async function registryStats(): Promise<{ entryCount: number; withEnrichmentCount: number } | null> {
-    if (!registryStore) return null;
-    return registryStore.getStats();
-  }
-
-  return { fetchers, search, facets, getArtwork, cite, clearanceManifest, registryStats };
+  return { fetchers, search, facets, getArtwork, cite, clearanceManifest };
 }

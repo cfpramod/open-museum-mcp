@@ -207,19 +207,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             description:
               'Optional filter for records with at least one openly-licensed 3D scan (Cleveland Museum of Art via Sketchfab, currently the only source). Post-fetch over the bounded window, so this may return fewer than `limit`.',
           },
-          has_enrichment: {
-            type: 'boolean',
-            description:
-              'Optional filter for records with a resolving provenance-enrichment registry entry. Only meaningful when this deployment has a registry store configured; on most deployments no record carries one yet, so this returns an empty page rather than erroring. Post-fetch over the bounded window, so this may return fewer than `limit`.',
-          },
         },
         required: ['query'],
       },
     },
     {
       name: 'get_artwork',
-      description:
-        'Fetch a single artwork by its normalized ID (e.g. met:436533). When a registry entry exists, includes provenance-enrichment metadata (evidence grade, assertion count). Most works have none yet; this is not a completeness signal.',
+      description: 'Fetch a single artwork by its normalized ID (e.g. met:436533).',
       inputSchema: {
         type: 'object',
         properties: {
@@ -295,15 +289,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           year_max: { type: 'integer', description: 'Optional inclusive upper bound on creation year (negative = BCE).' },
         },
         required: ['query'],
-      },
-    },
-    {
-      name: 'registry_stats',
-      description:
-        'Present-state counts for the provenance-enrichment registry: total entries and how many carry enrichment beyond the museum-source baseline. Growing, not exhaustive; reflects only sources harvested so far, never described as complete. Returns a hint if this deployment has no registry store configured.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
       },
     },
     {
@@ -415,16 +400,6 @@ async function handleDiscoverRandom(args: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(artwork, null, 2) }] };
 }
 
-async function handleRegistryStats() {
-  const stats = await federation.registryStats();
-  if (!stats) {
-    return errorResult(
-      'No provenance-enrichment registry is configured on this deployment yet. registry_stats reflects a registry store when one is wired in; none is available here.',
-    );
-  }
-  return { content: [{ type: 'text' as const, text: JSON.stringify(stats, null, 2) }] };
-}
-
 function handleListTraditions() {
   const traditions = cache.listTraditions();
   const isEmpty = traditions.regions.length === 0 && traditions.periods.length === 0;
@@ -445,7 +420,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === 'cite') return await handleCite(args);
     if (name === 'discover_random') return await handleDiscoverRandom(args);
     if (name === 'list_traditions') return handleListTraditions();
-    if (name === 'registry_stats') return await handleRegistryStats();
     if (name === 'clearance_record') return await handleClearanceRecord(federation, args);
     return errorResult(`unknown tool: ${name}`);
   } catch (err) {
