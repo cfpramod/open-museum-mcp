@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gettyFetcher } from '../src/fetchers/getty.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -110,5 +110,91 @@ describe('Getty adapter normalization', () => {
     // Falls back to the `_label`, stripped of its trailing "(accession)" parenthetical.
     expect(result.artwork.title).toBe('Irises');
     expect(result.artwork.description).toBeUndefined();
+  });
+});
+
+describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function objectFixtureWithShowsId(showsId: string): unknown {
+    return { ...(fixture('getty-object-accepted.json') as Record<string, unknown>), shows: [{ id: showsId }] };
+  }
+
+  it('does NOT fetch shows[0].id when its host is not *.getty.edu (SSRF vector)', async () => {
+    const objectUrl = 'http://169.254.169.254/latest/meta-data/iam/security-credentials/';
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      return new Response(JSON.stringify(objectFixtureWithShowsId(objectUrl)), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
+
+    // Only the object fetch happened; the attacker-controlled cloud-metadata URL was never requested.
+    expect(calls).toHaveLength(1);
+    expect(calls.some((u) => u.includes('169.254.169.254'))).toBe(false);
+    expect(raw.media).toBeNull();
+  });
+
+  it('does NOT fetch a plausible-but-wrong lookalike host (evil-getty.edu / getty.edu.evil.com)', async () => {
+    for (const lookalike of ['https://evil-getty.edu/x', 'https://media.getty.edu.evil.com/x', 'https://xgetty.edu/x']) {
+      const calls: string[] = [];
+      globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        calls.push(url);
+        return new Response(JSON.stringify(objectFixtureWithShowsId(lookalike)), { status: 200 });
+      }) as unknown as typeof fetch;
+
+      const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
+      expect(calls).toHaveLength(1);
+      expect(raw.media).toBeNull();
+    }
+  });
+
+  it('DOES fetch a legitimate media.getty.edu URL (no coverage loss from the guard)', async () => {
+    const mediaUrl = 'https://media.getty.edu/museum/collection/media/12345';
+    let mediaFetched = false;
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === mediaUrl) {
+        mediaFetched = true;
+        return new Response(JSON.stringify(fixture('getty-media-accepted.json')), { status: 200 });
+      }
+      return new Response(JSON.stringify(objectFixtureWithShowsId(mediaUrl)), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
+    expect(mediaFetched).toBe(true);
+    expect(raw.media).not.toBeNull();
+  });
+
+  it('DOES fetch the bare getty.edu apex host (no subdomain)', async () => {
+    const mediaUrl = 'https://getty.edu/museum/collection/media/12345';
+    let mediaFetched = false;
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === mediaUrl) {
+        mediaFetched = true;
+        return new Response(JSON.stringify(fixture('getty-media-accepted.json')), { status: 200 });
+      }
+      return new Response(JSON.stringify(objectFixtureWithShowsId(mediaUrl)), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb');
+    expect(mediaFetched).toBe(true);
+  });
+
+  it('does NOT fetch a malformed shows[0].id that fails URL parsing', async () => {
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      return new Response(JSON.stringify(objectFixtureWithShowsId('not a url')), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
+    expect(calls).toHaveLength(1);
+    expect(raw.media).toBeNull();
   });
 });

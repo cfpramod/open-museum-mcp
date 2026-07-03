@@ -30,6 +30,28 @@ function idFromUri(uri: string): string {
   return segments[segments.length - 1] ?? '';
 }
 
+// SSRF guard for the media hydration fetch below: `shows[0].id` is an
+// upstream-derived URL (Getty's own object JSON tells us where to fetch the
+// media entity), and this is the ONLY fetcher in the engine that follows an
+// upstream-influenceable URL server-side; every peer constructs its
+// hydration URL from a fixed API host + a validated numeric/UUID id. `fetch`
+// on Node routes `localhost`/`169.254.169.254`/private ranges, so an
+// unvalidated host here is a real SSRF surface, not a Workers-inert one.
+// Positive host-allowlist (not a private-range blocklist): Getty's media
+// entities live at `media.getty.edu`/`data.getty.edu`, so requiring the
+// `getty.edu` apex or a subdomain of it costs zero real coverage. `endsWith`
+// is anchored on the literal `.` separator, so a lookalike like
+// `evil-getty.edu` or `media.getty.edu.evil.com` does not match.
+const GETTY_APEX_HOST = 'getty.edu';
+function isGettyMediaHost(uri: string): boolean {
+  try {
+    const host = new URL(uri).hostname;
+    return host === GETTY_APEX_HOST || host.endsWith(`.${GETTY_APEX_HOST}`);
+  } catch {
+    return false;
+  }
+}
+
 const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
   rejectFor('getty', id, reason, rawSnapshot);
 
@@ -119,6 +141,7 @@ export const gettyFetcher: Fetcher = {
     const term = escapeSparqlLiteral(query.toLowerCase());
     const imageClause = options.hasImage !== false ? '?obj crm:P65_shows_visual_item ?img .' : '';
     const sparql = `PREFIX crm: <http://www.cidoc-crm.org/cidoc-crm/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 SELECT DISTINCT ?obj WHERE {
   ?obj a crm:E22_Human-Made_Object .
   ${imageClause}
@@ -153,7 +176,7 @@ SELECT DISTINCT ?obj WHERE {
       : [];
     const firstImageUri = asOptionalString(shows[0]?.id);
     let media: unknown = null;
-    if (firstImageUri) {
+    if (firstImageUri && isGettyMediaHost(firstImageUri)) {
       try {
         const mediaRes = await httpGet(firstImageUri, { headers: JSON_ACCEPT });
         if (mediaRes.ok) media = await mediaRes.json();
