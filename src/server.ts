@@ -27,6 +27,7 @@ import { buildSeedQueryFromConstraints } from './discoverSeed.js';
 import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
 import { europeanaFetcher } from './fetchers/europeana.js';
+import { gettyFetcher } from './fetchers/getty.js';
 import { harvardFetcher } from './fetchers/harvard.js';
 import { metFetcher } from './fetchers/met.js';
 import { ngaFetcher } from './fetchers/nga.js';
@@ -68,6 +69,9 @@ const FETCHERS: Record<string, Fetcher> = {
   // National Gallery of Art (Washington) — INGEST: a committed gzipped CC0 bundle
   // (~63k open-access works) ships in the package; keyless, no live API.
   [ngaFetcher.code]: ngaFetcher,
+  // Getty Museum — FEDERATE via the public SPARQL endpoint (no REST search or
+  // bulk dump exists); per-record REST hydration, keyless, no key required.
+  [gettyFetcher.code]: gettyFetcher,
 };
 
 // Europeana requires a per-user API key (free tier, 10K req/day). Only
@@ -167,7 +171,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           museum: {
             type: 'string',
             description:
-              'Optional museum code. Always available: met, cleveland, aic, rijksmuseum, walters, smk, wellcome, wikimedia (Commons). Key-gated: europeana (EUROPEANA_API_KEY), smithsonian (SMITHSONIAN_API_KEY). Omit to search every registered source.',
+              'Optional museum code. Always available: met, cleveland, aic, rijksmuseum, walters, smk, wellcome, nga, getty, wikimedia (Commons). Key-gated: europeana (EUROPEANA_API_KEY), smithsonian (SMITHSONIAN_API_KEY), harvard (HARVARD_API_KEY). Omit to search every registered source.',
           },
           has_image: {
             type: 'boolean',

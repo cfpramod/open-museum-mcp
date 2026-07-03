@@ -1,0 +1,33 @@
+{
+  "@context": "https://linked.art/ns/v1/linked-art.json",
+  "id": "https://data.getty.edu/media/image/00000000-0000-0000-0000-000000000003",
+  "type": "VisualItem",
+  "_label": "Media for a Copyrighted Work",
+  "digitally_shown_by": [
+    {
+      "type": "DigitalObject",
+      "access_point": [
+        {
+          "id": "https://media.getty.edu/iiif/image/00000000-0000-0000-0000-000000000003/full/max/0/default.jpg",
+          "type": "DigitalObject",
+          "_label": "Full-resolution version of the image",
+          "format": "image/jpeg"
+        }
+      ]
+    }
+  ],
+  "subject_to": [
+    {
+      "id": "https://data.getty.edu/media/image/00000000-0000-0000-0000-000000000003/rights",
+      "type": "Right",
+      "_label": "Rights for Media",
+      "classified_as": [
+        {
+          "id": "https://creativecommons.org/licenses/by/4.0/",
+          "type": "Type",
+          "_label": "Attribution 4.0 International (CC BY 4.0)"
+        }
+      ]
+    }
+  ]
+}

@@ -597,6 +597,93 @@ export const validateHarvardLicense: LicenseValidator = (raw) => {
   return reject(`harvard: imagepermissionlevel=${String(obj.imagepermissionlevel)} (need 0/open access; reject)`);
 };
 
+// The Getty Museum's Linked.Art API declares CC0 rights TWICE, independently,
+// at two different levels — and they can diverge:
+//   1. Collection METADATA (title, artist, date, etc.) is blanket-CC0 across
+//      the whole dataset per Getty's published policy, but we still verify it
+//      per-record from the object's own top-level `subject_to` block rather
+//      than assuming the blanket declaration holds for every record.
+//   2. Each IMAGE is independently rights-checked via its own media entity's
+//      `subject_to` (Getty's Open Content Program covers ~91k of the ~168k
+//      objects' images; the rest remain under copyright even though the
+//      metadata about them is open). This is the genuine two-tier case
+//      documented in CLAUDE.md: express it as `imageOpenAccess: false` +
+//      `metadataOpenAccess: true` rather than collapsing or rejecting outright.
+// `classified_as` is an array (not a fixed index) on both blocks, so the CC0
+// marker is found by scanning it, never assumed to be at position 0 — Getty's
+// own docs example and a live media-entity fetch (2026-07-02) both show CC0
+// at different array positions depending on the block.
+const CC0_URI = 'http://creativecommons.org/publicdomain/zero/1.0/';
+
+function hasClassification(subjectTo: unknown, targetId: string): boolean {
+  if (!Array.isArray(subjectTo)) return false;
+  for (const right of subjectTo) {
+    if (!right || typeof right !== 'object') continue;
+    const classified = (right as Record<string, unknown>).classified_as;
+    if (!Array.isArray(classified)) continue;
+    for (const c of classified) {
+      if (c && typeof c === 'object' && (c as Record<string, unknown>).id === targetId) return true;
+    }
+  }
+  return false;
+}
+
+// Gates the OBJECT record: is this record's collection metadata verified CC0?
+// Registered in VALIDATORS for the standard per-museum dispatch. Does not (and
+// cannot, from this record alone) determine image rights — see
+// `validateGettyImageLicense`, called separately by the Getty fetcher per
+// image, once it has fetched that image's own media entity.
+export const validateGettyLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('getty: object missing or not an object');
+  }
+  const obj = raw as Record<string, unknown>;
+  if (hasClassification(obj.subject_to, CC0_URI)) {
+    return {
+      accepted: true,
+      license: {
+        type: 'CC0',
+        rawValue: CC0_URI,
+        verificationSource: 'getty.subject_to (Collection Metadata)',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      // Image rights are independently verified by validateGettyImageLicense;
+      // never inferred from the metadata verdict.
+      imageOpenAccess: false,
+      metadataOpenAccess: true,
+      reason: 'getty: collection-metadata licensing declares CC0',
+    };
+  }
+  return reject('getty: collection-metadata licensing is not CC0 (strict default reject)');
+};
+
+// Gates a single IMAGE (a Getty `media/image/<uuid>` entity), independently of
+// the object's metadata rights. Never inherits `validateGettyLicense`'s
+// verdict — see the two-tier comment above.
+export const validateGettyImageLicense: LicenseValidator = (mediaRaw) => {
+  if (!mediaRaw || typeof mediaRaw !== 'object') {
+    return reject('getty-image: object missing or not an object');
+  }
+  const obj = mediaRaw as Record<string, unknown>;
+  if (hasClassification(obj.subject_to, CC0_URI)) {
+    return {
+      accepted: true,
+      license: {
+        type: 'CC0',
+        rawValue: CC0_URI,
+        verificationSource: 'getty.media.subject_to',
+        verifiedAt: nowIso(),
+        confidence: 'high',
+      },
+      imageOpenAccess: true,
+      metadataOpenAccess: true,
+      reason: 'getty-image: subject_to declares CC0 (Open Content Program)',
+    };
+  }
+  return reject('getty-image: subject_to is not CC0 (image restricted; strict default reject)');
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
@@ -609,6 +696,7 @@ const VALIDATORS: Record<string, LicenseValidator> = {
   wellcome: validateWellcomeLicense,
   nga: validateNgaLicense,
   harvard: validateHarvardLicense,
+  getty: validateGettyLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {

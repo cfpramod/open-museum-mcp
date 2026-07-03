@@ -3,6 +3,8 @@ import {
   validateAicLicense,
   validateCleveland3DLicense,
   validateClevelandLicense,
+  validateGettyImageLicense,
+  validateGettyLicense,
   validateLicense,
   validateMetLicense,
 } from '../src/licenseGate.js';
@@ -105,6 +107,71 @@ describe('licenseGate', () => {
     it('rejects malformed input', () => {
       const r = validateAicLicense(null);
       expect(r.accepted).toBe(false);
+    });
+  });
+
+  describe('Getty metadata validator', () => {
+    const cc0Right = (id: string) => [{ classified_as: [{ id }] }];
+
+    it('accepts subject_to declaring CC0 (collection metadata)', () => {
+      const r = validateGettyLicense({ subject_to: cc0Right('http://creativecommons.org/publicdomain/zero/1.0/') });
+      expect(r.accepted).toBe(true);
+      expect(r.license?.type).toBe('CC0');
+      expect(r.metadataOpenAccess).toBe(true);
+      // Image rights are independently verified elsewhere; never inherited here.
+      expect(r.imageOpenAccess).toBe(false);
+    });
+
+    it('rejects non-CC0 subject_to (strict default)', () => {
+      const r = validateGettyLicense({ subject_to: cc0Right('https://creativecommons.org/licenses/by/4.0/') });
+      expect(r.accepted).toBe(false);
+      expect(r.reason).toContain('strict default reject');
+    });
+
+    it('rejects missing subject_to (strict default)', () => {
+      const r = validateGettyLicense({});
+      expect(r.accepted).toBe(false);
+    });
+
+    it('rejects malformed input', () => {
+      expect(validateGettyLicense(null).accepted).toBe(false);
+      expect(validateGettyLicense('not an object').accepted).toBe(false);
+    });
+
+    it('finds the CC0 marker regardless of its position within classified_as', () => {
+      const r = validateGettyLicense({
+        subject_to: [
+          {
+            classified_as: [
+              { id: 'https://data.getty.edu/local/thesaurus/rights-statement' },
+              { id: 'http://vocab.getty.edu/aat/300417696' },
+              { id: 'http://creativecommons.org/publicdomain/zero/1.0/' },
+            ],
+          },
+        ],
+      });
+      expect(r.accepted).toBe(true);
+    });
+  });
+
+  describe('Getty per-image validator', () => {
+    it('accepts a media entity whose subject_to declares CC0', () => {
+      const r = validateGettyImageLicense({
+        subject_to: [{ classified_as: [{ id: 'http://creativecommons.org/publicdomain/zero/1.0/' }] }],
+      });
+      expect(r.accepted).toBe(true);
+      expect(r.imageOpenAccess).toBe(true);
+    });
+
+    it('rejects a media entity whose subject_to is CC-BY, not CC0 (image restricted)', () => {
+      const r = validateGettyImageLicense({
+        subject_to: [{ classified_as: [{ id: 'https://creativecommons.org/licenses/by/4.0/' }] }],
+      });
+      expect(r.accepted).toBe(false);
+    });
+
+    it('rejects malformed input', () => {
+      expect(validateGettyImageLicense(null).accepted).toBe(false);
     });
   });
 

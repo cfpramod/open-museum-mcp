@@ -1,0 +1,182 @@
+{
+  "@context": "https://linked.art/ns/v1/linked-art.json",
+  "id": "https://data.getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade",
+  "type": "VisualItem",
+  "_label": "Media for Lirios",
+  "shown_by": [
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb",
+      "type": "HumanMadeObject",
+      "_label": "Irises"
+    }
+  ],
+  "digitally_shown_by": [
+    {
+      "id": "https://data.getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade/digital_object/9b3245e9-4b8d-9264-ae22-12af3914dcea",
+      "type": "DigitalObject",
+      "_label": "Main View - Front for Media for Lirios",
+      "classified_by": [
+        {
+          "id": "http://vocab.getty.edu/aat/300215302",
+          "type": "Type",
+          "_label": "digital images"
+        }
+      ],
+      "format": "image/tiff",
+      "dimension": [
+        {
+          "id": "https://data.getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade/digital_object/9b3245e9-4b8d-9264-ae22-12af3914dcea/height",
+          "type": "Dimension",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300055644",
+              "type": "Type",
+              "_label": "Height"
+            }
+          ],
+          "value": 7122,
+          "unit": {
+            "id": "http://vocab.getty.edu/aat/300266190",
+            "type": "MeasurementUnit",
+            "_label": "pixels"
+          }
+        },
+        {
+          "id": "https://data.getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade/digital_object/9b3245e9-4b8d-9264-ae22-12af3914dcea/width",
+          "type": "Dimension",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300055647",
+              "type": "Type",
+              "_label": "Width"
+            }
+          ],
+          "value": 9021,
+          "unit": {
+            "id": "http://vocab.getty.edu/aat/300266190",
+            "type": "MeasurementUnit",
+            "_label": "pixels"
+          }
+        }
+      ],
+      "access_point": [
+        {
+          "id": "https://media.getty.edu/iiif/image/8c255d80-7382-46db-9fa8-892c0d37247e",
+          "type": "DigitalObject",
+          "_label": "IIIF Image API for the image",
+          "conforms_to": "http://iiif.io/api/image",
+          "format": "application/json",
+          "classified_as": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/iiif-image",
+              "type": "Type",
+              "_label": "IIIF image service"
+            }
+          ]
+        },
+        {
+          "id": "https://media.getty.edu/iiif/image/8c255d80-7382-46db-9fa8-892c0d37247e/full/!600,600/0/default.jpg",
+          "type": "DigitalObject",
+          "_label": "Thumbnail for the image",
+          "format": "image/jpeg",
+          "classified_as": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/thumbnail",
+              "type": "Type",
+              "_label": "thumbnail image"
+            }
+          ]
+        },
+        {
+          "id": "https://media.getty.edu/iiif/image/8c255d80-7382-46db-9fa8-892c0d37247e/full/max/0/default.jpg",
+          "type": "DigitalObject",
+          "_label": "Full-resolution version of the image",
+          "format": "image/jpeg",
+          "classified_as": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/full-resolution",
+              "type": "Type",
+              "_label": "full resolution image"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "subject_to": [
+    {
+      "id": "https://data.getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade/rights",
+      "type": "Right",
+      "_label": "Rights for Media for Lirios",
+      "classified_as": [
+        {
+          "type": "Type",
+          "_label": "Creative Commons Public Domain Dedication",
+          "id": "http://creativecommons.org/publicdomain/zero/1.0/",
+          "classified_as": [
+            {
+              "type": "Type",
+              "_label": "Rights Statement",
+              "id": "https://data.getty.edu/local/thesaurus/rights-statement"
+            },
+            {
+              "_deprecated": {
+                "reason": "Consolidation of local thesaurus terms.",
+                "replacement": "Filter on `Rights Statement` (https://data.getty.edu/local/thesaurus/rights-statement) instead.",
+                "since": "2023-08-13"
+              },
+              "type": "Type",
+              "_label": "RightsStatement.org Statement",
+              "id": "https://data.getty.edu/local/thesaurus/rightsstatement-org-statement"
+            }
+          ]
+        },
+        {
+          "type": "Type",
+          "_label": "download",
+          "id": "https://data.getty.edu/local/thesaurus/clearance/download",
+          "classified_as": [
+            {
+              "type": "Type",
+              "_label": "local clearance level",
+              "id": "https://data.getty.edu/local/thesaurus/clearance-level"
+            }
+          ]
+        }
+      ],
+      "possessed_by": [
+        {
+          "id": "http://vocab.getty.edu/ulan/500115988",
+          "type": "Group",
+          "_label": "The J. Paul Getty Museum, Los Angeles"
+        }
+      ]
+    }
+  ],
+  "subject_of": [
+    {
+      "id": "https://data.getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade/description",
+      "type": "LinguisticObject",
+      "value": "Front",
+      "classified_as": [
+        {
+          "type": "Type",
+          "_label": "descriptive note",
+          "id": "http://vocab.getty.edu/aat/300435416"
+        }
+      ]
+    },
+    {
+      "id": "https://data.getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade/texts/alt_text",
+      "type": "LinguisticObject",
+      "value": "Main View",
+      "classified_as": [
+        {
+          "type": "Type",
+          "_label": "Alternative text",
+          "id": "https://data.getty.edu/local/thesaurus/alt-text"
+        }
+      ]
+    }
+  ]
+}

@@ -19,7 +19,7 @@ import { normalizeMedium } from '../medium.js';
 import { isRightsUri, validateCommercialRights } from '../rights/commercialRights.js';
 import { fetchInfoJson, meetsPrintResolution } from '../iiif/client.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { httpGet, pickMaxResolution, rejectFor } from './helpers.js';
+import { derivePeriodFromYears, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
 import { ARTIST_NAME_MAX, TITLE_MAX } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
@@ -159,27 +159,6 @@ const RIJKS_PLACE_REGION: Record<string, string> = {
 function regionFromPlace(name: string): string | null {
   if (!name) return null;
   return normalizeRegion(name) ?? RIJKS_PLACE_REGION[name.trim().toLowerCase()] ?? null;
-}
-
-const ORDINAL_SUFFIX: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' };
-/** Century label for a CE year (1601 -> "17th century"). */
-function centuryLabel(year: number): string {
-  const c = Math.floor((year - 1) / 100) + 1;
-  const suffix = c % 100 >= 11 && c % 100 <= 13 ? 'th' : (ORDINAL_SUFFIX[c % 10] ?? 'th');
-  return `${c}${suffix} century`;
-}
-
-/**
- * Derive a period facet from the parsed year bounds — Rijks Linked-Art carries no
- * named-period vocabulary, but a single-century span is a useful tradition tag
- * (the date parser already gives the years). Null for BCE, missing, or
- * century-crossing spans (where no single century is meaningful).
- */
-function derivePeriod(yearStart: number | null, yearEnd: number | null): string | null {
-  if (yearStart === null || yearEnd === null || yearStart <= 0 || yearEnd <= 0) return null;
-  const cStart = Math.floor((yearStart - 1) / 100) + 1;
-  const cEnd = Math.floor((yearEnd - 1) / 100) + 1;
-  return cStart === cEnd ? centuryLabel(yearStart) : null;
 }
 
 /** Object-type label -> medium category (e.g. "painting"). */
@@ -331,7 +310,7 @@ export const rijksmuseumFetcher: Fetcher = {
       medium: '',
       mediumCategory: normalizeMedium(pickMedium(object)),
       region: regionFromPlace(str(raw.place)),
-      period: derivePeriod(yearStart, yearEnd),
+      period: derivePeriodFromYears(yearStart, yearEnd),
       imageUrls: {
         full: str(image.fullUrl),
         thumbnail: undefined,
