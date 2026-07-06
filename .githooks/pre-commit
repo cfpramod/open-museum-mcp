@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Shokunin craft gate — blocks stub/fake-demo code in staged shipping lines.
+# Policy (single source) lives at ~/.claude/scripts/craft-check.py via the `craft-check` wrapper.
+# No-ops where the tool isn't installed (CI / other machines), so it's safe to commit.
+if type craft-check >/dev/null 2>&1; then
+  craft-check
+  code=$?
+  if [ "$code" -eq 2 ]; then
+    echo ""
+    echo "✗ Shokunin craft gate BLOCKED this commit (stub / fake-demo in shipping code)."
+    echo "  Build the planned feature fully, or get an explicit scope decision from Pramod."
+    echo "  Deliberate, authorised override (logged): git commit --no-verify"
+    exit 1
+  fi
+fi
+exit 0
