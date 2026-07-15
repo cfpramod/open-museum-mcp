@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] — 2026-07-14
+
+### Added
+
+- **`waltersFetcher` + `createWaltersFetcher` on the `/core` surface (Workers-safe bundle-loader seam).** The Walters adapter (an ingest source: bundled `walters.json` index, no live API) was previously kept OFF `/core` because it read its bundle via a static `node:fs` import, which would break the core's Workers-safety guarantee. The bundle access is now an injectable seam: `createWaltersFetcher(loadBundle?)` takes a `WaltersBundleLoader` (sync or async), mirroring the `CacheStore` injection pattern, and the default loader reaches `node:fs`/`node:url` only through a lazy dynamic import inside the loader body — so importing `/core` stays safe in a Workers bundle, and only *calling* the default loader requires Node. A Workers host (e.g. the open-museum.art federation) constructs its own instance and injects the bundle as a bundler-imported JSON asset. The default `waltersFetcher` instance is unchanged in behaviour (package-shipped bundle, lazy single load per instance, identical search ranking and rights gating); the MCP server keeps using it as before. `WaltersBundle`, `WaltersBundleLoader`, and `WaltersRecord` types are exported alongside. A source-level guard test now enforces that the module never regains a static `node:` import.
+
 ## [0.18.0] — 2026-07-03
 
 ### Added
