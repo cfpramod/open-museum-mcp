@@ -113,3 +113,68 @@ describe('Walters adapter search + getRaw (bundled index)', () => {
     expect(ids.length).toBeLessThanOrEqual(3);
   });
 });
+
+// --- Bundle-loader seam (v0.19.0): Workers-safe /core export -------------------
+
+import { createWaltersFetcher, type WaltersBundle } from '../src/fetchers/walters.js';
+
+const TINY_BUNDLE: WaltersBundle = {
+  meta: { source: 'test' },
+  objects: [
+    {
+      i: '90607', n: 'W.554.1A', t: "Leaf from Qur'an", d: '1300-1400', a: 1300, b: 1400,
+      m: 'ink and gold on paper', c: 'Egyptian', l: 'Manuscripts', p: 'Mamluk', y: '',
+      k: 'quran calligraphy', r: 'Egyptian', g: 'w554_000a.jpg',
+    },
+    {
+      i: '12345', n: 'W.100', t: 'Persian Astrolabe', d: '1600', a: 1600, b: 1600,
+      m: 'brass', c: 'Iranian', l: 'Metalwork', p: 'Safavid', y: '',
+      k: 'astronomy instrument', r: 'Persian', g: 'w100_000a.jpg',
+    },
+  ],
+};
+
+describe('Walters bundle-loader seam (createWaltersFetcher)', () => {
+  it('searches and hydrates against an INJECTED bundle (no filesystem)', async () => {
+    let loads = 0;
+    const fetcher = createWaltersFetcher(() => { loads++; return TINY_BUNDLE; });
+    const ids = await fetcher.search('quran', 10);
+    expect(ids).toEqual(['walters:90607']);
+    const raw = await fetcher.getRaw('walters:90607');
+    const result = fetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.id).toBe('walters:90607');
+    // Loader runs once; the parsed index is cached per fetcher instance.
+    await fetcher.search('astrolabe', 10);
+    expect(loads).toBe(1);
+  });
+
+  it('accepts an async loader (Promise-returning), matching the CacheStore Awaitable pattern', async () => {
+    const fetcher = createWaltersFetcher(async () => TINY_BUNDLE);
+    const ids = await fetcher.search('persian astrolabe', 10);
+    expect(ids[0]).toBe('walters:12345');
+  });
+
+  it('keeps instances isolated: injected bundle never leaks into the default fetcher', async () => {
+    const injected = createWaltersFetcher(() => TINY_BUNDLE);
+    await injected.search('quran', 5);
+    // The default (fs-backed) fetcher still resolves real bundle records.
+    const raw = await waltersFetcher.getRaw('walters:90607');
+    expect(raw).not.toBeNull();
+  });
+
+  it('module stays Workers-safe: no static node:* imports in the source', () => {
+    // The /core export guarantee: importing walters.js must not crash a Workers
+    // bundle. Node built-ins may only be reached via lazy dynamic import inside
+    // the DEFAULT loader. This guards the module's import graph at source level.
+    const src = readFileSync(join(here, '..', 'src', 'fetchers', 'walters.ts'), 'utf-8');
+    expect(src).not.toMatch(/^import .* from 'node:/m);
+  });
+
+  it('exports from /core: waltersFetcher + createWaltersFetcher are on the public surface', async () => {
+    const core = await import('../src/core/index.js');
+    expect(core.waltersFetcher.code).toBe('walters');
+    expect(typeof core.createWaltersFetcher).toBe('function');
+  });
+});
