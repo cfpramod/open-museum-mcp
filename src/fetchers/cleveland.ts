@@ -168,6 +168,36 @@ export const clevelandFetcher: Fetcher = {
     // independent of the 2D imageOpenAccess/metadataOpenAccess above — never
     // inherited. Absent (not an empty array) when no scan exists or the gate
     // rejects it, matching every other optional Artwork field's convention.
+    // Provenance: Cleveland publishes a STRUCTURED custody record (ordered
+    // steps with description/date/citations/footnotes). Carried under the
+    // openclearance P-7 posture: `raw` = the source array EXACTLY as received,
+    // JSON-serialized (nothing dropped — citations/footnotes/sortorder all
+    // survive inside it, and it is authoritative); `entries` = the minimal
+    // interpretation, one entry per published step in museum order, wording
+    // verbatim. No step is merged, dropped, or synthesized; the museum's own
+    // gap language ("?–1963") rides inside the verbatim text. Absent field =
+    // "not published here", never a finding.
+    const provRaw = Array.isArray(r.provenance) ? (r.provenance as unknown[]) : [];
+    const provSteps = provRaw.filter(
+      (p): p is Record<string, unknown> => !!p && typeof p === 'object',
+    );
+    const provEntries = [...provSteps]
+      .sort((a, b) => (coerceFiniteNumber(a.sortorder) ?? 0) - (coerceFiniteNumber(b.sortorder) ?? 0))
+      .flatMap((p) => {
+        const description = asString(p.description);
+        const date = asOptionalString(p.date);
+        if (!description && !date) return []; // a fully empty step carries nothing to surface; it still survives in `raw`
+        return [{ description, ...(date ? { date } : {}) }];
+      });
+    const provenance =
+      provSteps.length > 0
+        ? {
+            raw: JSON.stringify(r.provenance),
+            rawFormat: 'structured-json' as const,
+            ...(provEntries.length > 0 ? { entries: provEntries } : {}),
+          }
+        : undefined;
+
     const sketchfabUrl = asOptionalString(r.sketchfab_url);
     let models3d: Model3D[] | undefined;
     const model3dDecision = validateCleveland3DLicense(inner);
@@ -220,6 +250,7 @@ export const clevelandFetcher: Fetcher = {
       },
       description: asOptionalString(r.accession_number),
       ...(models3d ? { models3d } : {}),
+      ...(provenance ? { provenance } : {}),
     };
 
     return { status: 'accepted', artwork };

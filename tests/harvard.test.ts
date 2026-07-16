@@ -73,3 +73,21 @@ describe('Harvard search query construction', () => {
     else process.env.HARVARD_API_KEY = prev;
   });
 });
+
+describe('Harvard provenance mapping (v0.20.0, openclearance P-7 posture)', () => {
+  it('carries the provenance string as verbatim raw text plus a single-entry interpretation', () => {
+    const result = harvardFetcher.normalize(fixture('harvard-provenance.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const prov = result.artwork.provenance;
+    expect(prov).toBeDefined();
+    expect(prov!.rawFormat).toBe('text');
+    expect(prov!.raw.length).toBeGreaterThan(0);
+    expect(prov!.entries![0].description).toBe(prov!.raw);
+  });
+
+  it('omits provenance when the source publishes null (real capture; absence is not a finding)', () => {
+    const result = harvardFetcher.normalize(fixture('harvard-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect('provenance' in result.artwork).toBe(false);
+  });
+});

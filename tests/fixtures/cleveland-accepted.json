@@ -7,7 +7,9 @@
     "creation_date": "1890",
     "creation_date_earliest": 1890,
     "creation_date_latest": 1890,
-    "culture": ["Netherlands"],
+    "culture": [
+      "Netherlands"
+    ],
     "technique": "oil on fabric",
     "type": "Painting",
     "url": "https://clevelandart.org/art/1958.31",
@@ -35,6 +37,57 @@
         "role": "artist",
         "birth_year": "1853",
         "death_year": "1890"
+      }
+    ],
+    "provenance": [
+      {
+        "description": "Johanna Van Gogh-Bonger [1862-1925], the wife of Theo van Gogh, Amsterdam, Netherlands.",
+        "citations": [],
+        "footnotes": [],
+        "date": null,
+        "sortorder": 1
+      },
+      {
+        "description": "(Artz and de Bois, The Hague, Netherlands)",
+        "citations": [],
+        "footnotes": null,
+        "date": "1912",
+        "sortorder": 2
+      },
+      {
+        "description": "Katherine S. Dreier [1877-1952], New York, NY",
+        "citations": [],
+        "footnotes": [],
+        "date": "1912-1929",
+        "sortorder": 3
+      },
+      {
+        "description": "Mrs. Cornelius Sullivan [1877-1939], New York, NY",
+        "citations": [],
+        "footnotes": [],
+        "date": "-1939",
+        "sortorder": 4
+      },
+      {
+        "description": "(Parke-Bernet Galleries, New York, NY, December 6-7, 1939, sold to Leonard C. Hanna Jr.)",
+        "citations": [],
+        "footnotes": [],
+        "date": "1939",
+        "sortorder": 5
+      },
+      {
+        "description": "Leonard C. Hanna Jr. [1889-1957], Cleveland, OH, bequeathed to the Cleveland Museum of Art",
+        "citations": [],
+        "footnotes": [],
+        "date": "1939-1958",
+        "sortorder": 6
+      },
+      {
+        "description": "The Cleveland Museum of Art, Cleveland, OH",
+        "citations": [],
+        "footnotes": [],
+        "date": "1958-",
+        "sortorder": 7
       }
     ]
   }

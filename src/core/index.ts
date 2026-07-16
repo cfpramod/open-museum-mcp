@@ -67,7 +67,7 @@ export {
 
 // Pure helpers a front door commonly needs alongside the federation.
 export { cite, type CiteStyle } from '../cite.js';
-export type { Artwork, ArtworkImages, ArtworkSource, ArtworkLicense, ValidationResult } from '../types.js';
+export type { Artwork, ArtworkImages, ArtworkSource, ArtworkLicense, ProvenanceEntry, ValidationResult } from '../types.js';
 export type { Fetcher, SearchOptions } from '../fetchers/types.js';
 
 // Medium controlled vocabulary — front doors (MCP tool schema, web facet UI)

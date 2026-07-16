@@ -84,6 +84,11 @@ export interface ArtworkImages {
   hotlinkRestricted?: boolean;
 }
 
+/**
+ * Where this RECORD came from (the museum's API + object page). NOT the
+ * object's custody history — that is {@link Artwork.provenance}. The two words
+ * collide in the wild ("provenance source"); here they are distinct on purpose.
+ */
 export interface ArtworkSource {
   apiUrl: string;
   pageUrl: string;
@@ -167,6 +172,68 @@ export interface Artwork {
    * by the Cleveland adapter (Sketchfab via `sketchfab_id`); Smithsonian 3D next.
    */
   models3d?: Model3D[];
+  /**
+   * The OBJECT's published custody record — where the object has BEEN. This is
+   * NOT {@link Artwork.source}, which is where this RECORD came from (the
+   * museum API); the two words collide in the wild and must never be conflated.
+   * ABSENT when the source publishes none via its API (e.g. the Met): absence
+   * means "not published here" — NEVER a clean bill, a red flag, or any other
+   * finding, and no consumer may treat it as implying clearance. The engine
+   * SURFACES the record; it never adjudicates it: no grading, no completeness,
+   * no derived flags, no dealer characterisation — screening judgments are
+   * curatorial work downstream. Additive v0.20 field.
+   */
+  provenance?: ObjectProvenance;
+}
+
+/**
+ * A source museum's published provenance record for an object, carried under
+ * the openclearance P-7 posture: `raw` is the source's record VERBATIM and is
+ * AUTHORITATIVE; `entries` is an INTERPRETATION — lossy by nature — and `raw`
+ * wins wherever the two could disagree.
+ */
+export interface ObjectProvenance {
+  /**
+   * The source's published provenance, VERBATIM — required whenever this block
+   * exists at all, so no parse can ever replace (and thereby launder) the
+   * source's own words. For `rawFormat: 'text'` this is the source's
+   * provenance string exactly as published. For `rawFormat: 'structured-json'`
+   * (Cleveland) it is the source's provenance array exactly as its API
+   * returned it, JSON-serialized with key order as received — every step,
+   * date, citation, and footnote survives inside it, nothing dropped.
+   */
+  raw: string;
+  /** How to read `raw`: source-published free text, or the source's own structured steps as JSON. */
+  rawFormat: 'text' | 'structured-json';
+  /**
+   * INTERPRETATION of `raw`, and deliberately a minimal one: one entry per
+   * step AS PUBLISHED, museum order, museum wording. The engine does NOT parse
+   * holders or dates out of prose, does NOT merge, drop, or synthesize steps,
+   * and does NOT promote gaps to entries (gap promotion is manifest-producer
+   * interpretation governed by the openclearance spec; the museum's own gap
+   * language — "?–1963", a bare dealer first step — survives verbatim in the
+   * step text and in `raw`). Free-text sources (AIC, Harvard) publish one
+   * block, so they carry exactly one entry.
+   */
+  entries?: ProvenanceEntry[];
+  /**
+   * The source's OWN hedge about its record, verbatim, when its API publishes
+   * one. Never fabricated: a museum's website-boilerplate caveat that is not
+   * in the API record is NOT synthesized here (per-source constants are the
+   * manifest producer's decision, not engine data).
+   */
+  caveat?: string;
+}
+
+/** One step of a published provenance record. See {@link ObjectProvenance.entries}. */
+export interface ProvenanceEntry {
+  /** The source's wording for this step, verbatim (may include the source's own uncertainty language). */
+  description: string;
+  /**
+   * The source's date text for this step, verbatim (e.g. "1912", "?–1963",
+   * "1930–"). Absent when the source publishes none — never derived.
+   */
+  date?: string;
 }
 
 /**

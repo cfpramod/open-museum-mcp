@@ -35,6 +35,8 @@ const AIC_FIELDS = [
   'classification_title',
   'image_id',
   'thumbnail',
+  // One string per record; the payload survives the 10x fields trim comfortably.
+  'provenance_text',
 ].join(',');
 
 const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
@@ -168,6 +170,14 @@ export const aicFetcher: Fetcher = {
     const maxResolution =
       thumbW !== null && thumbH !== null ? { width: thumbW, height: thumbH } : undefined;
 
+    // Provenance: published as ONE free-text block. P-7 posture: `raw` is the
+    // text VERBATIM (authoritative); `entries` is the minimal interpretation —
+    // exactly one entry, same text. Absent = not published here, never a finding.
+    const provText = asOptionalString(r.provenance_text);
+    const provenance = provText
+      ? { raw: provText, rawFormat: 'text' as const, entries: [{ description: provText }] }
+      : undefined;
+
     const artwork: Artwork = {
       id,
       museum: {
@@ -202,6 +212,7 @@ export const aicFetcher: Fetcher = {
         pageUrl: `${AIC_PAGE}/${objectId}`,
       },
       description: asOptionalString(r.classification_title),
+      ...(provenance ? { provenance } : {}),
     };
 
     return { status: 'accepted', artwork };
