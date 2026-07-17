@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] — 2026-07-16
+
+### Added
+
+- **`Artwork.provenance` — the OBJECT's published custody record, carried without adjudication.** New optional block `ObjectProvenance`, reconciled with the openclearance provenance-seam contract (P-7 posture) before either side merges: `raw` is REQUIRED whenever the block exists and carries the source's published provenance VERBATIM (free-text sources exactly as published with `rawFormat: 'text'`; Cleveland's structured chain as the source array exactly as its API returned it, `rawFormat: 'structured-json'` — every citation, footnote and sort key survives inside it), so no parse can ever replace, and thereby launder, the source's own words; `entries` is normatively an INTERPRETATION — lossy by nature, `raw` authoritative on conflict — and a deliberately minimal one: one entry per step as published, museum order, museum wording, no holder/date parsing, no merging or synthesis, and no gap promotion (that is manifest-producer interpretation under the openclearance spec; the museum's own gap language such as "?–1963" survives verbatim). `caveat` carries the source's OWN hedge when its API publishes one, and is never fabricated from website boilerplate. Absence of the whole block means "not published here" — never a clean bill nor a red flag, and the field carries NO grading, score, completeness metric, derived flag, or dealer characterisation of any kind: screening judgment stays curatorial. Populated for Cleveland (structured), AIC (`provenance_text`), and Harvard (`provenance`); the Met publishes no provenance via its API and the field is honestly absent there. Naming note: `Artwork.source` is where the RECORD came from; `Artwork.provenance` is where the OBJECT has been — documented on both types to keep the two unconfusable.
+
 ## [0.19.0] — 2026-07-14
 
 ### Added

@@ -130,6 +130,14 @@ export const harvardFetcher: Fetcher = {
 
     const { width, height } = imageDims(r.images);
 
+    // Provenance: published as ONE free-text block. P-7 posture: `raw` is the
+    // text VERBATIM (authoritative); `entries` is the minimal interpretation —
+    // exactly one entry, same text. Absent = not published here, never a finding.
+    const provText = asOptionalString(r.provenance);
+    const provenance = provText
+      ? { raw: provText, rawFormat: 'text' as const, entries: [{ description: provText }] }
+      : undefined;
+
     const artwork: Artwork = {
       id,
       museum: {
@@ -165,6 +173,7 @@ export const harvardFetcher: Fetcher = {
         pageUrl: asString(r.url) || `https://harvardartmuseums.org/collections/object/${objectId}`,
       },
       description: asOptionalString(r.creditline),
+      ...(provenance ? { provenance } : {}),
     };
 
     return { status: 'accepted', artwork };

@@ -135,3 +135,11 @@ describe('Met adapter mediumCategory', () => {
     expect(result.artwork.mediumCategory).toBe('other');
   });
 });
+
+describe('Met provenance (v0.20.0): source publishes none via API', () => {
+  it('never fabricates provenance — the field is absent on Met records', () => {
+    const result = metFetcher.normalize(fixture('met-tang-fixture.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect('provenance' in result.artwork).toBe(false);
+  });
+});

@@ -209,3 +209,43 @@ describe('Cleveland adapter 3D models (Sketchfab, Open Access in 3-D)', () => {
     expect(result.artwork.models3d).toBeUndefined();
   });
 });
+
+// Compile-time regression guard (CR-2 F1, the Model3D-class gap): the FULL
+// provenance surface must be importable from /core — the parent type, not just
+// the entry type. This line fails tsc if either export is dropped.
+import type { ObjectProvenance as CoreObjectProvenance, ProvenanceEntry as CoreProvenanceEntry } from '../src/core/index.js';
+const provenanceSurfaceCheck: (p: CoreObjectProvenance) => CoreProvenanceEntry[] | undefined = (p) => p.entries;
+void provenanceSurfaceCheck;
+
+describe('Cleveland provenance mapping (v0.20.0, openclearance P-7 posture)', () => {
+  it('carries raw VERBATIM (structured-json) plus a per-step interpretation, museum order', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const prov = result.artwork.provenance;
+    expect(prov).toBeDefined();
+    // raw is the source array exactly as received: every step, and the
+    // citations/footnotes the interpretation deliberately leaves behind.
+    expect(prov!.rawFormat).toBe('structured-json');
+    const rawParsed = JSON.parse(prov!.raw) as Array<Record<string, unknown>>;
+    expect(rawParsed.length).toBe(7);
+    expect(Object.keys(rawParsed[0])).toContain('citations');
+    // entries: one per published step, museum order, wording verbatim.
+    expect(prov!.entries!.length).toBe(7);
+    expect(prov!.entries![0].description).toContain('Johanna Van Gogh-Bonger');
+    expect(prov!.entries![0].date).toBeUndefined(); // API null -> absent, never fabricated
+    expect(prov!.entries![1].date).toBe('1912');
+    // interpretation carries description+date ONLY; raw stays authoritative.
+    expect(Object.keys(prov!.entries![1]).sort()).toEqual(['date', 'description']);
+    // no grading, no score, no completeness — anywhere.
+    expect(Object.keys(prov!).sort()).toEqual(['entries', 'raw', 'rawFormat']);
+  });
+
+  it('omits provenance entirely when the source publishes none (absence is not a finding)', () => {
+    const raw = fixture('cleveland-accepted.json') as Record<string, unknown>;
+    const inner = (raw.data ?? raw) as Record<string, unknown>;
+    delete inner.provenance;
+    const result = clevelandFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect('provenance' in result.artwork).toBe(false);
+  });
+});

@@ -266,3 +266,16 @@ describe('AIC adapter mediumCategory', () => {
     expect(result.artwork.mediumCategory).toBe('other');
   });
 });
+
+describe('AIC provenance mapping (v0.20.0, openclearance P-7 posture)', () => {
+  it('carries provenance_text as verbatim raw text plus a single-entry interpretation', () => {
+    const result = aicFetcher.normalize(fixture('aic-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const prov = result.artwork.provenance;
+    expect(prov).toBeDefined();
+    expect(prov!.rawFormat).toBe('text');
+    expect(prov!.raw).toContain('Durand-Ruel');
+    expect(prov!.entries!.length).toBe(1);
+    expect(prov!.entries![0].description).toBe(prov!.raw); // interpretation IS the text, unaltered
+  });
+});
