@@ -210,6 +210,13 @@ describe('Cleveland adapter 3D models (Sketchfab, Open Access in 3-D)', () => {
   });
 });
 
+// Compile-time regression guard (CR-2 F1, the Model3D-class gap): the FULL
+// provenance surface must be importable from /core — the parent type, not just
+// the entry type. This line fails tsc if either export is dropped.
+import type { ObjectProvenance as CoreObjectProvenance, ProvenanceEntry as CoreProvenanceEntry } from '../src/core/index.js';
+const provenanceSurfaceCheck: (p: CoreObjectProvenance) => CoreProvenanceEntry[] | undefined = (p) => p.entries;
+void provenanceSurfaceCheck;
+
 describe('Cleveland provenance mapping (v0.20.0, openclearance P-7 posture)', () => {
   it('carries raw VERBATIM (structured-json) plus a per-step interpretation, museum order', () => {
     const result = clevelandFetcher.normalize(fixture('cleveland-accepted.json'));
