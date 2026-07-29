@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Rejects internal process language and a non-project author/co-author
+# identity from commit messages before they can reach this public remote.
+# No-ops where the local check tool isn't installed (CI, other machines,
+# outside contributors), so it adds no friction to external contributions —
+# same design as the placeholder-code guard in .githooks/pre-commit.
+if ! type craft-check >/dev/null 2>&1; then
+  exit 0
+fi
+
+msg_file="$1"
+msg="$(cat "$msg_file")"
+fail=0
+reasons=()
+
+if echo "$msg" | grep -qE '\bOM-[A-Z][A-Z0-9-]{0,4}\b'; then
+  fail=1
+  reasons+=("looks like an internal lane code (e.g. OM-CR, OM-M)")
+fi
+
+if echo "$msg" | grep -qiE '\[(STARTED|PROGRESS|DISPATCH(-NEEDED)?|BLOCKED|DECISION-(NEEDED|MADE)|REVIEW-(READY|DONE)|MILESTONE|HANDOVER|DONE|ESCALATE|ROUTING)\]'; then
+  fail=1
+  reasons+=("contains a bracketed internal status tag")
+fi
+
+if echo "$msg" | grep -qiE "escalations log|session-states?/|craft-check|craft gate|shokunin|\\bT[12] review\\b|per (OM-OR|OM-CR|OM-QC)'s (dispatch|ruling)|Pramod (ruled|approved)"; then
+  fail=1
+  reasons+=("references internal tooling, process, or a private ruling")
+fi
+
+co_author_line=$(echo "$msg" | grep -i 'Co-Authored by' | tail -1)
+if [ -n "$co_author_line" ]; then
+  co_author_email=$(echo "$co_author_line" | sed -n 's/.*<\(.*\)>.*/\1/p')
+  if [[ -n "$co_author_email" && "$co_author_email" != *"@open-museum.art" ]]; then
+    fail=1
+    reasons+=("co-author trailer uses '$co_author_email', not an open-museum.art identity")
+  fi
+fi
+
+author_email=$(git var GIT_AUTHOR_IDENT | sed -n 's/.*<\([^>]*\)>.*/\1/p')
+if [[ "$author_email" != *"@open-museum.art" ]]; then
+  fail=1
+  reasons+=("author identity '$author_email' is not an open-museum.art address")
+fi
+
+if [ "$fail" -eq 1 ]; then
+  echo ""
+  echo "✗ Commit message rejected for a public repo:"
+  for r in "${reasons[@]}"; do
+    echo "  - $r"
+  done
+  echo "  Describe the change and its reason on the merits instead."
+  echo "  Deliberate, visible override: git commit --no-verify"
+  exit 1
+fi
+exit 0
