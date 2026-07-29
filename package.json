@@ -32,7 +32,7 @@
     "build": "tsc && node scripts/copy-data-assets.mjs",
     "build:mcpb": "node scripts/build-mcpb.mjs",
     "dev": "NODE_OPTIONS=--experimental-sqlite tsx src/server.ts",
-    "prepare": "npm run build",
+    "prepare": "npm run build && (git config core.hooksPath .githooks || true)",
     "test": "NODE_OPTIONS=--experimental-sqlite vitest run",
     "test:watch": "NODE_OPTIONS=--experimental-sqlite vitest",
     "smoke:smithsonian": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-smithsonian.ts",

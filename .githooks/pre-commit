@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Blocks placeholder code (mock returns, deferral markers, demo-only
+# implementations) in staged shipping lines. No-ops where the check tool
+# isn't installed (CI, other machines, outside contributors), so it adds no
+# friction to external contributions.
+if type craft-check >/dev/null 2>&1; then
+  craft-check
+  code=$?
+  if [ "$code" -eq 2 ]; then
+    echo ""
+    echo "✗ Commit blocked: placeholder/stub code detected in staged changes."
+    echo "  Deliberate, visible override: git commit --no-verify"
+    exit 1
+  fi
+fi
+exit 0
