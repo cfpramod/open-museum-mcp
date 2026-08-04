@@ -23,7 +23,7 @@ The Met, Rijksmuseum, the Smithsonian, Cleveland Museum of Art, the Art Institut
 
 I kept wanting reuse-safe artwork for my writing, and every museum's rights model is different. So I built one MCP interface that only returns records that pass per-museum verification rules, with strict deny on ambiguity. It lets me search by artist, period, region, and other fields, and pulls the image and description back in one normalized shape.
 
-If anyone else is exploring open-access art, I hope this helps. The plan is to keep adding museums from around the world.
+If anyone else is exploring open-access art, I hope this helps. The plan is to keep adding museums from around the world — see [`docs/coverage-queue.md`](docs/coverage-queue.md) for the current, tracked queue.
 
 ## How this is different from single-museum MCPs
 
