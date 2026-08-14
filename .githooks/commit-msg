@@ -5,6 +5,7 @@
 # outside contributors), so it adds no friction to external contributions —
 # same design as the placeholder-code guard in .githooks/pre-commit.
 if ! type craft-check >/dev/null 2>&1; then
+  echo "⚠ commit-msg guard skipped: craft-check not installed, this commit was NOT checked for public-writing register." >&2
   exit 0
 fi
 
