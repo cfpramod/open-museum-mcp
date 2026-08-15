@@ -14,6 +14,13 @@ describe('isAllowlistedImageHost — CDN allowlist (exact hostname)', () => {
     expect(isAllowlistedImageHost('https://ids.si.edu/ids/deliveryService?id=x')).toBe(true);
     expect(isAllowlistedImageHost('https://images.metmuseum.org/full.jpg')).toBe(true);
   });
+  it('allows the Wellcome Collection IIIF host (colour extraction has silently skipped every Wellcome record until now)', () => {
+    expect(isAllowlistedImageHost('https://iiif.wellcomecollection.org/image/V0010411/full/full/0/default.jpg')).toBe(true);
+  });
+  it('still rejects a Wellcome look-alike host (no substring spoofing)', () => {
+    expect(isAllowlistedImageHost('https://iiif.wellcomecollection.org.evil.com/x.jpg')).toBe(false);
+    expect(isAllowlistedImageHost('https://evil.com/?x=iiif.wellcomecollection.org')).toBe(false);
+  });
 });
 
 function artwork(over: Partial<Artwork['imageUrls']> = {}): Artwork {
