@@ -1,0 +1,90 @@
+name: Check for unpublished releases
+
+# Catches exactly what let four minors (0.17-0.20) accumulate unpublished for
+# 49 days: package.json's version can drift ahead of what's actually on npm
+# indefinitely, with nothing noticing. A short gap between bumping the
+# version and cutting a release is normal and should stay silent — this only
+# speaks up once the gap has been open longer than a normal release cycle
+# reasonably takes, so it doesn't cry wolf on every version bump.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # weekly, Monday 09:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  DRIFT_THRESHOLD_DAYS: 14
+  TRACKING_ISSUE_TITLE: 'npm publish is behind package.json'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare package.json against the published npm version
+        id: compare
+        run: |
+          pkg_version=$(node -p "require('./package.json').version")
+          published_version=$(npm view open-museum-mcp version 2>/dev/null || echo "")
+          echo "package.json version: $pkg_version"
+          echo "npm published version: $published_version"
+
+          if [ "$pkg_version" = "$published_version" ]; then
+            echo "in_sync=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "in_sync=false" >> "$GITHUB_OUTPUT"
+
+          published_time=$(npm view open-museum-mcp time --json 2>/dev/null | node -e "
+            let data = '';
+            process.stdin.on('data', d => data += d);
+            process.stdin.on('end', () => {
+              const times = JSON.parse(data);
+              const latest = times['$published_version'];
+              console.log(latest || '');
+            });
+          ")
+          if [ -z "$published_time" ]; then
+            echo "::error::Could not resolve a publish timestamp for $published_version — skipping drift calculation, not failing silently."
+            exit 1
+          fi
+
+          published_epoch=$(date -d "$published_time" +%s)
+          now_epoch=$(date +%s)
+          days_since=$(( (now_epoch - published_epoch) / 86400 ))
+          echo "days_since_last_publish=$days_since" >> "$GITHUB_OUTPUT"
+          echo "$days_since days since npm's latest publish ($published_version, $published_time)."
+          echo "package_version=$pkg_version" >> "$GITHUB_OUTPUT"
+          echo "published_version=$published_version" >> "$GITHUB_OUTPUT"
+
+      - name: Close any open tracking issue (back in sync)
+        if: steps.compare.outputs.in_sync == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing=$(gh issue list --state open --search "in:title \"${TRACKING_ISSUE_TITLE}\"" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "package.json's version now matches what's published on npm. Closing."
+            gh issue close "$existing"
+          fi
+
+      - name: Open or update the tracking issue if drift exceeds the threshold
+        if: steps.compare.outputs.in_sync == 'false' && fromJSON(steps.compare.outputs.days_since_last_publish) >= fromJSON(env.DRIFT_THRESHOLD_DAYS)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="package.json is at \`${{ steps.compare.outputs.package_version }}\`, but the latest version published to npm is \`${{ steps.compare.outputs.published_version }}\` — ${{ steps.compare.outputs.days_since_last_publish }} days since that publish, past the ${DRIFT_THRESHOLD_DAYS}-day threshold for a normal release cycle.
+
+          Cut a release for the current version (or the next one, if more has landed since) to close this gap. This issue re-checks weekly and closes itself once npm catches up."
+
+          existing=$(gh issue list --state open --search "in:title \"${TRACKING_ISSUE_TITLE}\"" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$TRACKING_ISSUE_TITLE" --body "$body"
+          fi
