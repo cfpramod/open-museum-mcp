@@ -1,0 +1,85 @@
+name: Publish to npm
+
+# Fires on the same trigger as the .mcpb release workflow, so cutting one
+# GitHub release moves both distribution channels together. Requires a
+# Trusted Publisher entry for this repo + workflow configured on the
+# package's npmjs.com settings page beforehand — see the workflow's own
+# failure message if that step hasn't been done yet.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write # required for npm OIDC trusted publishing — no long-lived token stored in this repo
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing needs npm >=11.5.1; the version bundled with
+      # actions/setup-node's Node 22 build is often older.
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      - name: Guard — release tag must match package.json version
+        run: |
+          pkg_version=$(node -p "require('./package.json').version")
+          expected="v${pkg_version}"
+          tag="${{ github.event.release.tag_name }}"
+          if [ "$tag" != "$expected" ]; then
+            echo "::error::Release tag '$tag' does not match package.json version '$pkg_version' (expected '$expected'). Fix the tag or the version and cut the release again."
+            exit 1
+          fi
+          echo "Tag $tag matches package.json version $pkg_version."
+
+      - name: Guard — manifest.json version must match package.json
+        run: |
+          pkg_version=$(node -p "require('./package.json').version")
+          manifest_version=$(node -p "require('./manifest.json').version")
+          if [ "$pkg_version" != "$manifest_version" ]; then
+            echo "::error::package.json version ($pkg_version) and manifest.json version ($manifest_version) disagree. The .mcpb build will fail on this mismatch — bump manifest.json before releasing."
+            exit 1
+          fi
+          echo "package.json and manifest.json agree on version $pkg_version."
+
+      - name: Guard — CHANGELOG.md must have an entry for this version
+        run: |
+          pkg_version=$(node -p "require('./package.json').version")
+          if ! grep -qE "^## \[${pkg_version//./\\.}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [${pkg_version}]' entry. Add one before releasing — the changelog is part of what a version means."
+            exit 1
+          fi
+          echo "CHANGELOG.md has an entry for $pkg_version."
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Verify the published tarball's file list
+        run: |
+          npm pack --dry-run --json > /tmp/pack.json
+          node -e "
+            const files = require('/tmp/pack.json')[0].files.map(f => f.path);
+            const required = ['dist/server.js', 'dist/data/walters.json', 'dist/data/nga.json.gz', 'dist/data/dynasties.json', 'dist/data/regions.json', 'README.md', 'LICENSE'];
+            const missing = required.filter(f => !files.includes(f));
+            if (missing.length) {
+              console.error('::error::Tarball is missing expected files: ' + missing.join(', '));
+              process.exit(1);
+            }
+            console.log('Tarball contains all ' + required.length + ' expected files (' + files.length + ' total).');
+          "
+
+      - run: npm publish
