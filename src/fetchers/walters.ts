@@ -133,6 +133,7 @@ export function createWaltersFetcher(
     code: 'walters',
     name: 'Walters Art Museum',
     hotlinkRestricted: true,
+    ingestOnly: true,
 
     // Local keyword search over the bundled index (no live API exists). OR-ranked:
     // a record qualifies if it matches ANY query token, and is ranked first by how

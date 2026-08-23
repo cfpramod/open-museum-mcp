@@ -30,4 +30,20 @@ export interface Fetcher {
    * Walters (art.thewalters.org), Smithsonian (ids.si.edu).
    */
   hotlinkRestricted?: true;
+  /**
+   * Env var name a host must set to enable this source (e.g.
+   * `'EUROPEANA_API_KEY'`). Unset for sources that need no key. Purely
+   * descriptive — each adapter still reads its own env var itself (or via a
+   * helper like `smithsonianApiKey()`); this field lets a caller (e.g. a
+   * `/museums` page) describe the federation's coverage without hand-listing
+   * it separately from the fetchers themselves.
+   */
+  requiresApiKey?: string;
+  /**
+   * True when this source has no live query API and instead serves a bundled,
+   * build-time-ingested snapshot (e.g. Walters, NGA) rather than fetching per
+   * query. Distinguishes FEDERATE from INGEST sources for anything describing
+   * the federation's coverage.
+   */
+  ingestOnly?: true;
 }
