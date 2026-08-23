@@ -135,6 +135,7 @@ function parseRecord(raw: Record<string, unknown>): {
 export const europeanaFetcher: Fetcher = {
   code: 'europeana',
   name: 'Europeana',
+  requiresApiKey: 'EUROPEANA_API_KEY',
 
   async search(query: string, limit: number, options: SearchOptions = {}): Promise<string[]> {
     const key = apiKey();

@@ -103,7 +103,11 @@ export { aicFetcher } from '../fetchers/aic.js';
 export { wikimediaFetcher } from '../fetchers/wikimedia.js';
 export { europeanaFetcher } from '../fetchers/europeana.js';
 export { smithsonianFetcher } from '../fetchers/smithsonian.js';
+export { harvardFetcher } from '../fetchers/harvard.js';
 export { rijksmuseumFetcher } from '../fetchers/rijksmuseum.js';
+export { smkFetcher } from '../fetchers/smk.js';
+export { wellcomeFetcher } from '../fetchers/wellcome.js';
+export { gettyFetcher } from '../fetchers/getty.js';
 // Walters is an INGEST source (bundled index, no live API). The default instance
 // reads the package-shipped bundle via a lazily-imported node:fs — safe to IMPORT
 // from Workers, but a Workers host must construct its own via createWaltersFetcher
@@ -115,6 +119,20 @@ export {
   type WaltersBundleLoader,
   type WaltersRecord,
 } from '../fetchers/walters.js';
+// NGA is an INGEST source (gzipped bundle, no live API) — same Workers-safe
+// injectable-loader seam as Walters.
+export {
+  ngaFetcher,
+  createNgaFetcher,
+  type NgaBundle,
+  type NgaBundleLoader,
+} from '../fetchers/nga.js';
+
+// Static per-source coverage metadata (code, display name, key requirement,
+// federate-vs-ingest) — derived from the fetchers above, never hand-listed, so
+// a host can render "which museums are federated" (e.g. a `/museums` page)
+// without re-deriving or drifting from the engine's actual registry.
+export { FETCHER_REGISTRY, type FetcherRegistryEntry } from '../fetchers/registry.js';
 
 // Coverage foundation: the reusable IIIF client + the shared commercial-POD
 // rights gate (CC0/PDM/CC-BY/CC-BY-SA allow; NC/ND/unknown deny; >=3000px floor).
