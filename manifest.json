@@ -2,9 +2,9 @@
   "manifest_version": "0.2",
   "name": "open-museum-mcp",
   "display_name": "Open Museum",
-  "version": "0.10.0",
+  "version": "0.20.0",
   "description": "License-verified federated search across open-access museum collections.",
-  "long_description": "Federated MCP search across major open-access museum collections — currently The Met, Cleveland Museum of Art, Art Institute of Chicago, Wikimedia Commons, and Europeana, with more being added. Records pass per-museum rights verification (strict-default-deny on ambiguous license signals) and ship with citation output in `full`, `caption`, and `short` formats — paste-ready for papers, slide decks, and inline references.",
+  "long_description": "Federated MCP search across open-access museum collections — The Met, Cleveland Museum of Art, Art Institute of Chicago, Rijksmuseum, Smithsonian, SMK, the Walters, Wellcome Collection, the National Gallery of Art, Harvard Art Museums, the J. Paul Getty Museum, Wikimedia Commons, and Europeana, with more being added. Records pass per-museum rights verification (strict-default-deny on ambiguous license signals) and ship with citation output in `full`, `caption`, and `short` formats — paste-ready for papers, slide decks, and inline references.",
   "author": {
     "name": "Pramod Prasanth",
     "url": "https://pramod.ch"
@@ -28,6 +28,9 @@
     "metropolitan-museum",
     "cleveland-museum",
     "art-institute-chicago",
+    "rijksmuseum",
+    "smithsonian",
+    "getty",
     "wikimedia-commons",
     "europeana"
   ],
@@ -38,14 +41,16 @@
       "command": "node",
       "args": ["${__dirname}/dist/server.js"],
       "env": {
-        "EUROPEANA_API_KEY": "${user_config.europeana_api_key}"
+        "EUROPEANA_API_KEY": "${user_config.europeana_api_key}",
+        "SMITHSONIAN_API_KEY": "${user_config.smithsonian_api_key}",
+        "HARVARD_API_KEY": "${user_config.harvard_api_key}"
       }
     }
   },
   "tools": [
     {
       "name": "search_artworks",
-      "description": "Search across registered museums. Returns records that pass the rights gate. Supports date-range filter (BCE = negative integer)."
+      "description": "Search across registered open-access museum collections. Returns artwork records that pass source-specific rights verification (ambiguous records excluded by default). Supports date-range, medium, colour, and 3D-scan filters."
     },
     {
       "name": "get_artwork",
@@ -53,15 +58,23 @@
     },
     {
       "name": "cite",
-      "description": "Render a citation. Styles: full, caption, short."
+      "description": "Render a citation for an artwork. Styles: full, caption, short."
     },
     {
       "name": "discover_random",
-      "description": "Random artwork suggestion, optionally constrained by region or period."
+      "description": "Pick one random artwork from the local cache matching given constraints (region, period, excluded artists)."
     },
     {
       "name": "list_traditions",
-      "description": "Meta-tool over already-collected results — list dynasties / regions present in the local cache."
+      "description": "Meta-tool over already-collected results — list regions and periods present in the local cache, with per-museum counts."
+    },
+    {
+      "name": "facets",
+      "description": "Return available facet values and counts for a query: medium categories, date buckets, top artists, and colour families."
+    },
+    {
+      "name": "clearance_record",
+      "description": "Emit a portable, fail-closed Clearance Manifest (rights-clearance + provenance + citation) for an artwork id, per the Clearance Manifest spec at spec/clearance/v0.1."
     }
   ],
   "user_config": {
@@ -69,6 +82,20 @@
       "type": "string",
       "title": "Europeana API Key",
       "description": "Optional. Free key from https://pro.europeana.eu/page/get-api enables the Europeana adapter (~30M records aggregated from European cultural-heritage institutions). Without a key, Europeana silently disables and the other adapters work normally.",
+      "sensitive": true,
+      "required": false
+    },
+    "smithsonian_api_key": {
+      "type": "string",
+      "title": "Smithsonian API Key",
+      "description": "Optional. Free api.data.gov key enables the Smithsonian Open Access adapter. Without a key, Smithsonian silently disables and the other adapters work normally.",
+      "sensitive": true,
+      "required": false
+    },
+    "harvard_api_key": {
+      "type": "string",
+      "title": "Harvard Art Museums API Key",
+      "description": "Optional. Free key enables the Harvard Art Museums adapter. Without a key, Harvard silently disables and the other adapters work normally.",
       "sensitive": true,
       "required": false
     }

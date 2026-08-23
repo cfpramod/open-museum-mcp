@@ -60,6 +60,7 @@ function imageDims(images: unknown): { width?: number; height?: number } {
 export const harvardFetcher: Fetcher = {
   code: 'harvard',
   name: 'Harvard Art Museums',
+  requiresApiKey: 'HARVARD_API_KEY',
   // Harvard ToS: no caching beyond two weeks → never cache full records.
   noCache: true,
 

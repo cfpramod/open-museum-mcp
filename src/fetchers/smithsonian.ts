@@ -367,6 +367,8 @@ export const smithsonianFetcher: Fetcher = {
   code: 'smithsonian',
   name: 'Smithsonian Institution',
   hotlinkRestricted: true,
+  // Canonical env var (SI_API_KEY is an accepted alias — see smithsonianApiKey()).
+  requiresApiKey: 'SMITHSONIAN_API_KEY',
 
   async search(query: string, limit: number, options: SearchOptions = {}): Promise<string[]> {
     const url = new URL(`${SI_API}/search`);
