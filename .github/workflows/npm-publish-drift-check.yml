@@ -3,9 +3,9 @@ name: Check for unpublished releases
 # Catches exactly what let four minors (0.17-0.20) accumulate unpublished for
 # 49 days: package.json's version can drift ahead of what's actually on npm
 # indefinitely, with nothing noticing. A short gap between bumping the
-# version and cutting a release is normal and should stay silent — this only
+# version and cutting a release is normal and should stay silent, so this only
 # speaks up once the gap has been open longer than a normal release cycle
-# reasonably takes, so it doesn't cry wolf on every version bump.
+# reasonably takes, and doesn't cry wolf on every version bump.
 
 on:
   schedule:
@@ -25,6 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Full history: the drift measurement below looks up the commit that
+          # introduced the current version string, which a shallow clone cannot see.
+          fetch-depth: 0
 
       - name: Compare package.json against the published npm version
         id: compare
@@ -50,15 +54,34 @@ jobs:
             });
           ")
           if [ -z "$published_time" ]; then
-            echo "::error::Could not resolve a publish timestamp for $published_version — skipping drift calculation, not failing silently."
+            echo "::error::Could not resolve a publish timestamp for $published_version. Skipping the drift calculation rather than failing silently."
             exit 1
           fi
 
           published_epoch=$(date -d "$published_time" +%s)
           now_epoch=$(date +%s)
-          days_since=$(( (now_epoch - published_epoch) / 86400 ))
-          echo "days_since_last_publish=$days_since" >> "$GITHUB_OUTPUT"
-          echo "$days_since days since npm's latest publish ($published_version, $published_time)."
+
+          # Drift is the time since the version was BUMPED, not the time since the
+          # last publish. The two diverge whenever a quiet period precedes a bump:
+          # measured from the last publish, a version bumped yesterday reads as
+          # weeks of drift purely because the previous release was old, which is
+          # precisely the false alarm the threshold exists to prevent. Measuring
+          # from the bump keeps the promise this workflow's own comment makes.
+          bump_epoch=$(git log -1 --format=%ct -S "\"version\": \"$pkg_version\"" -- package.json)
+          if [ -n "$bump_epoch" ]; then
+            drift_days=$(( (now_epoch - bump_epoch) / 86400 ))
+            drift_basis="since the version was bumped to $pkg_version"
+          else
+            # Nothing in history introduces the current version string (a squashed
+            # or rewritten history, say). Fall back to the publish-based measure so
+            # the check still reports rather than going quiet.
+            drift_days=$(( (now_epoch - published_epoch) / 86400 ))
+            drift_basis="since $published_version was published (no commit introducing $pkg_version was found)"
+          fi
+
+          echo "drift_days=$drift_days" >> "$GITHUB_OUTPUT"
+          echo "drift_basis=$drift_basis" >> "$GITHUB_OUTPUT"
+          echo "$drift_days days $drift_basis."
           echo "package_version=$pkg_version" >> "$GITHUB_OUTPUT"
           echo "published_version=$published_version" >> "$GITHUB_OUTPUT"
 
@@ -74,11 +97,11 @@ jobs:
           fi
 
       - name: Open or update the tracking issue if drift exceeds the threshold
-        if: steps.compare.outputs.in_sync == 'false' && fromJSON(steps.compare.outputs.days_since_last_publish) >= fromJSON(env.DRIFT_THRESHOLD_DAYS)
+        if: steps.compare.outputs.in_sync == 'false' && fromJSON(steps.compare.outputs.drift_days) >= fromJSON(env.DRIFT_THRESHOLD_DAYS)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          body="package.json is at \`${{ steps.compare.outputs.package_version }}\`, but the latest version published to npm is \`${{ steps.compare.outputs.published_version }}\` — ${{ steps.compare.outputs.days_since_last_publish }} days since that publish, past the ${DRIFT_THRESHOLD_DAYS}-day threshold for a normal release cycle.
+          body="package.json is at \`${{ steps.compare.outputs.package_version }}\`, but the latest version published to npm is \`${{ steps.compare.outputs.published_version }}\`. That is ${{ steps.compare.outputs.drift_days }} days ${{ steps.compare.outputs.drift_basis }}, past the ${DRIFT_THRESHOLD_DAYS}-day threshold for a normal release cycle.
 
           Cut a release for the current version (or the next one, if more has landed since) to close this gap. This issue re-checks weekly and closes itself once npm catches up."
 
