@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { aicFetcher } from '../src/fetchers/aic.js';
+import { AIC_FIELDS, aicFetcher } from '../src/fetchers/aic.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -52,7 +52,40 @@ describe('AIC adapter normalization', () => {
     expect(a.imageUrls.height).toBe(768);
     expect(a.source.pageUrl).toBe('https://www.artic.edu/artworks/16568');
     expect(a.source.apiUrl).toContain('api.artic.edu');
-    expect(a.description).toBe('oil on canvas');
+    // `description` is deliberately ABSENT for AIC. AIC licenses its `description`
+    // field as CC-BY while the rest of the record is CC0, so the adapter does not
+    // request it; the field previously carried `classification_title`, which is an
+    // object classification and not a description at all.
+    expect(a.description).toBeUndefined();
+    // The museum's own object-type term, verbatim.
+    expect(a.objectType).toBe('Painting');
+    // Dimensions are the museum's verbatim display string. AIC's structured
+    // `dimensions_detail` is integer-truncated (73.6cm -> 73) so it is not consumed.
+    expect(a.dimensions).toBe('73.6 \u00d7 92.3 cm (29 \u00d7 36 5/8 in.); Framed: 88.9 \u00d7 108 \u00d7 8.9 cm');
+    expect(a.dimensions).not.toBe('73 \u00d7 92 cm');
+  });
+
+  it('omits objectType and dimensions when AIC publishes neither', () => {
+    const raw = fixture('aic-accepted.json') as { data: Record<string, unknown> };
+    delete raw.data.artwork_type_title;
+    delete raw.data.dimensions;
+    const result = aicFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    // Absent, never an empty string: a consumer must be able to tell "not
+    // published" from a real value.
+    expect(result.artwork.objectType).toBeUndefined();
+    expect(result.artwork.dimensions).toBeUndefined();
+  });
+
+  it('never requests the CC-BY `description` field', () => {
+    // The rights gate emits CC0 for AIC records, but AIC licenses `description`
+    // separately as CC-BY. Requesting it would put attribution-bearing text into
+    // a record whose licence block says CC0, so the field stays out of the query
+    // until that licence question is settled. This test pins the omission as a
+    // deliberate choice rather than an oversight someone "fixes" in one line.
+    expect(AIC_FIELDS.split(',')).not.toContain('description');
+    expect(AIC_FIELDS.split(',')).not.toContain('short_description');
   });
 
   it('rejects a record with is_public_domain=false', () => {

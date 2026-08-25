@@ -21,7 +21,19 @@ const AIC_PAGE = 'https://www.artic.edu/artworks';
 // Fields requested from /artworks/{id}. Limiting via ?fields= shrinks the
 // payload roughly 10x compared with the default response (which carries
 // every relationship and provenance entry AIC has).
-const AIC_FIELDS = [
+// Exported so a test can assert which fields this adapter does NOT request.
+//
+// `description` and `short_description` are deliberately ABSENT. AIC publishes
+// both under CC-BY while the rest of the record is CC0 -- its own API response
+// says so in `info.license_text`: "The `description` field in this response is
+// licensed under a Creative Commons Attribution 4.0 Generic License (CC-By)...
+// All other data in this response is licensed under a Creative Commons Zero
+// (CC0) 1.0 designation." Requesting either would put attribution-bearing text
+// into a record whose licence block reads CC0, which a consumer would
+// reasonably publish unattributed. `short_description` is not named in that
+// statement either way, and an unnamed field beside an explicitly CC-BY one is
+// not promoted to CC0 under this project's strict-default-deny posture.
+export const AIC_FIELDS = [
   'id',
   'title',
   'is_public_domain',
@@ -33,6 +45,11 @@ const AIC_FIELDS = [
   'place_of_origin',
   'medium_display',
   'classification_title',
+  // The museum's own object-type term ("Painting", "Architectural fragment") and
+  // its verbatim dimensions string. Both fall under the CC0 "all other data"
+  // clause above.
+  'artwork_type_title',
+  'dimensions',
   'image_id',
   'thumbnail',
   // One string per record; the payload survives the 10x fields trim comfortably.
@@ -211,7 +228,15 @@ export const aicFetcher: Fetcher = {
         apiUrl: `${AIC_API}/artworks/${objectId}`,
         pageUrl: `${AIC_PAGE}/${objectId}`,
       },
-      description: asOptionalString(r.classification_title),
+      // No `description`: AIC's own description field is CC-BY and is not
+      // requested (see AIC_FIELDS). This previously carried
+      // `classification_title`, an object classification such as "earthenware",
+      // which made a one-word classification read as a description and made the
+      // real text's absence invisible. The classification now has no home on the
+      // record rather than a misleading one; `objectType` below carries the
+      // museum's object-type term, which is what consumers of that field wanted.
+      objectType: asOptionalString(r.artwork_type_title),
+      dimensions: asOptionalString(r.dimensions),
       ...(provenance ? { provenance } : {}),
     };
 

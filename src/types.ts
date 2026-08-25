@@ -153,6 +153,28 @@ export interface Artwork {
   license: ArtworkLicense;
   source: ArtworkSource;
   description?: string;
+  /**
+   * The museum's OWN term for what kind of object this is, verbatim (e.g.
+   * "Painting", "Architectural fragment"). Distinct from {@link Artwork.medium}
+   * (what it is made of) and {@link Artwork.mediumCategory} (our controlled
+   * vocabulary). Several adapters previously had nowhere to put this and folded
+   * it into `description`, which made an object classification read as prose.
+   * ABSENT when the source publishes no object-type term: absence means "not
+   * published", never "unknown kind of object". Additive v0.21 field.
+   */
+  objectType?: string;
+  /**
+   * Physical dimensions as the museum's VERBATIM display string (e.g.
+   * "50.8 x 32.5 x 3.4 cm (20 x 12 3/4 x 1 3/8 in.)"), including any framed or
+   * secondary measurements the source publishes in it. Deliberately NOT parsed
+   * into numbers: sources publish multiple entries, framed variants, diameters
+   * and mixed units in one string, and at least one source's own structured
+   * numeric field is integer-truncated, so a parsed number would be less
+   * accurate than the string it came from. A consumer needing numerics should
+   * parse this and own that interpretation. ABSENT when the source publishes
+   * none. Additive v0.21 field.
+   */
+  dimensions?: string;
   rawTags?: string[];
   /**
    * Dominant colour as a `#rrggbb` hex. Set by Node-side colour enrichment when

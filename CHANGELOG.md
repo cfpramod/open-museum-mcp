@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`Artwork.objectType` and `Artwork.dimensions` — the museum's own object-type term and its verbatim dimensions string.** `objectType` carries what the source calls the kind of object ("Painting", "Architectural fragment"), which is distinct from `medium` (what it is made of) and from `mediumCategory` (this project's controlled vocabulary). Several adapters had nowhere to put this and folded it into `description`, which made an object classification read as prose. `dimensions` carries the source's display string verbatim, including any framed or secondary measurements published within it, and is deliberately NOT parsed into numbers: sources publish multiple entries, framed variants, diameters and mixed units in a single string, and AIC's own structured `dimensions_detail` is integer-truncated (a 73.6 cm height is published there as `73`), so a parsed number would be less accurate than the string it came from. A consumer needing numerics parses this and owns that interpretation. Both fields are absent, never empty, when the source publishes nothing — so "not published" stays distinguishable from a real value. Populated for AIC in this change.
+
+### Changed
+
+- **AIC records no longer report a `description`, and the adapter does not request AIC's CC-BY description fields.** The field previously carried `classification_title`, an object classification such as `"earthenware"`, which is not a description: a one-word classification read as prose, and the real curatorial text's absence was invisible because something plausible occupied the field. AIC's actual `description` is licensed separately from the rest of the record — its API response states that `description` is CC-BY 4.0 while all other data is CC0 — so requesting it would place attribution-bearing text into a record whose licence block reads CC0, which a consumer could reasonably publish unattributed. Neither `description` nor `short_description` is requested, the omission is documented at the field list and pinned by a test so it stays a deliberate choice rather than something a later one-line change quietly undoes, and the classification now has no home on the record rather than a misleading one.
+
 ## [0.20.0] — 2026-07-16
 
 ### Added
