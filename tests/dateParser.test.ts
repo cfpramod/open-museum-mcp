@@ -286,4 +286,66 @@ describe('parseDisplayDate', () => {
       expect(parseDisplayDate('twenty-first century')).toEqual({ yearStart: 2001, yearEnd: 2100 });
     });
   });
+
+  describe('ISO calendar dates are single days, not year ranges', () => {
+    // A source that publishes a full calendar date (Wikimedia's `DateTime`,
+    // for one) was being fed to the short-suffix range rule, which read the
+    // MONTH as a two-digit year suffix: "2024-04-11" expanded 04 to 2004,
+    // found that lands before 2024, and bumped a century to 2104. A calendar
+    // date names one day, so both bounds are its year.
+    it.each([
+      ['2024-04-11', 2024],
+      ['1999-12-31', 1999],
+      ['2001-02-03', 2001],
+      ['1837-06-20', 1837],
+    ])('parses %s as a single year (%i)', (input, year) => {
+      expect(parseDisplayDate(input)).toEqual({ yearStart: year, yearEnd: year });
+    });
+
+    it('handles a calendar date carrying a time component', () => {
+      expect(parseDisplayDate('2024-04-11 05:05:29')).toEqual({ yearStart: 2024, yearEnd: 2024 });
+      expect(parseDisplayDate('2024-04-11T05:05:29Z')).toEqual({ yearStart: 2024, yearEnd: 2024 });
+    });
+
+    // The short-suffix range forms are legitimate and must keep working. If a
+    // fix for the above ever swallows these, it has over-reached.
+    it.each([
+      ['1889-90', { yearStart: 1889, yearEnd: 1890 }],
+      ['1820-5', { yearStart: 1820, yearEnd: 1825 }],
+      ['1899\u201305', { yearStart: 1899, yearEnd: 1905 }],
+      ['1820\u20131830', { yearStart: 1820, yearEnd: 1830 }],
+      ['1486\u201390', { yearStart: 1486, yearEnd: 1490 }],
+    ])('leaves the range form %s alone', (input, expected) => {
+      expect(parseDisplayDate(input)).toEqual(expected);
+    });
+
+    it('finds a calendar date embedded in a title', () => {
+      // The real case: Commons titles carry the date mid-string, so an
+      // anchored check never sees it.
+      expect(parseDisplayDate('Total Solar Eclipse Darkens North America (MODIS 2024-04-11)')).toEqual({
+        yearStart: 2024,
+        yearEnd: 2024,
+      });
+    });
+
+    it('still prefers a genuine range when a date merely sits nearby', () => {
+      // Guard against over-reach: the artwork is from the 1820s; the calendar
+      // date is when someone photographed it.
+      expect(parseDisplayDate('1820\u20131830, photographed 2024-04-11')).toEqual({
+        yearStart: 1820,
+        yearEnd: 1830,
+      });
+    });
+
+    it('does not treat an impossible month or day as a calendar date', () => {
+      // Month 13 and day 32 are not calendar dates; they fall through to the
+      // existing rules rather than being silently accepted as a year.
+      expect(parseDisplayDate('2024-13-11')).not.toEqual({ yearStart: 2024, yearEnd: 2024 });
+      expect(parseDisplayDate('2024-04-32')).not.toEqual({ yearStart: 2024, yearEnd: 2024 });
+    });
+
+    it('does not mistake a BCE range for a calendar date', () => {
+      expect(parseDisplayDate('1550-712 BCE')).toEqual({ yearStart: -1550, yearEnd: -712 });
+    });
+  });
 });
