@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Met search works again.** The Met retired `/public/collection/v1/search` on 2026-10-01 (it now answers HTTP 410) in favour of the paginated `/public/collection/v1.1/search`. The adapter now queries the successor, requesting exactly the count it needs with an explicit `limit` and `offset` and paging past the endpoint's 500-per-call ceiling, so a Met search returns results again instead of an empty list. Object lookup by id is unchanged. The `isPublicDomain` search parameter is not sent; the new endpoint ignores it, and rights are still enforced per record after fetch.
 
+- **Colour is now extracted for NGA, SMK and Getty records.** Their image hosts (`api.nga.gov`, `api.smk.dk`, `media.getty.edu`) were not on the colour-extraction host allowlist, so every record from those three sources carried no colour and was silently dropped by `color_family` and `color` searches. The hosts are listed by exact name; look-alike and sibling hosts are still refused. Records already cached pick up colour the next time they are read.
+
 ## [0.21.0] — 2026-09-10
 
 ### Added

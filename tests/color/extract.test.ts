@@ -3,6 +3,23 @@ import { createColorExtractor, isAllowlistedImageHost, type SharpLike } from '..
 import type { Artwork } from '../../src/types.js';
 
 describe('isAllowlistedImageHost — CDN allowlist (exact hostname)', () => {
+  it.each([
+    'https://api.nga.gov/iiif/d6b29041-544b-4914-9c4b-342953febbee/full/full/0/default.jpg',
+    'https://api.smk.dk/api/v1/thumbnail/d962b33e-2362-4388-8d29-80909610a6cc.jpg',
+    'https://media.getty.edu/iiif/image/fb184f3a-57ca-4a2b-b4da-30be59f301c3/full/max/0/default.jpg',
+  ])('allows the image host of a source whose records otherwise stay colourless: %s', (u) => {
+    expect(isAllowlistedImageHost(u)).toBe(true);
+  });
+
+  it.each([
+    'https://api.nga.gov.evil.example/x',
+    'https://evil-api.smk.dk.attacker.test/x',
+    'https://getty.edu/x',
+    'https://data.getty.edu/x',
+  ])('still rejects look-alike and sibling hosts: %s', (u) => {
+    expect(isAllowlistedImageHost(u)).toBe(false);
+  });
+
   it('allows the Rijksmuseum Micrio IIIF host (OM-CR N1: colour facet no longer fails closed)', () => {
     expect(isAllowlistedImageHost('https://iiif.micr.io/QkOGy/full/max/0/default.jpg')).toBe(true);
   });
