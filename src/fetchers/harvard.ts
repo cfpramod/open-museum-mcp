@@ -69,7 +69,14 @@ export const harvardFetcher: Fetcher = {
     if (!key) throw new Error('HARVARD_API_KEY not set');
     const url = new URL(`${HARVARD_API}/object`);
     url.searchParams.set('apikey', key);
-    url.searchParams.set('q', query);
+    // `keyword`, not `q`. Harvard's `q` ORs every term and does not drop stop
+    // words: `q=from` alone matches 97,036 records, and under `sort=rank` one
+    // verbose photograph (harvard:285105) sat first for any query containing a
+    // common word, so "horses from 1000 years ago" and "two cows in a landscape"
+    // both returned it. `keyword` requires every content term, so a result is
+    // about the query. A natural-language query with a term nothing carries
+    // returns nothing rather than returning noise.
+    url.searchParams.set('keyword', query);
     if (options.hasImage !== false) url.searchParams.set('hasimage', '1');
     url.searchParams.set('size', String(Math.min(limit, 100)));
     url.searchParams.set('sort', 'rank');

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Harvard search no longer returns the same off-topic record for unrelated queries.** Harvard's `q` parameter ORs every term and does not drop stop words, so a query containing a common word matched most of the collection, and one verbose photograph ranked first for all of them. The adapter now uses Harvard's `keyword` parameter, which requires every content term. A query containing a term no record carries now returns nothing instead of noise.
+
 ## [0.21.0] — 2026-09-10
 
 ### Added
