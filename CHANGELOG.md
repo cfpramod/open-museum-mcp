@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Colour is now extracted for NGA, SMK and Getty records.** Their image hosts (`api.nga.gov`, `api.smk.dk`, `media.getty.edu`) were not on the colour-extraction host allowlist, so every record from those three sources carried no colour and was silently dropped by `color_family` and `color` searches. The hosts are listed by exact name; look-alike and sibling hosts are still refused. Records already cached pick up colour the next time they are read.
+
 ## [0.21.0] — 2026-09-10
 
 ### Added
