@@ -8,30 +8,67 @@ import { sanitizeArtistName, sanitizeDescription, sanitizeTitle } from './saniti
 import type { Fetcher, SearchOptions } from './types.js';
 
 const MET_API = 'https://collectionapi.metmuseum.org/public/collection/v1';
+// Search lives under v1.1 (Elastic-backed, paginated via `offset` + `limit`). The
+// v1 `/search` endpoint answered HTTP 410 from 2026-10-01 and returned every
+// matching ID in one response; `/objects/{id}` is unchanged and stays on v1.
+const MET_SEARCH_API = 'https://collectionapi.metmuseum.org/public/collection/v1.1/search';
+// Measured against the live API (2026-10-12): a request without `limit` returns 100
+// IDs, and any `limit` above 500 is clamped to 500. Page in steps no larger than
+// the server's own ceiling so a request for N IDs is never silently short.
+const MET_SEARCH_PAGE_SIZE = 500;
+// Upper bound on pages per search, so a misbehaving upstream (an endless
+// non-empty page) can never turn one call into an unbounded request loop.
+const MET_SEARCH_MAX_PAGES = 10;
 
 export const metFetcher: Fetcher = {
   code: 'met',
   name: 'The Metropolitan Museum of Art',
 
   async search(query: string, limit: number, options: SearchOptions = {}): Promise<string[]> {
-    const url = new URL(`${MET_API}/search`);
-    url.searchParams.set('q', query);
-    if (options.hasImage !== false) {
-      url.searchParams.set('hasImages', 'true');
-    }
-    // No `isPublicDomain=true` here. The Met search API treats that flag as a
-    // hard pre-filter that collapses non-matching queries onto a fixed
-    // public-domain fallback set, destroying relevance ranking. Rights
-    // enforcement is not the search call's job: `normalize` runs
+    if (!Number.isInteger(limit) || limit < 1) return [];
+
+    // No `isPublicDomain=true` here. On the v1 endpoint that flag was a hard
+    // pre-filter that collapsed non-matching queries onto a fixed public-domain
+    // fallback set, destroying relevance ranking; v1.1 ignores it entirely (same
+    // total with it true, false or absent), so sending it would only mislead.
+    // Rights enforcement is not the search call's job: `normalize` runs
     // `validateMetLicense` on every fetched object (strict default deny), so a
     // non-public-domain record is rejected post-fetch regardless. Filtering in
     // search would only hide the engine's actual rights behaviour behind the
     // upstream API's quirk.
+    const ids: number[] = [];
+    // Offset paging over a search index can repeat an ID across a page boundary
+    // when scores tie (observed live: one object at positions 1497 and 1500 of a
+    // 2000-ID `flower` query), and the same shift can skip a tied ID, which the
+    // adapter cannot recover. v1 returned a set, so keep that contract: dedupe,
+    // preserving first-seen (relevance) order.
+    const seen = new Set<number>();
+    // Raw IDs consumed so far. The offset must follow what the server has sent, not
+    // what survived validation, or one malformed ID would shift every later page.
+    let consumed = 0;
+    for (let page = 0; page < MET_SEARCH_MAX_PAGES && ids.length < limit; page++) {
+      const url = new URL(MET_SEARCH_API);
+      url.searchParams.set('q', query);
+      if (options.hasImage !== false) {
+        url.searchParams.set('hasImages', 'true');
+      }
+      url.searchParams.set('limit', String(Math.min(limit - ids.length, MET_SEARCH_PAGE_SIZE)));
+      url.searchParams.set('offset', String(consumed));
 
-    const res = await httpGet(url);
-    if (!res.ok) throw new Error(`Met search failed: ${res.status}`);
-    const json = (await res.json()) as { objectIDs?: number[] | null; total?: number };
-    const ids = json.objectIDs ?? [];
+      const res = await httpGet(url);
+      if (!res.ok) throw new Error(`Met search failed: ${res.status}`);
+      const json = (await res.json()) as { objectIDs?: unknown; total?: unknown };
+      const rawBatch: unknown[] = Array.isArray(json.objectIDs) ? json.objectIDs : [];
+      if (rawBatch.length === 0) break;
+      consumed += rawBatch.length;
+      for (const n of rawBatch) {
+        if (isValidPositiveInt(n) && !seen.has(n)) {
+          seen.add(n);
+          ids.push(n);
+        }
+      }
+      if (typeof json.total === 'number' && consumed >= json.total) break;
+    }
     return ids.slice(0, limit).map((n) => `met:${n}`);
   },
 
