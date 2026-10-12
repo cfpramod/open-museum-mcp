@@ -144,17 +144,6 @@ function tryRangeRegex(s: string): DateRange | null {
   // that the lookbehind permits).
   const m = s.match(/(?<!\.)(-?\d{1,5})\s*[-–]\s*(-?\d{1,5})\s*(b\.?c\.?e?\.?|bc)?/i);
   if (m) {
-    // The range rules must never fire on an ISO calendar date. A title such as
-    // "... (MODIS 2024-04-11)" carries the date mid-string, so the anchored
-    // check above cannot see it; without this the short-suffix rule reads the
-    // month as a year suffix and returns 2024–2104. Tested at the point of
-    // mis-fire rather than by scanning the whole string, so a genuine range
-    // that merely sits near a date ("1820–1830, photographed 2024-04-11")
-    // still resolves to the range.
-    const atMatch = s.slice(m.index ?? 0);
-    const isoAtMatch = tryIsoCalendarDate(atMatch);
-    if (isoAtMatch) return isoAtMatch;
-
     const firstStr = m[1];
     const secondStr = m[2];
     let a = parseInt(firstStr, 10);
@@ -313,13 +302,16 @@ function tryDynasty(s: string): DateRange | null {
  *
  * Strategies are tried in this exact order — earlier strategies win:
  *   1. cross-era range ("500 BCE – 50 CE")
- *   2. ISO calendar date ("2024-04-11") — one day, so one year
- *   3. numeric range ("1820–1830", "1820-5", "1899–05")
- *   4. ordinal-century range ("14th-15th century")
- *   5. ordinal century with optional early/mid/late qualifier
- *   6. decade ("1820s")
- *   7. single year ("1888", "ca. 1820", "500 BCE")
- *   8. dynasty/period lookup (longest key first to avoid prefix shadowing)
+ *   2. numeric range ("1820–1830", "1820-5", "1899–05")
+ *   3. ordinal-century range ("14th-15th century")
+ *   4. ordinal century with optional early/mid/late qualifier
+ *   5. decade ("1820s")
+ *   6. single year ("1888", "ca. 1820", "500 BCE")
+ *   7. dynasty/period lookup (longest key first to avoid prefix shadowing)
+ *
+ * Before any strategy, calendar dates and hyphenated year-months are collapsed
+ * to their year (see collapseCalendarDates), and an ISO-shaped token that is not a
+ * valid date is blanked rather than guessed at.
  *
  * Returns {null, null} when nothing matches — never guesses. BCE is encoded
  * as negative integers so range arithmetic Just Works.
@@ -332,41 +324,86 @@ function tryDynasty(s: string): DateRange | null {
 // regexes below; this cap is a belt-and-suspenders guard on top.
 const DATE_INPUT_MAX = 256;
 
-// An ISO calendar date names ONE DAY, so both bounds are that day's year.
+// Calendar dates ("2024-04-11") and hyphenated year-months ("1830-01") name a day
+// or a month, so their year is ONE year, never a range.
 //
-// This must run BEFORE the numeric-range rules, which otherwise read
-// "2024-04-11" as a short-suffix range: they take the MONTH (04) for a
-// two-digit year suffix, expand it to 2004, notice that lands before the start
-// year, and bump a century — yielding 2024–2104 for an image made on 11 April
-// 2024. Any source publishing machine-readable dates hits this on every record.
+// This must run BEFORE every range rule. The short-suffix rule otherwise reads
+// the MONTH as a two-digit year suffix ("2024-04-11" -> 04 -> 2004, lands before
+// the start, bumps a century -> 2024-2104), and in a range of such dates it
+// loses a bound ("1786-04-20 - 1787-03-15" -> 1786 only). Collapsing each
+// calendar token to its year first lets the ordinary strategies see "1786 - 1787"
+// and "a photo from 2024" and do what they already do correctly.
 //
-// Deliberately restricted to the THREE-part form. `YYYY-MM` is genuinely
-// ambiguous and this project has already chosen the range reading for it
-// ("1899–05" means 1899–1905), so only a full date with a real month and day
-// is treated as a calendar date.
-const ISO_CALENDAR_DATE_RE = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])(?![\d-])/;
+// Two token forms, hyphen-minus only:
+//   - YYYY-MM-DD with a real month and day;
+//   - YYYY-MM with a real month (01-12), but ONLY when the two digits after the
+//     hyphen are smaller than the year's own last two digits ("1830-01",
+//     "1920-10", "1899-05"). That is exactly the case the short-suffix rule can
+//     only answer by bumping a century (1830-01 -> 1830-1901, a 71-year span),
+//     which is the reported defect on the two-part form. Observed data (31 of 31
+//     such rollovers in the cache, Rijksmuseum and Commons) were year-months,
+//     never ranges.
+// When the suffix is not smaller ("1808-09") there is no rollover and the string
+// keeps its documented range reading, as does the en-dash form ("1899\u201305" =
+// 1899-1905). "1889-90" (90 is not a month) and "1820-5" are untouched.
+//
+// A string that LOOKS like a calendar date but is not one ("2024-13-11",
+// "2024-04-32", "2024-04-11-15", "2020-01-01-2021-12-31") must not fall through
+// to the short-suffix rule, which would reproduce the original century-bump
+// defect on it. The whole offending run of digits and hyphens is blanked, so the
+// module never guesses from it, while any other date text in the string
+// ("19th century, ... 2012-30-02") is still read.
+const ISO_SHAPED_RE = /(?<![\d-])\d{4}-\d{2}-\d{2}(?:-\d+)*(?!\d)/g;
+const ISO_VALID_RE = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const YEAR_MONTH_RE =
+  /(?<![\d-])(\d{4})-(0[1-9]|1[0-2])(?!\d|-\d|\s*(?:b\.?c\.?e?|c\.?e|a\.?d)(?![a-z]))/gi;
 
-function tryIsoCalendarDate(s: string): DateRange | null {
-  const m = ISO_CALENDAR_DATE_RE.exec(s);
+/** Collapse calendar dates and rollover year-months to their year; blank ISO-shaped non-dates. */
+function collapseCalendarDates(s: string): string {
+  const out = s.replace(ISO_SHAPED_RE, (token) => {
+    const m = ISO_VALID_RE.exec(token);
+    const year = m ? Number(m[1]) : NaN;
+    if (!m || year < YEAR_PLAUSIBLE_MIN || year > YEAR_PLAUSIBLE_MAX) return ' ';
+    return m[1];
+  });
+  return out.replace(YEAR_MONTH_RE, (token, year: string, month: string) => {
+    const y = Number(year);
+    if (y < YEAR_PLAUSIBLE_MIN || y > YEAR_PLAUSIBLE_MAX) return token;
+    return Number(month) < y % 100 ? year : token;
+  });
+}
+
+// "1700 - in or before 1743" is a range whose far bound carries a qualifier. The
+// qualifier is a hedge about the second year, not a reason to drop the first, so
+// both bounds are kept. Anchored on both ends so it cannot reach into prose.
+const QUALIFIED_RANGE_RE =
+  /^(\d{4})\s*[-\u2013]\s*(?:in or before|or before|before|by|in or after|or after|after)\s+(\d{4})$/i;
+
+function tryQualifiedRange(s: string): DateRange | null {
+  const m = QUALIFIED_RANGE_RE.exec(s);
   if (!m) return null;
-  const year = Number(m[1]);
-  if (year < YEAR_PLAUSIBLE_MIN || year > YEAR_PLAUSIBLE_MAX) return null;
-  return { yearStart: year, yearEnd: year };
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  if (a < YEAR_PLAUSIBLE_MIN || b > YEAR_PLAUSIBLE_MAX || a > b) return null;
+  return { yearStart: a, yearEnd: b };
 }
 
 export function parseDisplayDate(input: string | null | undefined): DateRange {
   if (!input || typeof input !== 'string') {
     return { yearStart: null, yearEnd: null };
   }
-  const s = input.trim();
+  const trimmed = input.trim();
+  if (!trimmed) return { yearStart: null, yearEnd: null };
+  if (trimmed.length > DATE_INPUT_MAX) return { yearStart: null, yearEnd: null };
+
+  const s = collapseCalendarDates(trimmed).trim();
   if (!s) return { yearStart: null, yearEnd: null };
-  if (s.length > DATE_INPUT_MAX) return { yearStart: null, yearEnd: null };
 
   const cross = tryCrossEraRange(s);
   if (cross) return cross;
 
-  const isoDate = tryIsoCalendarDate(s);
-  if (isoDate) return isoDate;
+  const qualified = tryQualifiedRange(s);
+  if (qualified) return qualified;
 
   const range = tryRangeRegex(s);
   if (range) return range;

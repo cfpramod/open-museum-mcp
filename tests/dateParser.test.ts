@@ -337,15 +337,66 @@ describe('parseDisplayDate', () => {
       });
     });
 
-    it('does not treat an impossible month or day as a calendar date', () => {
-      // Month 13 and day 32 are not calendar dates; they fall through to the
-      // existing rules rather than being silently accepted as a year.
-      expect(parseDisplayDate('2024-13-11')).not.toEqual({ yearStart: 2024, yearEnd: 2024 });
-      expect(parseDisplayDate('2024-04-32')).not.toEqual({ yearStart: 2024, yearEnd: 2024 });
+    // An ISO-shaped string that is not a valid date must not fall through to the
+    // short-suffix rule: that reproduces the century bump (2024-04-32 used to give
+    // 2024-2104). The module never guesses, so these are undated. Pinned to the
+    // actual value because a `not.toEqual(bug)` assertion also passes on the bug's
+    // sibling outputs.
+    it.each(['2024-13-11', '2024-04-32', '2024-00-11', '2024-04-11-15', '2020-01-01-2021-12-31'])(
+      'returns undated for the ISO-shaped non-date %s',
+      (input) => {
+        expect(parseDisplayDate(input)).toEqual({ yearStart: null, yearEnd: null });
+      },
+    );
+
+    // Observed Rijksmuseum shapes: both ends are dates, and a lost bound is a
+    // plausible wrong answer that no later plausibility check can catch.
+    it.each([
+      ['1786-04-20 - 1787-03-15', { yearStart: 1786, yearEnd: 1787 }],
+      ['1777-10 - 1786-03', { yearStart: 1777, yearEnd: 1786 }],
+      ['1700 - in or before 1743-08-13', { yearStart: 1700, yearEnd: 1743 }],
+      ['1700 - 1743', { yearStart: 1700, yearEnd: 1743 }],
+    ])('keeps both bounds of a range whose ends are dates: %s', (input, expected) => {
+      expect(parseDisplayDate(input)).toEqual(expected);
+    });
+
+    // Hyphenated YYYY-MM with a real month is a year-month. Observed: every
+    // two-digit century rollover on such a string (31 of 31 in the cache) was a
+    // year-month, never a range. The en-dash short-suffix form stays a range.
+    it.each([
+      ['1830-01', { yearStart: 1830, yearEnd: 1830 }],
+      ['1920-10', { yearStart: 1920, yearEnd: 1920 }],
+      ['1899-05', { yearStart: 1899, yearEnd: 1899 }],
+      ['1949-04 - 1949-12', { yearStart: 1949, yearEnd: 1949 }],
+    ])('reads hyphenated year-month %s (a century rollover otherwise) as one year', (input, expected) => {
+      expect(parseDisplayDate(input)).toEqual(expected);
+    });
+
+    it('keeps a hyphenated dual-year form as a range when no century would roll over', () => {
+      // A Qajar manuscript dated "1808-09" spans two Gregorian years; 09 is not
+      // smaller than 08, so the short-suffix reading needs no century bump.
+      expect(parseDisplayDate('1808-09')).toEqual({ yearStart: 1808, yearEnd: 1809 });
+      expect(parseDisplayDate('dated 1808-09')).toEqual({ yearStart: 1808, yearEnd: 1809 });
+    });
+
+    it('still reads the rest of a string around an ISO-shaped non-date', () => {
+      expect(parseDisplayDate("'Mother Tiger and Cub', 19th century, Honolulu Museum of Art, 2012-30-02")).toEqual({
+        yearStart: 1801,
+        yearEnd: 1900,
+      });
+    });
+
+    it('keeps the en-dash and non-month short-suffix forms as ranges', () => {
+      expect(parseDisplayDate('1899\u201305')).toEqual({ yearStart: 1899, yearEnd: 1905 });
+      expect(parseDisplayDate('1889-90')).toEqual({ yearStart: 1889, yearEnd: 1890 });
+      expect(parseDisplayDate('1820-5')).toEqual({ yearStart: 1820, yearEnd: 1825 });
     });
 
     it('does not mistake a BCE range for a calendar date', () => {
       expect(parseDisplayDate('1550-712 BCE')).toEqual({ yearStart: -1550, yearEnd: -712 });
+      // "12" is a valid month number, but followed by an era marker it is a year
+      // (the same string main reads as -1550..-12), so it is not collapsed.
+      expect(parseDisplayDate('1550-12 BCE')).toEqual({ yearStart: -1550, yearEnd: -12 });
     });
   });
 });
