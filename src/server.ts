@@ -162,6 +162,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'search_artworks',
+      title: 'Search open-access artworks',
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         'Search across registered open-access museum collections. Returns artwork records that pass source-specific rights verification (ambiguous records excluded by default). Supports an optional date-range filter for researcher queries like "Dutch genre painting 1640–1680".',
       inputSchema: {
@@ -217,6 +219,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'get_artwork',
+      title: 'Get an artwork by ID',
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description: 'Fetch a single artwork by its normalized ID (e.g. met:436533).',
       inputSchema: {
         type: 'object',
@@ -228,6 +232,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'cite',
+      title: 'Cite an artwork',
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         'Render a citation for an artwork. Styles: "full" (artist, title, date, museum, license, URL), "caption" (image caption form), "short" (inline reference).',
       inputSchema: {
@@ -245,6 +251,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'discover_random',
+      title: 'Discover a random artwork',
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         'Pick one random artwork from the local cache that matches the given constraints. Useful for breaking out of repetitive search territory (e.g. surface a random Edo-period work to satisfy a no-back-to-back-European-pre-1900 pairing rule). On a cold cache with `region` or `period` constraints provided, auto-seeds via a small search_artworks call derived from those constraints before sampling — so first-time use works without manually warming the cache. Without constraints, returns a hint to run search_artworks first.',
       inputSchema: {
@@ -272,6 +280,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'list_traditions',
+      title: 'List cached regions and periods',
+      annotations: { readOnlyHint: true, openWorldHint: false },
       description:
         'List the regions and periods present in non-expired cached records, with per-museum record counts. Helps you see which traditions are well-represented before searching, and where holdings are sparse. Returns { regions, periods } where each entry has { tag, label, coverage: { museumCode: count } }. On an empty cache, returns a hint to run search_artworks first — list_traditions is a meta-tool over what you have already collected, not a search trigger.',
       inputSchema: {
@@ -281,6 +291,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'facets',
+      title: 'Facet counts for a search',
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         'Return available facet values and counts for a query: medium categories, century date-buckets, top artists, and colour families. Counts are computed over a BOUNDED candidate window of up to ~150 rights-verified records per museum (not the entire corpus), so they reflect the head of the result set, not exhaustive totals. Only values actually present in that window are returned (no empty buckets). Use the returned medium/colorFamily values with search_artworks({ ..., medium, color_family }) to drill down.',
       inputSchema: {
@@ -297,6 +309,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'clearance_record',
+      title: 'Get a Clearance Manifest',
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         'Emit a portable, fail-closed Clearance Manifest (rights-clearance + provenance + citation) for an artwork id, wrapped in a byte-exact Tier-0 integrity envelope: the manifest is carried as an exact UTF-8 JSON string in `payload`, with a SHA-256 over those exact bytes in `integrity.hash`. Consumers hash the payload string verbatim, then JSON.parse it to read. A non-cleared work — rejected by the rights gate, an unknown museum, or an invalid id — returns a definitive DENY manifest, not an error: a deny is a valid answer. Conforms to the in-repo Clearance Manifest spec at spec/clearance/v0.1 (openclearance.org/v0.1).',
       inputSchema: {
