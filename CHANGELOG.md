@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Every tool now carries a human-readable `title` and `readOnlyHint`/`openWorldHint` annotations.** All seven tools only read: none writes to a museum or to the caller's files. `openWorldHint` is true for the six tools that can reach external museum APIs and false for `list_traditions`, which reads only the local cache. A test fails if a registered tool ships without a title and `readOnlyHint`.
+- **Claude Code plugin.** `.claude-plugin/marketplace.json` makes this repository a single-plugin marketplace, and `plugin/` holds the plugin, which runs the published package through `npx`. See the README for the install commands.
+
 ## [0.21.0] — 2026-09-10
 
 ### Added

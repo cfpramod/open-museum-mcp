@@ -97,6 +97,23 @@ For supported clients, no JSON, no Node, no npm — pick your client:
 - **VS Code:** [Install in VS Code](vscode:mcp/install?%7B%22name%22%3A%22open-museum-mcp%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22open-museum-mcp%22%5D%7D) — opens VS Code with the install dialog prefilled (requires the GitHub Copilot Chat extension).
 - **Cursor:** [Install in Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=open-museum-mcp&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIm9wZW4tbXVzZXVtLW1jcCJdfQ==) — same idea, Cursor-flavoured (MCP support is built in).
 
+### Claude Code
+
+Install it as a plugin. This repository is its own single-plugin marketplace:
+
+```sh
+claude plugin marketplace add cfpramod/open-museum-mcp
+claude plugin install open-museum-mcp@open-museum
+```
+
+Or add just the server, without the plugin wrapper:
+
+```sh
+claude mcp add open-museum -- npx -y open-museum-mcp
+```
+
+Either way, `npx` fetches and runs the published package on first launch. The plugin pins an exact version, so an update arrives when the plugin does; the `claude mcp add` form follows the latest release.
+
 ### JSON config (any MCP client)
 
 For ChatGPT with MCP, Cline, Goose, Continue, Zed, or anything else: paste this into your client's MCP config and restart. `npx` fetches and runs the server on first launch.
