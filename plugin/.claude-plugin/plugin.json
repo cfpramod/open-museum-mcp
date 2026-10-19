@@ -1,0 +1,19 @@
+{
+  "name": "open-museum-mcp",
+  "version": "0.21.0",
+  "description": "License-verified federated search across open-access museum collections, with a citation and a clearance record for every work.",
+  "author": {
+    "name": "Pramod Prasanth",
+    "url": "https://pramod.ch"
+  },
+  "homepage": "https://github.com/cfpramod/open-museum-mcp#readme",
+  "repository": "https://github.com/cfpramod/open-museum-mcp",
+  "license": "MIT",
+  "keywords": ["museum", "art", "open-access", "cc0", "public-domain", "citation", "mcp"],
+  "mcpServers": {
+    "open-museum-mcp": {
+      "command": "npx",
+      "args": ["-y", "open-museum-mcp@0.21.0"]
+    }
+  }
+}
