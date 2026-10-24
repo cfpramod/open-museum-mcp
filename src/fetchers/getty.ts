@@ -152,7 +152,7 @@ SELECT DISTINCT ?obj WHERE {
 
     const url = new URL(SPARQL_ENDPOINT);
     url.searchParams.set('query', sparql);
-    const res = await httpGet(url, { headers: { Accept: 'application/sparql-results+json' } });
+    const res = await httpGet(url, { headers: { Accept: 'application/sparql-results+json' }, signal: options.signal });
     if (res.status === 401 || res.status === 403) {
       // Since 2026-10-12 data.getty.edu answers every unauthenticated SPARQL
       // request with 401 "Wrong Authorization Token". Only search is gated:

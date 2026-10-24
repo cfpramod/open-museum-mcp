@@ -212,7 +212,7 @@ export const wikimediaFetcher: Fetcher = {
     url.searchParams.set('format', 'json');
     url.searchParams.set('formatversion', '2');
 
-    const res = await httpGet(url);
+    const res = await httpGet(url, { signal: options.signal });
     if (!res.ok) throw new Error(`Wikimedia search failed: ${res.status}`);
     const json = (await res.json()) as { query?: { search?: Array<{ pageid?: unknown }> } };
     const results = json.query?.search ?? [];

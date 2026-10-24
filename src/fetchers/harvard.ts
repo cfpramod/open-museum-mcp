@@ -82,7 +82,7 @@ export const harvardFetcher: Fetcher = {
     url.searchParams.set('sort', 'rank');
     url.searchParams.set('fields', 'id');
 
-    const res = await httpGet(url);
+    const res = await httpGet(url, { signal: options.signal });
     if (!res.ok) throw new Error(`Harvard search failed: ${res.status}`);
     const json = (await res.json()) as { records?: Array<{ id?: unknown }> };
     return (json.records ?? [])

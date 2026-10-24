@@ -22,6 +22,7 @@ import {
 import { handleClearanceRecord } from './clearanceTool.js';
 import { createColorExtractor } from './color/extract.js';
 import { COLOR_FAMILY_NAMES } from './core/index.js';
+import { totalFailureResult } from './totalFailure.js';
 import { Cache } from './db.js';
 import { buildSeedQueryFromConstraints } from './discoverSeed.js';
 import { aicFetcher } from './fetchers/aic.js';
@@ -130,6 +131,9 @@ const federation = createFederation({
   cache,
   engineVersion: VERSION,
   onReject: (id, reason) => console.error(`[open-museum-mcp] rejected ${id}: ${reason}`),
+  // The message is sanitised in core, so it is safe to log and to return.
+  onSourceFailure: (s) =>
+    console.error(`[open-museum-mcp] source ${s.museum} ${s.status} after ${s.ms ?? 0}ms: ${s.error}`),
   // Node-side colour enrichment. createColorExtractor lazily loads the optional
   // `sharp` dependency; if it's absent (e.g. a sharp-less install) extraction
   // fails open and colour fields stay unset. Workers never inject this.
@@ -322,6 +326,8 @@ async function handleSearch(args: unknown) {
   const params = SearchParamsSchema.parse(args);
   try {
     const result = await federation.search(params);
+    const failed = totalFailureResult('search_artworks', result.sources);
+    if (failed) return failed;
     return {
       content: [
         {
@@ -342,6 +348,8 @@ async function handleFacets(args: unknown) {
   const params = SearchParamsSchema.parse(args);
   try {
     const result = await federation.facets(params);
+    const failed = totalFailureResult('facets', result.sources);
+    if (failed) return failed;
     return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
   } catch (err) {
     if (err instanceof UnknownMuseumError) {

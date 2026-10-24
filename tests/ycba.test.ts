@@ -586,6 +586,34 @@ describe('YCBA search', () => {
     expect(JSON.stringify(queryOf(calls[0]))).not.toContain('hasDigitalImage');
   });
 
+  it("a caller's abort cancels the request and is not retried", async () => {
+    let calls = 0;
+    globalThis.fetch = vi.fn(
+      (_input: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          calls++;
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        }),
+    ) as unknown as typeof fetch;
+    const controller = new AbortController();
+    const pending = ycbaFetcher.search('horse', 5, { signal: controller.signal });
+    await vi.waitFor(() => expect(calls).toBe(1));
+    const abortedAt = Date.now();
+    controller.abort();
+    await expect(pending).rejects.toThrow();
+    expect(calls).toBe(1);
+    // Rejects at once rather than after the first 500 ms backoff.
+    expect(Date.now() - abortedAt).toBeLessThan(250);
+  });
+
+  it('makes no request when the signal is already aborted', async () => {
+    const calls = stubFetch(() => json(page));
+    const controller = new AbortController();
+    controller.abort();
+    await expect(ycbaFetcher.search('horse', 5, { signal: controller.signal })).rejects.toThrow();
+    expect(calls).toHaveLength(0);
+  });
+
   it('passes the query term as JSON data, not by string concatenation', async () => {
     const calls = stubFetch(() => json(page));
     const term = 'x"},{"hasDigitalImage":0}],"OR":[{"text":"';

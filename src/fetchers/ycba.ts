@@ -66,25 +66,29 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  * GET a Yale JSON resource inside the concurrency limit, retrying transient
  * failures (network errors and RETRYABLE_STATUS) with backoff. Resolves with
  * the final status and, for a 2xx, the parsed body. `redirect` is passed
- * through to fetch.
+ * through to fetch. A caller's `signal` aborts the request in flight and stops
+ * any further attempt; it is never retried.
  */
 async function yaleGetJson(
   url: string,
   redirect: RequestInit['redirect'] = 'follow',
+  signal?: AbortSignal,
 ): Promise<{ status: number; body: unknown }> {
   for (let attempt = 0; ; attempt++) {
+    signal?.throwIfAborted();
     const canRetry = attempt < RETRY_DELAYS_MS.length;
     await acquireSlot();
     let outcome: { status: number; body: unknown };
     try {
+      const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
       const res = await httpGet(url, {
         headers: JSON_ACCEPT,
         redirect,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });
       outcome = { status: res.status, body: res.ok ? await res.json() : null };
     } catch (err) {
-      if (!canRetry) throw err;
+      if (!canRetry || signal?.aborted) throw err;
       outcome = { status: 0, body: null };
     } finally {
       releaseSlot();
@@ -229,7 +233,7 @@ export const ycbaFetcher: Fetcher = {
     url.searchParams.set('page', '1');
     url.searchParams.set('pageLength', String(Math.max(1, Math.min(limit, MAX_PAGE_LENGTH))));
 
-    const { status, body } = await yaleGetJson(url.toString());
+    const { status, body } = await yaleGetJson(url.toString(), 'follow', options.signal);
     if (status < 200 || status >= 300) throw new Error(`YCBA (LUX) search failed: ${status}`);
     const items = body && typeof body === 'object' ? (body as Record<string, unknown>).orderedItems : undefined;
     return asRecordArray(items)

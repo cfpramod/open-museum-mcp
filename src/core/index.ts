@@ -23,6 +23,14 @@ export {
 
 export type { CacheStore, Awaitable } from './cache.js';
 
+// Per-source outcome carried on every search and facets result.
+export {
+  SOURCE_STATUSES,
+  allSourcesFailed,
+  type SourceStatus,
+  type SourceStatusKind,
+} from './sourceStatus.js';
+
 // Clearance Manifest — the portable, fail-closed rights-clearance artifact and
 // its Tier-0 integrity envelope, emitted by Federation.clearanceManifest.
 export { wrapTier0, type Tier0Envelope } from './clearance/envelope.js';
