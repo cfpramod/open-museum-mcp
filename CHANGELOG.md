@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.22.0] - 2026-10-24
 
 ### Added
 
@@ -19,15 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Met search works again.** The Met retired `/public/collection/v1/search` on 2026-10-01 (it now answers HTTP 410) in favour of the paginated `/public/collection/v1.1/search`. The adapter now queries the successor, requesting exactly the count it needs with an explicit `limit` and `offset` and paging past the endpoint's 500-per-call ceiling, so a Met search returns results again instead of an empty list. Object lookup by id is unchanged. The `isPublicDomain` search parameter is not sent; the new endpoint ignores it, and rights are still enforced per record after fetch.
 - **A malformed numeric character reference in museum text no longer hides the record.** The shared text sanitizer decoded every `&#N;` and `&#xH;` with `String.fromCodePoint`, which throws `RangeError` for values above `0x10FFFF` (for example `&#99999999;` or `&#x110000;`). One such escape in a title, description or artist name made the adapter's `normalize()` throw, so the record dropped out of search results and a direct lookup, its citation and its clearance manifest all failed with an error. References are now decoded only when they name a Unicode scalar value (`0`–`0x10FFFF`, excluding the surrogate range `0xD800`–`0xDFFF`); anything else is kept verbatim. Surrogate references previously decoded to a lone UTF-16 surrogate and are now kept verbatim too. Rights decisions are unaffected.
+- **Harvard search no longer returns the same off-topic record for unrelated queries.** Harvard's `q` parameter ORs every term and does not drop stop words, so a query containing a common word matched most of the collection, and one verbose photograph ranked first for all of them. The adapter now uses Harvard's `keyword` parameter, which requires every content term. A query containing a term no record carries now returns nothing instead of noise.
 
 ### Changed
 
 - **The federated query cache key now includes the set of sources queried.** A cached result is only valid for the exact sources that produced it, so a source added or restored later is queried instead of being reported `ok` from an older entry. Existing cached search lists miss once and refill.
 - **Breaking for TypeScript consumers that construct a `SearchResult` or `FacetResult` by hand:** `sources` is a required field. Results returned by the federation always include it. The `/core` public shape grows by this field, which is why this ships as a minor release.
-
 - **The Wikimedia Commons adapter uses the shared HTML stripper.** It carried its own copy, which removed tags with a `/<[^>]*>/g` replace. That replace takes time quadratic in the length of a run of unclosed `<`, and it ran on uploader-written fields (`ObjectName`, `Artist`, `ImageDescription`) before their length caps. The shared stripper in `sanitize.ts`, which the other adapters reach through `sanitizeTitle` and its siblings, removes tags in one linear pass with the same output, and its entity table is identical. Normalizing a record with 100,000 unclosed `<` in one of those fields took 14 to 17 seconds before and takes under 20 ms now.
 
-- **Harvard search no longer returns the same off-topic record for unrelated queries.** Harvard's `q` parameter ORs every term and does not drop stop words, so a query containing a common word matched most of the collection, and one verbose photograph ranked first for all of them. The adapter now uses Harvard's `keyword` parameter, which requires every content term. A query containing a term no record carries now returns nothing instead of noise.
+### Security
+
+- **The lockfile resolves patched versions of two transitive dependencies.** `hono` moves from 4.13.1 to 4.13.7 and `qs` from 6.15.2 to 6.16.0; both arrive through `@modelcontextprotocol/sdk`. This governs installs from a clone of this repository. The published package does not ship a lockfile, so an install from npm resolves these within the SDK's own version ranges.
 
 ## [0.21.0] — 2026-09-10
 
