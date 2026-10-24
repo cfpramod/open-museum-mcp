@@ -38,6 +38,11 @@ export interface ColorExtractorOptions {
   loadSharp?: () => Promise<SharpLike | null>;
   /** Fetch image bytes; resolves null on failure. Injectable for tests. */
   fetchImage?: (url: string) => Promise<Uint8Array | null>;
+  /**
+   * Time allowed for the whole default image fetch (every redirect hop and the
+   * body). Ignored when `fetchImage` is injected. Default 10000.
+   */
+  imageTimeoutMs?: number;
   /** Square downsample target for the thumbnail. Default 32 (dominant colour is scale-invariant enough). */
   sampleSize?: number;
 }
@@ -50,6 +55,14 @@ const DEFAULT_SAMPLE = 32;
 // multi-MB response means a wrong/oversized URL, so we fail open past the cap
 // rather than buffer it. Checked against Content-Length and the actual bytes.
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+// Time allowed for one enrichment image fetch, redirect hops and body included.
+// Colour is awaited inside getArtwork, so an image host that stalls would stall
+// the search that asked for the record. Measured live on SMK, the slowest source
+// this path fetches: 23 thumbnails answered in 0.15-0.92s, and whole extractions
+// mostly took 0.06-0.6s with occasional first requests of 1.7-4.8s. 10s leaves
+// twice the slowest measured call and still bounds a host that never answers.
+const DEFAULT_IMAGE_TIMEOUT_MS = 10_000;
 
 // Decompression-bomb cap: reject images whose uncompressed pixel buffer
 // (width × height × channels) would exceed 50 MB. A 50 MP RGB image expands
@@ -117,15 +130,27 @@ const CDN_ALLOWLIST = new Set([
   'iiif.micr.io',                    // Rijksmuseum images via Micrio IIIF (data.rijksmuseum.nl)
   'iiif.wellcomecollection.org',     // Wellcome Collection IIIF image server
   'api.nga.gov',                     // National Gallery of Art IIIF image server
-  'api.smk.dk',                      // SMK (Statens Museum for Kunst) image/thumbnail API
+  // SMK's 1024px thumbnail rendition for records with an IIIF image.
+  'iip-thumb.smk.dk',
   'media.getty.edu',                 // J. Paul Getty Museum IIIF image server
   // Europeana edmIsShownBy (full images) comes from arbitrary per-provider
   // CDNs — those are intentionally NOT listed here and will fail open.
 ]);
 
+// Hosts allowed only for one path shape. api.smk.dk publishes the thumbnail for
+// records without an IIIF image, but the same host also serves the full-resolution
+// /download derivative, which 503s, returns empty bodies and streams for minutes
+// (measured live), and colour never needs it. The pattern is one plain path
+// segment with no query: dot segments are resolved by URL parsing before this
+// check, and percent-encoded slashes or backslashes cannot match.
+const CDN_PATH_SCOPED: ReadonlyMap<string, RegExp> = new Map([
+  ['api.smk.dk', /^\/api\/v1\/thumbnail\/[A-Za-z0-9-]+\.jpg$/],
+]);
+
 /**
- * Returns true when the image URL's hostname is on the CDN allowlist.
- * Non-allowlisted hosts cause color extraction to fail open (return null)
+ * Returns true when the image URL's hostname is on the CDN allowlist, or is a
+ * path-scoped host and the URL matches its one allowed path shape.
+ * Non-allowlisted URLs cause color extraction to fail open (return null)
  * without any outbound fetch — the record itself is unaffected.
  */
 export function isAllowlistedImageHost(urlString: string): boolean {
@@ -135,7 +160,9 @@ export function isAllowlistedImageHost(urlString: string): boolean {
   } catch {
     return false;
   }
-  return CDN_ALLOWLIST.has(url.hostname);
+  if (CDN_ALLOWLIST.has(url.hostname)) return true;
+  const pathPattern = CDN_PATH_SCOPED.get(url.hostname);
+  return pathPattern !== undefined && url.search === '' && pathPattern.test(url.pathname);
 }
 
 /**
@@ -218,7 +245,7 @@ const MAX_REDIRECT_HOPS = 5;
  * `redirect: 'manual'` to prevent the platform fetch from silently
  * following a redirect to a private IP (C2 / redirect TOCTOU fix).
  */
-async function fetchImageWithSafeRedirects(startUrl: string): Promise<Response | null> {
+async function fetchImageWithSafeRedirects(startUrl: string, signal: AbortSignal): Promise<Response | null> {
   let url = startUrl;
   for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
     let res: Response;
@@ -226,6 +253,7 @@ async function fetchImageWithSafeRedirects(startUrl: string): Promise<Response |
       res = await fetch(url, {
         headers: { 'User-Agent': USER_AGENT },
         redirect: 'manual',
+        signal,
       });
     } catch {
       return null;
@@ -249,21 +277,73 @@ async function fetchImageWithSafeRedirects(startUrl: string): Promise<Response |
   return null;
 }
 
-async function defaultFetchImage(url: string): Promise<Uint8Array | null> {
+/**
+ * Wait for `work`, but give up the moment `signal` aborts. A fetch that honours
+ * the signal rejects on its own; this also covers one that does not (a stub, a
+ * stalled body read), so the deadline holds either way.
+ */
+function untilAborted<T>(signal: AbortSignal, work: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
+}
+
+/**
+ * Read a response body, stopping at the byte cap rather than buffering past it.
+ * The Content-Length check alone is not enough: the header can be absent or wrong.
+ */
+async function readCapped(res: Response, signal: AbortSignal): Promise<Uint8Array | null> {
+  if (!res.body) return null;
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
   try {
-    // Museum CDNs can also 403 a UA-less request from datacenter IPs; send the
-    // descriptive UA on the enrichment image fetch too. See helpers.USER_AGENT.
-    // Manual redirect following re-validates every Location hop (C2 guard).
-    const res = await fetchImageWithSafeRedirects(url);
-    if (!res || !res.ok) return null;
-    const declared = Number(res.headers.get('content-length'));
-    if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES) return null;
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.length > MAX_IMAGE_BYTES) return null;
-    return bytes;
-  } catch {
-    return null;
+    for (;;) {
+      const { done, value } = await untilAborted(signal, reader.read());
+      if (done) break;
+      total += value.length;
+      if (total > MAX_IMAGE_BYTES) return null;
+      chunks.push(value);
+    }
+  } finally {
+    void reader.cancel().catch(() => undefined);
   }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return bytes;
+}
+
+function makeDefaultFetchImage(timeoutMs: number): (url: string) => Promise<Uint8Array | null> {
+  return async function defaultFetchImage(url: string): Promise<Uint8Array | null> {
+    // One deadline covers every redirect hop and the body, so no stage can hold
+    // the caller past it. Aborting also tears the request down.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException(`image fetch timed out after ${timeoutMs}ms`, 'TimeoutError')), timeoutMs);
+    try {
+      // Museum CDNs can also 403 a UA-less request from datacenter IPs; send the
+      // descriptive UA on the enrichment image fetch too. See helpers.USER_AGENT.
+      // Manual redirect following re-validates every Location hop (C2 guard).
+      const res = await untilAborted(controller.signal, fetchImageWithSafeRedirects(url, controller.signal));
+      if (!res || !res.ok) return null;
+      const declared = Number(res.headers.get('content-length'));
+      if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES) return null;
+      return await readCapped(res, controller.signal);
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 }
 
 /**
@@ -273,7 +353,11 @@ async function defaultFetchImage(url: string): Promise<Uint8Array | null> {
  */
 export function createColorExtractor(opts: ColorExtractorOptions = {}): ColorExtractor {
   const loadSharp = opts.loadSharp ?? defaultLoadSharp;
-  const fetchImage = opts.fetchImage ?? defaultFetchImage;
+  const imageTimeoutMs = opts.imageTimeoutMs ?? DEFAULT_IMAGE_TIMEOUT_MS;
+  if (!Number.isFinite(imageTimeoutMs) || imageTimeoutMs <= 0) {
+    throw new RangeError(`imageTimeoutMs must be a positive, finite number of milliseconds (got ${String(imageTimeoutMs)})`);
+  }
+  const fetchImage = opts.fetchImage ?? makeDefaultFetchImage(Math.min(imageTimeoutMs, 2 ** 31 - 1));
   const size = opts.sampleSize ?? DEFAULT_SAMPLE;
 
   return async function extractColor(art: Artwork): Promise<ColorData | null> {

@@ -22,6 +22,7 @@ const SMK_FIELDS = [
   'rights',
   'has_image',
   'image_native',
+  'image_thumbnail',
   'image_width',
   'image_height',
   'production_date',
@@ -157,7 +158,7 @@ export const smkFetcher: Fetcher = {
         // `image_native` is the full-resolution JPEG derivative (print-grade), so
         // it is both the displayable image and the maximum SMK offers.
         full: asString(r.image_native),
-        thumbnail: undefined,
+        thumbnail: asOptionalString(r.image_thumbnail),
         width,
         height,
         maxResolution: pickMaxResolution({ width, height }),
