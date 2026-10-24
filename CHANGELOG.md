@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.22.0] - 2026-10-24
 
 ### Added
 
@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The Wikimedia Commons adapter uses the shared HTML stripper.** It carried its own copy, which removed tags with a `/<[^>]*>/g` replace. That replace takes time quadratic in the length of a run of unclosed `<`, and it ran on uploader-written fields (`ObjectName`, `Artist`, `ImageDescription`) before their length caps. The shared stripper in `sanitize.ts`, which the other adapters reach through `sanitizeTitle` and its siblings, removes tags in one linear pass with the same output, and its entity table is identical. Normalizing a record with 100,000 unclosed `<` in one of those fields took 14 to 17 seconds before and takes under 20 ms now.
 
 - **Harvard search no longer returns the same off-topic record for unrelated queries.** Harvard's `q` parameter ORs every term and does not drop stop words, so a query containing a common word matched most of the collection, and one verbose photograph ranked first for all of them. The adapter now uses Harvard's `keyword` parameter, which requires every content term. A query containing a term no record carries now returns nothing instead of noise.
+
+### Security
+
+- **The lockfile resolves patched versions of two transitive dependencies.** `hono` moves from 4.13.1 to 4.13.7 and `qs` from 6.15.2 to 6.16.0; both arrive through `@modelcontextprotocol/sdk`. This governs installs from a clone of this repository. The published package does not ship a lockfile, so an install from npm resolves these within the SDK's own version ranges.
 
 ## [0.21.0] — 2026-09-10
 
