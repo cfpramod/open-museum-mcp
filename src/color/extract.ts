@@ -133,6 +133,7 @@ const CDN_ALLOWLIST = new Set([
   // SMK's 1024px thumbnail rendition for records with an IIIF image.
   'iip-thumb.smk.dk',
   'media.getty.edu',                 // J. Paul Getty Museum IIIF image server
+  'images.collections.yale.edu',     // Yale IIIF image server (Yale Center for British Art)
   // Europeana edmIsShownBy (full images) comes from arbitrary per-provider
   // CDNs — those are intentionally NOT listed here and will fail open.
 ]);

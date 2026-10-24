@@ -70,6 +70,18 @@ describe('isAllowlistedImageHost — CDN allowlist (exact hostname)', () => {
     expect(isAllowlistedImageHost('https://iiif.wellcomecollection.org.evil.com/x.jpg')).toBe(false);
     expect(isAllowlistedImageHost('https://evil.com/?x=iiif.wellcomecollection.org')).toBe(false);
   });
+  it('allows the Yale IIIF image host the YCBA fetcher emits', () => {
+    expect(
+      isAllowlistedImageHost(
+        'https://images.collections.yale.edu/iiif/2/ycba:19504a99-09b0-4810-bb04-31ff694953f5/full/full/0/default.jpg',
+      ),
+    ).toBe(true);
+  });
+  it('still rejects a Yale look-alike host (no substring spoofing)', () => {
+    expect(isAllowlistedImageHost('https://images.collections.yale.edu.evil.com/x.jpg')).toBe(false);
+    expect(isAllowlistedImageHost('https://evil.com/?x=images.collections.yale.edu')).toBe(false);
+    expect(isAllowlistedImageHost('https://collections.yale.edu/x.jpg')).toBe(false);
+  });
 });
 
 function artwork(over: Partial<Artwork['imageUrls']> = {}): Artwork {

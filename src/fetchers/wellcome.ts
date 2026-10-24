@@ -99,7 +99,7 @@ export const wellcomeFetcher: Fetcher = {
     if (options.hasImage !== false) url.searchParams.set('items.locations.license', 'cc0,pdm');
     url.searchParams.set('pageSize', String(Math.min(limit, 100)));
 
-    const res = await httpGet(url);
+    const res = await httpGet(url, { signal: options.signal });
     if (!res.ok) throw new Error(`Wellcome search failed: ${res.status}`);
     const json = (await res.json()) as { results?: Array<{ id?: unknown }> };
     return (json.results ?? [])

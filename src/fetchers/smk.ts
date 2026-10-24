@@ -68,7 +68,7 @@ export const smkFetcher: Fetcher = {
     url.searchParams.set('rows', String(limit));
     url.searchParams.set('fields', 'object_number');
 
-    const res = await httpGet(url);
+    const res = await httpGet(url, { signal: options.signal });
     if (!res.ok) throw new Error(`SMK search failed: ${res.status}`);
     const json = (await res.json()) as { items?: Array<{ object_number?: unknown }> };
     const items = json.items ?? [];

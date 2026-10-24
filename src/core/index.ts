@@ -23,6 +23,14 @@ export {
 
 export type { CacheStore, Awaitable } from './cache.js';
 
+// Per-source outcome carried on every search and facets result.
+export {
+  SOURCE_STATUSES,
+  allSourcesFailed,
+  type SourceStatus,
+  type SourceStatusKind,
+} from './sourceStatus.js';
+
 // Clearance Manifest — the portable, fail-closed rights-clearance artifact and
 // its Tier-0 integrity envelope, emitted by Federation.clearanceManifest.
 export { wrapTier0, type Tier0Envelope } from './clearance/envelope.js';
@@ -108,6 +116,7 @@ export { rijksmuseumFetcher } from '../fetchers/rijksmuseum.js';
 export { smkFetcher } from '../fetchers/smk.js';
 export { wellcomeFetcher } from '../fetchers/wellcome.js';
 export { gettyFetcher } from '../fetchers/getty.js';
+export { ycbaFetcher } from '../fetchers/ycba.js';
 // Walters is an INGEST source (bundled index, no live API). The default instance
 // reads the package-shipped bundle via a lazily-imported node:fs — safe to IMPORT
 // from Workers, but a Workers host must construct its own via createWaltersFetcher

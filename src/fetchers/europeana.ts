@@ -157,7 +157,7 @@ export const europeanaFetcher: Fetcher = {
     // Bandwidth cost is small relative to the gate-rejection ratio.
     url.searchParams.set('profile', 'standard');
 
-    const res = await httpGet(url);
+    const res = await httpGet(url, { signal: options.signal });
     if (!res.ok) throw new Error(`Europeana search failed: ${res.status}`);
     const json = (await res.json()) as { items?: Array<{ id?: unknown }> };
     const items = json.items ?? [];

@@ -12,7 +12,9 @@ import {
   pickMaxResolution,
   rejectFor,
 } from './helpers.js';
-import { ARTIST_NAME_MAX, DESCRIPTION_MAX, TITLE_MAX } from './sanitize.js';
+// Commons text fields are HTML-laden. The shared stripHtml strips tags in one
+// linear pass, decodes entities, and collapses whitespace.
+import { ARTIST_NAME_MAX, DESCRIPTION_MAX, TITLE_MAX, stripHtml } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
@@ -61,17 +63,6 @@ function getExtField(ext: Record<string, unknown> | undefined, field: string): s
   return asString((wrap as { value?: unknown }).value);
 }
 
-// Common HTML entities seen in Commons text fields. Numeric escapes
-// (`&#39;`, `&#x2014;`) are handled by separate regex passes below.
-const HTML_ENTITIES: Record<string, string> = {
-  amp: '&',
-  quot: '"',
-  apos: "'",
-  lt: '<',
-  gt: '>',
-  nbsp: ' ',
-};
-
 // Wikidata Quick Statements markers that Commons concatenates into
 // ObjectName / ImageDescription for structured-data fields. These never
 // belong in user-facing text. Examples seen on real records:
@@ -108,22 +99,6 @@ const FILE_NUMBER_SUFFIX_RE = /\s+0\d{1,2}$/;
 
 function stripFileNumberSuffix(s: string): string {
   return s.replace(FILE_NUMBER_SUFFIX_RE, '').trim();
-}
-
-function decodeEntities(s: string): string {
-  return s
-    .replace(/&([a-z]+);/gi, (match, name: string) => HTML_ENTITIES[name.toLowerCase()] ?? match)
-    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(parseInt(code, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)));
-}
-
-// Commons text fields are HTML-laden. Strip tags, decode entities, collapse
-// whitespace. Order matters: strip tags first so entity decoding doesn't
-// reintroduce angle brackets that we then have to re-strip.
-function stripHtml(s: string): string {
-  return decodeEntities(s.replace(/<[^>]*>/g, ''))
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 // Commons `Credit` extmetadata is the upstream-source field. It is often a
@@ -237,7 +212,7 @@ export const wikimediaFetcher: Fetcher = {
     url.searchParams.set('format', 'json');
     url.searchParams.set('formatversion', '2');
 
-    const res = await httpGet(url);
+    const res = await httpGet(url, { signal: options.signal });
     if (!res.ok) throw new Error(`Wikimedia search failed: ${res.status}`);
     const json = (await res.json()) as { query?: { search?: Array<{ pageid?: unknown }> } };
     const results = json.query?.search ?? [];
