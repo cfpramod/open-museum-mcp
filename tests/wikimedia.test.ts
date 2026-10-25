@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { wikimediaFetcher } from '../src/fetchers/wikimedia.js';
+import { growthRatio, LINEAR_CEILING } from './helpers/growth.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -1029,13 +1030,346 @@ describe('Wikimedia mapper: tag stripping is linear on unclosed "<" runs', () =>
   }
 
   for (const field of ['ObjectName', 'Artist', 'ImageDescription']) {
-    it(`normalizes a 100k unclosed-"<" ${field} in under 1s`, () => {
-      const raw = withExtField(field, `<b>Kept</b> ${UNCLOSED}`);
-      const start = performance.now();
-      const result = wikimediaFetcher.normalize(raw);
-      const elapsed = performance.now() - start;
-      expect(elapsed).toBeLessThan(1000);
-      expect(result.status).toBe('accepted');
+    it(`normalizes a 100k unclosed-"<" ${field} in linear time`, () => {
+      expect(wikimediaFetcher.normalize(withExtField(field, `<b>Kept</b> ${UNCLOSED}`)).status).toBe('accepted');
+      const ratio = growthRatio(
+        (size) => wikimediaFetcher.normalize(withExtField(field, `<b>Kept</b> ${'<'.repeat(size)}`)),
+        UNCLOSED.length,
+      );
+      expect(ratio).toBeLessThan(LINEAR_CEILING);
+    }, 60_000);
+  }
+});
+
+// Commons renders extmetadata from wiki templates, so the HTML carries layout
+// the reader never sees as text. Two live records (both saved verbatim as
+// fixtures) showed the effect: the {{title}} template puts the original-language
+// title and its English translation on two lines, which fused into one word,
+// and the {{Unknown}} template appends a hidden copy of its own label, which
+// doubled the artist name.
+describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
+  function withExtField(field: string, value: string): unknown {
+    const raw = fixture('wikimedia-accepted-cc0.json') as {
+      query: { pages: Array<{ imageinfo: Array<{ extmetadata: Record<string, unknown> }> }> };
+    };
+    raw.query.pages[0].imageinfo[0].extmetadata[field] = { value, source: 'commons-desc-page' };
+    return raw;
+  }
+
+  function accepted(raw: unknown) {
+    const result = wikimediaFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') throw new Error('expected an accepted record');
+    return result.artwork;
+  }
+
+  it('titles a {{title}} template record as the original title with the English in parentheses', () => {
+    const a = accepted(fixture('wikimedia-accepted-title-template.json'));
+    expect(a.id).toBe('wikimedia:74450965');
+    expect(a.title).toBe('De triomf van de Doods (The Triumph of Death)');
+    expect(a.artist.name).toBe('Pieter Brueghel the Elder');
+  });
+
+  it('drops the hidden copy {{Unknown}} appends to the artist label', () => {
+    const a = accepted(fixture('wikimedia-accepted-hidden-span.json'));
+    expect(a.id).toBe('wikimedia:152447317');
+    expect(a.artist.name).toBe('Unknown author');
+    expect(a.artist.attributionType).toBe('anonymous');
+  });
+
+  it('titles a Wikidata-driven record as original (English) and leaves out the alternative titles', () => {
+    const a = accepted(fixture('wikimedia-accepted-alternative-title.json'));
+    expect(a.id).toBe('wikimedia:11452106');
+    expect(a.title).toBe("Dama con l'ermelli (Lady with an Ermine)");
+  });
+
+  it('ends the title at the hidden Wikidata label block, as the text marker did before', () => {
+    const a = accepted(
+      withExtField(
+        'ObjectName',
+        '<div>Zonnebloemen</div><div style="display: none;">label QS:Len,"Sunflowers"</div>' +
+          '<br><b>Alternative title(s): </b><br> <div>Vase with Fifteen Sunflowers</div>',
+      ),
+    );
+    expect(a.title).toBe('Zonnebloemen');
+  });
+
+  it('reads an italic translation wrapped in layout elements after the line break', () => {
+    const a = accepted(
+      withExtField(
+        'ObjectName',
+        '<div>Italian: <div lang="it"><i>Girasoli</i></div></div><br>' +
+          '<div style="font-weight:bold"><div lang="en"><i>Sunflowers</i></div></div>',
+      ),
+    );
+    expect(a.title).toBe('Girasoli (Sunflowers)');
+  });
+
+  it('keeps a line break followed by a layout element without italics as a plain separator', () => {
+    const a = accepted(withExtField('ObjectName', '<div>Zonnebloemen</div><br><div>Arles, 1888</div>'));
+    expect(a.title).toBe('Zonnebloemen Arles, 1888');
+  });
+
+  it('gives one title, without parentheses, when the translation repeats the original', () => {
+    const a = accepted(withExtField('ObjectName', '<div>Sunflowers</div><br><i>Sunflowers</i>'));
+    expect(a.title).toBe('Sunflowers');
+  });
+
+  it('gives the original title alone when the translation line is empty', () => {
+    const a = accepted(withExtField('ObjectName', '<div>Zonnebloemen</div><br><i></i>'));
+    expect(a.title).toBe('Zonnebloemen');
+  });
+
+  it('keeps a line break that is not followed by an italic translation as a plain separator', () => {
+    const a = accepted(withExtField('ObjectName', 'Zonnebloemen<br>Arles, 1888'));
+    expect(a.title).toBe('Zonnebloemen Arles, 1888');
+  });
+
+  it('does not read an <img> after the line break as an italic translation', () => {
+    const a = accepted(withExtField('ObjectName', 'Zonnebloemen<br><img src="x">Sunflowers'));
+    expect(a.title).toBe('Zonnebloemen Sunflowers');
+  });
+
+  it('drops the Wikidata marker from the translation line too', () => {
+    const a = accepted(
+      withExtField('ObjectName', '<div>Zonnebloemen</div><br><i>Sunflowers</i> title QS:P1476,nl:"Zonnebloemen"'),
+    );
+    expect(a.title).toBe('Zonnebloemen (Sunflowers)');
+  });
+
+  it('drops a hidden element together with everything nested inside it', () => {
+    const a = accepted(
+      withExtField('Artist', 'Jan Steen<div style="display:none"><span>Jan</span> <span>Steen</span></div>'),
+    );
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('drops a hidden element nested in an element of the same name', () => {
+    const a = accepted(
+      withExtField('Artist', '<span>Jan <span style="display: none">x</span>Steen</span>'),
+    );
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('drops a hidden element that contains an element of its own name, up to its own close', () => {
+    const a = accepted(
+      withExtField('Artist', 'Jan Steen<span style="display:none"><span>Jan</span> Steen</span>'),
+    );
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('drops a hidden void or self-closing element without swallowing the text after it', () => {
+    const a = accepted(
+      withExtField(
+        'ImageDescription',
+        'Oil on canvas.<img style="display:none" src="x"> Signed<span style="display:none"/> lower left.',
+      ),
+    );
+    expect(a.description).toBe('Oil on canvas. Signed lower left.');
+  });
+
+  it('keeps an element whose attribute name only ends in "style"', () => {
+    const a = accepted(withExtField('Artist', '<span data-style="display:none">Jan Steen</span>'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('does not read an italic inside a bold element after the line break as a translation', () => {
+    const a = accepted(withExtField('ObjectName', 'Zonnebloemen<br><b><i>Arles</i></b>'));
+    expect(a.title).toBe('Zonnebloemen Arles');
+  });
+
+  it('does not read an italic in the next block as a translation when the line break ends its own block', () => {
+    const a = accepted(withExtField('ObjectName', '<div>Zonnebloemen<br></div><div><i>Arles</i></div>'));
+    expect(a.title).toBe('Zonnebloemen Arles');
+  });
+
+  it('drops an unclosed hidden element to the end of the field, as a browser would', () => {
+    const a = accepted(withExtField('Artist', 'Jan Steen<span style="DISPLAY : NONE">Jan Steen'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('keeps elements whose style only mentions another display value', () => {
+    const a = accepted(withExtField('Artist', '<span style="display:inline-block">Jan Steen</span>'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('keeps an element whose non-style attribute happens to say display:none', () => {
+    const a = accepted(withExtField('Artist', '<span title="display:none">Jan Steen</span>'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('drops hidden text from the description as well', () => {
+    const a = accepted(
+      withExtField('ImageDescription', 'Oil on canvas.<span style="display:none">Oil on canvas.</span>'),
+    );
+    expect(a.description).toBe('Oil on canvas.');
+  });
+
+  it('stays linear on a long run of nested hidden elements', () => {
+    const value = (count: number): string => `Jan Steen${'<span style="display:none">'.repeat(count)}x`;
+    const ratio = growthRatio((count) => wikimediaFetcher.normalize(withExtField('Artist', value(count))), 20_000);
+    expect(ratio).toBeLessThan(LINEAR_CEILING);
+    expect(accepted(withExtField('Artist', value(20_000))).artist.name).toBe('Jan Steen');
+  }, 60_000);
+
+  // The marker used to be matched on the stripped, decoded text, where a tag
+  // between "label" and "QS:" left nothing and a whitespace entity read as a
+  // space. The raw-HTML match has to see through the same things.
+  for (const [what, between] of [
+    ['an empty inline element', '<span></span> '],
+    ['a decimal space entity', '&#32;'],
+    ['a hexadecimal space entity', '&#x20;'],
+    ['a named no-break space', '&nbsp;'],
+    ['a numeric no-break space', '&#160;'],
+    ['a decimal em space', '&#8195;'],
+    ['a hexadecimal em space', '&#x2003;'],
+    ['a form feed', '&#12;'],
+    ['an ideographic space', '&#x3000;'],
+    ['a byte order mark', '&#65279;'],
+    ['a tag holding a second "<"', '<x <y>'],
+    ['an inline tag and a space entity', '<i></i>&#x2003;<b></b>'],
+  ]) {
+    it(`ends the title at a Wikidata label marker split by ${what}`, () => {
+      const a = accepted(
+        withExtField(
+          'ObjectName',
+          `<div>Sun</div><div style="display: none;">label${between}QS:Len,"S"</div>` +
+            '<br><b>Alternative title(s): </b><br> <div>ALT LEAK</div>',
+        ),
+      );
+      expect(a.title).toBe('Sun');
     });
   }
+
+  // "&amp;#32;" decodes once, to the literal text "&#32;", which is not
+  // whitespace, so there is no marker: the title shows what the page shows.
+  it('finds no marker where an escaped reference stands between the keyword and "QS:"', () => {
+    const visible = accepted(withExtField('ObjectName', 'Sun label&amp;#32;QS:Len,"S" ALT LEAK'));
+    expect(visible.title).toBe('Sun label&#32;QS:Len,"S" ALT LEAK');
+    const hidden = accepted(
+      withExtField(
+        'ObjectName',
+        '<div>Sun</div><div style="display: none;">label&amp;#32;QS:Len,"S"</div>' +
+          '<br><b>Alternative title(s): </b><br> <div>ALT LEAK</div>',
+      ),
+    );
+    expect(hidden.title).toBe('Sun Alternative title(s): ALT LEAK');
+  });
+
+  it('sees a marker after a "<" that no ">" follows, which the text view kept as text', () => {
+    const a = accepted(
+      withExtField('ObjectName', 'Lilies 3 < 4 label QS:Lfr,"x" Alternative title(s): ALT LEAK'),
+    );
+    expect(a.title).toBe('Lilies 3 < 4');
+  });
+
+  it('sees a marker whose keyword is split by inline markup or an entity, as the text view did', () => {
+    expect(accepted(withExtField('ObjectName', 'Sun la<i></i>bel QS:Len,"S" ALT LEAK')).title).toBe('Sun');
+    expect(accepted(withExtField('ObjectName', 'Sun &#108;abel QS:Len,"S" ALT LEAK')).title).toBe('Sun');
+  });
+
+  it('does not read a separating tag inside the keyword as part of a marker', () => {
+    const a = accepted(withExtField('ObjectName', 'Sun la<br>bel QS:x'));
+    expect(a.title).toBe('Sun la bel QS:x');
+  });
+
+  it('ignores a marker inside an attribute value, which the text view never saw', () => {
+    const a = accepted(withExtField('ObjectName', '<div title="label QS:x">Sun</div>'));
+    expect(a.title).toBe('Sun');
+  });
+
+  it('never cuts inside a tag, so no raw markup reaches the title', () => {
+    const a = accepted(withExtField('ObjectName', '<img src=x onerror=alert(1) title="label QS:x">Sun'));
+    expect(a.title).toBe('Sun');
+    expect(a.title).not.toContain('<');
+  });
+
+  it('still cuts at a real marker that follows one inside an attribute value', () => {
+    const a = accepted(
+      withExtField(
+        'ObjectName',
+        '<div title="label QS:x">Sun</div><div style="display:none">label QS:Len,"S"</div>' +
+          '<br><b>Alternative title(s): </b><br> <div>ALT LEAK</div>',
+      ),
+    );
+    expect(a.title).toBe('Sun');
+  });
+
+  for (const [what, unit] of [
+    ['unclosed "<" after each keyword', 'label<'],
+    ['an entity after each keyword', 'label&nbsp;'],
+    ['tags after each keyword', 'label<b></b>'],
+    ['tags holding a second "<" after each keyword', 'label<x <y>'],
+    ['numeric entities after each keyword', 'label&#x2003;'],
+    ['markers inside one attribute', 'label QS:'],
+  ]) {
+    it(`finds the marker in linear time on a 1 MB run of ${what}`, () => {
+      const run = (size: number): string => unit.repeat(Math.ceil(size / unit.length));
+      const shapes = [(size: number) => `<span title="${run(size)}">Sun</span>`, run];
+      for (const shape of shapes) {
+        const ratio = growthRatio((size) => wikimediaFetcher.normalize(withExtField('ObjectName', shape(size))), 1_000_000);
+        expect(ratio).toBeLessThan(LINEAR_CEILING);
+      }
+    }, 60_000);
+  }
+
+  it('reads an italic translation after an earlier plain line break', () => {
+    const a = accepted(withExtField('ObjectName', 'De triomf<br>van de Doods<br><i>The Triumph</i>'));
+    expect(a.title).toBe('De triomf van de Doods (The Triumph)');
+  });
+
+  it('reads an italic translation after a block that holds its own line break', () => {
+    const a = accepted(withExtField('ObjectName', '<div>A<br>B</div><br><i>T</i>'));
+    expect(a.title).toBe('A B (T)');
+  });
+
+  it('stays linear on many line breaks that are not translations', () => {
+    const value = (count: number): string => `Sun${('<br>' + '<span>'.repeat(50)).repeat(count)}`;
+    const ratio = growthRatio((count) => wikimediaFetcher.normalize(withExtField('ObjectName', value(count))), 1_000);
+    expect(ratio).toBeLessThan(LINEAR_CEILING);
+    expect(accepted(withExtField('ObjectName', value(1_000))).title).toBe('Sun');
+  }, 60_000);
+
+  it('does not read "style=" inside another attribute value as a style attribute', () => {
+    const a = accepted(withExtField('Artist', '<span title="a style=display:none">Rembrandt</span>'));
+    expect(a.artist.name).toBe('Rembrandt');
+  });
+
+  it('does not read "style=" inside a single-quoted attribute value either', () => {
+    const a = accepted(withExtField('Artist', `<span title='x style="display:none"'>Rembrandt</span>`));
+    expect(a.artist.name).toBe('Rembrandt');
+  });
+
+  it('still hides an element whose real style attribute follows a quoted decoy', () => {
+    const a = accepted(withExtField('Artist', '<span title="style" style="display:none">x</span>Jan Steen'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('reads past a self-closing slash among the attributes', () => {
+    expect(accepted(withExtField('Artist', 'Jan<br/>Steen')).artist.name).toBe('Jan Steen');
+    const a = accepted(withExtField('Artist', '<span title="a" / style="display:none">x</span>Jan Steen'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('keeps an element whose style value only becomes display:none if a reference is decoded twice', () => {
+    const a = accepted(withExtField('Artist', 'Rembrandt <span style="display&amp;#58;none">van Rijn</span>'));
+    expect(a.artist.name).toBe('Rembrandt van Rijn');
+  });
+
+  it('hides an element whose style value spells a character as a reference, as a browser decodes it', () => {
+    for (const style of ['display&#58;none', 'display&#x3A;none', 'display:&#110;one', 'display:&#78;ONE', 'display:&#32;none']) {
+      const a = accepted(withExtField('Artist', `Rembrandt<span style="${style}">ZZHIDDEN</span>`));
+      expect(a.artist.name).toBe('Rembrandt');
+    }
+  });
+
+  it('keeps an element whose style value only becomes display:none if a no-break space is read as CSS whitespace', () => {
+    const a = accepted(withExtField('Artist', '<span style="display:&nbsp;none">Rembrandt</span>'));
+    expect(a.artist.name).toBe('Rembrandt');
+  });
+
+  it('still hides an element whose unquoted style attribute follows an unquoted attribute', () => {
+    const a = accepted(withExtField('Artist', '<span data-x=y style=display:none>x</span>Jan Steen'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
 });

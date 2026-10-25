@@ -1,0 +1,80 @@
+{
+  "continue": {
+    "iistart": "2017-03-29T17:53:28Z",
+    "continue": "||categories"
+  },
+  "query": {
+    "pages": [
+      {
+        "pageid": 11452106,
+        "ns": 6,
+        "title": "File:Dama z gronostajem.jpg",
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 3497427,
+            "width": 3543,
+            "height": 4876,
+            "thumburl": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Dama_z_gronostajem.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+            "thumbwidth": 2048,
+            "thumbheight": 2819,
+            "thumbattribs": {
+              "src": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Dama_z_gronostajem.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+              "decoding": "async",
+              "loading": "lazy",
+              "width": 2048,
+              "height": 2819
+            },
+            "url": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Dama_z_gronostajem.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Dama_z_gronostajem.jpg",
+            "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=11452106",
+            "extmetadata": {
+              "DateTime": {
+                "value": "2017-04-25 22:45:26",
+                "source": "mediawiki-metadata",
+                "hidden": ""
+              },
+              "ObjectName": {
+                "value": "<div class=\"fn\">\n<div style=\"font-size:0.9em;display:inline-block;\">Italian:  <div style=\"display:inline-block\" dir=\"ltr\" lang=\"it\"><i>Dama con l'ermelli <span class=\"mw-valign-text-top noprint\" typeof=\"mw:File/Frameless\"><a href=\"https://www.wikidata.org/wiki/Q474338#P1476\" title=\"Edit this at Wikidata\"><img alt=\"Edit this at Wikidata\" src=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/OOjs_UI_icon_edit-ltr-progressive.svg/20px-OOjs_UI_icon_edit-ltr-progressive.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail\" decoding=\"async\" loading=\"lazy\" width=\"10\" height=\"10\" class=\"mw-file-element\" data-file-width=\"20\" data-file-height=\"20\"></a></span></i></div></div><br><div style=\"font-weight:bold;display:inline-block;\"><div style=\"display:inline-block\" dir=\"ltr\" lang=\"en\"><i>Lady with an Ermine</i></div></div><div style=\"display: none;\">label QS:Les,\"La dama del armiño\"</div><div style=\"display: none;\">label QS:Lfr,\"La dame à l'hermine\"</div><div style=\"display: none;\">label QS:Len,\"Lady with an Ermine\"</div><div style=\"display: none;\">label QS:Lde,\"Dame mit dem Hermelin\"</div><div style=\"display: none;\">label QS:Lit,\"Dama con l'ermellino\"</div><div style=\"display: none;\">label QS:Lpl,\"Dama z gronostajem\"</div><br><b>Alternative title(s): </b><br> <div style=\"font-weight:bold;display:inline-block;\">Portrait of Q254451</div></div>",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Leonardo_da_Vinci\" class=\"extiw\" title=\"w:en:Leonardo da Vinci\"><span title=\"Italian Renaissance polymath (1452−1519)\">Leonardo da Vinci</span></a></bdi>",
+                "source": "commons-desc-page"
+              },
+              "ImageDescription": {
+                "value": "A young woman holds an ermine in her arms.",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "<a rel=\"nofollow\" class=\"external text\" href=\"http://www.ncm.com/content/files/art_downloads/LeonardodaVinci-TheLadywithanErmineX6803.jpg\">www.ncm.com</a>",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "Public domain",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Public domain",
+                "source": "commons-desc-page"
+              },
+              "License": {
+                "value": "pd",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            },
+            "mime": "image/jpeg"
+          }
+        ],
+        "categories": [
+          {
+            "ns": 14,
+            "title": "Category:Lady with an Ermine"
+          }
+        ]
+      }
+    ]
+  }
+}
