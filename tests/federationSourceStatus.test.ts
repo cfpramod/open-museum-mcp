@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createFederation, SearchParamsSchema, type CacheStore, type SourceStatus } from '../src/core/index.js';
-import { classifyFailure, sanitizeSourceError } from '../src/core/sourceStatus.js';
+import { classifyFailure, MAX_SCAN_LENGTH, sanitizeSourceError } from '../src/core/sourceStatus.js';
 import { totalFailureResult } from '../src/totalFailure.js';
 import type { Fetcher } from '../src/fetchers/types.js';
 import type { Artwork } from '../src/types.js';
-import { BOUNDED_CEILING, growthRatioOf } from './helpers/growth.js';
+import { BOUNDED_CEILING, growthRatioOf, LINEAR_CEILING } from './helpers/growth.js';
 
 function makeArtwork(id: string): Artwork {
   const code = id.slice(0, id.indexOf(':'));
@@ -326,6 +326,13 @@ describe('redaction cost is bounded whatever a source sends back', () => {
   it.each(hostile)('stops growing past the scan limit on %s', (_label, shape) => {
     expect(sanitizeSourceError(new Error(shape(30_000))).length).toBeLessThanOrEqual(300);
     expect(growthRatioOf(error(shape), sanitizeSourceError, 30_000)).toBeLessThan(BOUNDED_CEILING);
+  }, 60_000);
+
+  // The check above only sees the cap: a quadratic rule inside the window would
+  // cost the same at both sizes. Sizes a quarter of the window and the whole
+  // window are both scanned in full, so here the cost must grow linearly.
+  it.each(hostile)('grows linearly within the scan limit on %s', (_label, shape) => {
+    expect(growthRatioOf(error(shape), sanitizeSourceError, MAX_SCAN_LENGTH)).toBeLessThan(LINEAR_CEILING);
   }, 60_000);
 
   it('still redacts a credential inside the scanned window of a long message', () => {

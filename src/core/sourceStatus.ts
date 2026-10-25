@@ -77,7 +77,7 @@ const SECRET_PAIR = new RegExp(`\\b(${SECRET_NAME})["']?\\s*[=:]\\s*("[^"]*"|'[^
 const QUERY_SECRET = /([?&])([^=&\s"'#]{0,64}(?:key|token|secret|passw|credential|sig|auth)[^=&\s"'#]{0,64})=[^&\s"'#]*/gi;
 // Most of an upstream message the redaction rules will ever look at. Applied
 // BEFORE any regex runs, so the cost is bounded whatever a museum sends back.
-const MAX_SCAN_LENGTH = 2000;
+export const MAX_SCAN_LENGTH = 2000;
 const ESCAPED_QUOTE = /\\+(["'])/g;
 const PERCENT_ESCAPE = /%[0-9A-Fa-f]{2}/g;
 
