@@ -1221,6 +1221,13 @@ describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
     ['a hexadecimal space entity', '&#x20;'],
     ['a named no-break space', '&nbsp;'],
     ['a numeric no-break space', '&#160;'],
+    ['a decimal em space', '&#8195;'],
+    ['a hexadecimal em space', '&#x2003;'],
+    ['a form feed', '&#12;'],
+    ['an ideographic space', '&#x3000;'],
+    ['a byte order mark', '&#65279;'],
+    ['a tag holding a second "<"', '<x <y>'],
+    ['an inline tag and a space entity', '<i></i>&#x2003;<b></b>'],
   ]) {
     it(`ends the title at a Wikidata label marker split by ${what}`, () => {
       const a = accepted(
@@ -1233,6 +1240,23 @@ describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
       expect(a.title).toBe('Sun');
     });
   }
+
+  it('sees a marker after a "<" that no ">" follows, which the text view kept as text', () => {
+    const a = accepted(
+      withExtField('ObjectName', 'Lilies 3 < 4 label QS:Lfr,"x" Alternative title(s): ALT LEAK'),
+    );
+    expect(a.title).toBe('Lilies 3 < 4');
+  });
+
+  it('sees a marker whose keyword is split by inline markup or an entity, as the text view did', () => {
+    expect(accepted(withExtField('ObjectName', 'Sun la<i></i>bel QS:Len,"S" ALT LEAK')).title).toBe('Sun');
+    expect(accepted(withExtField('ObjectName', 'Sun &#108;abel QS:Len,"S" ALT LEAK')).title).toBe('Sun');
+  });
+
+  it('does not read a separating tag inside the keyword as part of a marker', () => {
+    const a = accepted(withExtField('ObjectName', 'Sun la<br>bel QS:x'));
+    expect(a.title).toBe('Sun la bel QS:x');
+  });
 
   it('ignores a marker inside an attribute value, which the text view never saw', () => {
     const a = accepted(withExtField('ObjectName', '<div title="label QS:x">Sun</div>'));
@@ -1260,6 +1284,8 @@ describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
     ['unclosed "<" after each keyword', 'label<'],
     ['an entity after each keyword', 'label&nbsp;'],
     ['tags after each keyword', 'label<b></b>'],
+    ['tags holding a second "<" after each keyword', 'label<x <y>'],
+    ['numeric entities after each keyword', 'label&#x2003;'],
     ['markers inside one attribute', 'label QS:'],
   ]) {
     it(`finds the marker in linear time on a 1 MB run of ${what}`, () => {
@@ -1309,6 +1335,18 @@ describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
     expect(accepted(withExtField('Artist', 'Jan<br/>Steen')).artist.name).toBe('Jan Steen');
     const a = accepted(withExtField('Artist', '<span title="a" / style="display:none">x</span>Jan Steen'));
     expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('hides an element whose style value spells a character as a reference, as a browser decodes it', () => {
+    for (const style of ['display&#58;none', 'display&#x3A;none', 'display:&#110;one', 'display:&#78;ONE', 'display:&#32;none']) {
+      const a = accepted(withExtField('Artist', `Rembrandt<span style="${style}">ZZHIDDEN</span>`));
+      expect(a.artist.name).toBe('Rembrandt');
+    }
+  });
+
+  it('keeps an element whose style value only becomes display:none if a no-break space is read as CSS whitespace', () => {
+    const a = accepted(withExtField('Artist', '<span style="display:&nbsp;none">Rembrandt</span>'));
+    expect(a.artist.name).toBe('Rembrandt');
   });
 
   it('still hides an element whose unquoted style attribute follows an unquoted attribute', () => {

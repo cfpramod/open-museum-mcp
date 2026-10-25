@@ -14,7 +14,15 @@ import {
 } from './helpers.js';
 // Commons text fields are HTML-laden. The shared stripHtml strips tags in one
 // linear pass, decodes entities, and collapses whitespace.
-import { ARTIST_NAME_MAX, DESCRIPTION_MAX, TITLE_MAX, stripHtml, tagNameAt } from './sanitize.js';
+import {
+  ARTIST_NAME_MAX,
+  DESCRIPTION_MAX,
+  TITLE_MAX,
+  decodeEntities,
+  stripHtml,
+  tagNameAt,
+  textView,
+} from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
@@ -82,27 +90,19 @@ function stripQsMetadata(s: string): string {
 // the title still ends where the marker block begins. The hidden element the
 // cut leaves open is then dropped to the end of the field.
 //
-// The marker used to be matched on the stripped, decoded text, where a tag
-// between the keyword and "QS:" left nothing and a whitespace entity read as
-// whitespace, so the raw match accepts all three there. The alternatives start
-// with different characters, and a tag runs from `<` to `>` without crossing
-// another `<`, so an unclosed `<` ends at the next one; the search stays linear.
-// It recognises tags and removes nothing. A marker inside a tag (an attribute
-// value) was never text and is skipped, so the cut never leaves a tag open.
-const QS_MARKER_RE =
-  /(?:title|label)(?:\s|&(?:nbsp|#0*(?:9|10|13|32|160)|#[xX]0*(?:9|[aA]|[dD]|20|[aA]0));|<[^<>]*>)*QS:/g;
+// The marker is found in the text the reader sees, the same text stripHtml
+// reads (tags gone, character references decoded), and the cut is made in the
+// HTML at the place that text came from. So whatever the text view counted as
+// a marker still counts: a tag or any whitespace reference between the keyword
+// and "QS:", a "<" that no ">" closes, which stays text. A marker inside a tag
+// (an attribute value) was never text, so the cut never leaves a tag open.
+// Building the view and searching it are both linear in the field length.
+const QS_MARKER_RE = /(?:title|label)\s*QS:/;
 
 function cutAtQsMarker(html: string): string {
-  let scanned = 0;
-  let inTag = false;
-  for (const m of html.matchAll(QS_MARKER_RE)) {
-    for (; scanned < m.index; scanned++) {
-      if (html[scanned] === '<') inTag = true;
-      else if (html[scanned] === '>') inTag = false;
-    }
-    if (!inTag) return html.slice(0, m.index);
-  }
-  return html;
+  const { text, offsets } = textView(html);
+  const at = text.search(QS_MARKER_RE);
+  return at === -1 ? html : html.slice(0, offsets[at]);
 }
 
 // Commons surfaces multilingual ObjectName as `<Language>: <native form>`,
@@ -145,6 +145,15 @@ function isSpace(c: string | undefined): boolean {
   return c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f';
 }
 
+// A browser decodes character references in an attribute value before CSS
+// reads it, so "display&#58;none" hides. A no-break space is not CSS
+// whitespace, so `&nbsp;` is kept as U+00A0 here rather than read as the
+// plain space the text view gives it.
+function styleHides(value: string): boolean {
+  const css = decodeEntities(value.replace(/&nbsp;/gi, '\u00a0')).toLowerCase();
+  return css.split(/[ \t\n\r\f]+/).join('').includes('display:none');
+}
+
 // Walk the tag's attributes in order, stepping over each value whole, so
 // "style=" inside another attribute's quoted value is never read as the style
 // attribute. The first style attribute decides, as in a browser.
@@ -173,7 +182,7 @@ function isHiddenByStyle(tag: string): boolean {
       while (i < lower.length && !isSpace(lower[i]) && lower[i] !== '>') i++;
       value = lower.slice(start, i);
     }
-    if (name === 'style') return value.split(/\s+/).join('').includes('display:none');
+    if (name === 'style') return styleHides(value);
   }
 }
 

@@ -32,7 +32,7 @@ function decodeCodePoint(ref: string, codePoint: number): string {
   return String.fromCodePoint(codePoint);
 }
 
-function decodeEntities(s: string): string {
+export function decodeEntities(s: string): string {
   return s
     .replace(/&([a-z]+);/gi, (m, name: string) => HTML_ENTITIES[name.toLowerCase()] ?? m)
     .replace(/&#(\d+);/g, (m, code: string) => decodeCodePoint(m, parseInt(code, 10)))
@@ -72,26 +72,84 @@ export function tagNameAt(s: string, lt: number, gt: number): string {
   return s.slice(start, i).toLowerCase();
 }
 
-function stripTags(s: string): string {
-  let out = '';
+// Walk `s` as the tag stripper reads it, reporting each run of text that stays
+// and the position of each tag that leaves a separating space.
+function walkTags(s: string, text: (from: number, to: number) => void, separator: (at: number) => void): void {
   let i = 0;
   while (i < s.length) {
     const lt = s.indexOf('<', i);
     if (lt === -1) {
-      out += s.slice(i);
+      text(i, s.length);
       break;
     }
-    out += s.slice(i, lt);
+    text(i, lt);
     const gt = s.indexOf('>', lt + 1);
     if (gt === -1) {
       // No closing '>': the unclosed '<…' tail is not a tag — keep it verbatim.
-      out += s.slice(lt);
+      text(lt, s.length);
       break;
     }
-    if (SEPARATING_TAGS.has(tagNameAt(s, lt, gt))) out += ' ';
+    if (SEPARATING_TAGS.has(tagNameAt(s, lt, gt))) separator(lt);
     i = gt + 1; // skip the '<…>' tag
   }
+}
+
+function stripTags(s: string): string {
+  let out = '';
+  walkTags(
+    s,
+    (from, to) => {
+      out += s.slice(from, to);
+    },
+    () => {
+      out += ' ';
+    },
+  );
   return out;
+}
+
+// The text stripHtml reads, before its whitespace collapse, with the index in
+// `s` that each character came from. A caller that finds something in the text
+// can then act on the markup at the same place. Tags follow stripTags, and
+// each character reference is decoded once with decodeEntities' tables, after
+// the tags are gone, as stripHtml does.
+const ENTITY_RE = /&(?:([a-z]+)|#(\d+)|#x([0-9a-f]+));/gi;
+
+export function textView(s: string): { text: string; offsets: number[] } {
+  let stripped = '';
+  const strippedFrom: number[] = [];
+  walkTags(
+    s,
+    (from, to) => {
+      stripped += s.slice(from, to);
+      for (let k = from; k < to; k++) strippedFrom.push(k);
+    },
+    (at) => {
+      stripped += ' ';
+      strippedFrom.push(at);
+    },
+  );
+  let text = '';
+  const offsets: number[] = [];
+  let i = 0;
+  const keep = (from: number, to: number): void => {
+    text += stripped.slice(from, to);
+    for (let k = from; k < to; k++) offsets.push(strippedFrom[k]);
+  };
+  for (const m of stripped.matchAll(ENTITY_RE)) {
+    const [ref, name, dec, hex] = m;
+    const decoded =
+      name !== undefined
+        ? (HTML_ENTITIES[name.toLowerCase()] ?? ref)
+        : decodeCodePoint(ref, dec !== undefined ? parseInt(dec, 10) : parseInt(hex, 16));
+    if (decoded === ref) continue; // left verbatim, kept with the text around it
+    keep(i, m.index);
+    text += decoded;
+    for (let k = 0; k < decoded.length; k++) offsets.push(strippedFrom[m.index]);
+    i = m.index + ref.length;
+  }
+  keep(i, stripped.length);
+  return { text, offsets };
 }
 
 export function stripHtml(s: string): string {

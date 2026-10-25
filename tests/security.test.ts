@@ -15,7 +15,7 @@ import { metFetcher } from '../src/fetchers/met.js';
 import { wikimediaFetcher } from '../src/fetchers/wikimedia.js';
 import { createColorExtractor, isSafeImageUrl } from '../src/color/extract.js';
 import { parseDisplayDate } from '../src/dateParser.js';
-import { sanitizeTitle, stripHtml } from '../src/fetchers/sanitize.js';
+import { sanitizeTitle, stripHtml, textView } from '../src/fetchers/sanitize.js';
 import type { Artwork } from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -575,6 +575,39 @@ describe('stripHtml: line breaks and block boundaries separate words', () => {
 
   it('collapses the separators a run of block tags leaves behind', () => {
     expect(stripHtml('<div><p>one</p></div><br><br><div>two</div>')).toBe('one two');
+  });
+});
+
+describe('textView: the text stripHtml reads, with where each character came from', () => {
+  it('maps text through inline tags, and a block tag to the space it leaves', () => {
+    expect(textView('a<i>b</i><br>c')).toEqual({ text: 'ab c', offsets: [0, 4, 9, 13] });
+  });
+
+  it('maps every character of a decoded reference to the reference', () => {
+    expect(textView('a&#x2003;b&nbsp;c&#128512;')).toEqual({
+      text: 'a\u2003b c\u{1F600}',
+      offsets: [0, 1, 9, 10, 16, 17, 17],
+    });
+  });
+
+  it('maps a reference after a tag to its place in the markup, not in the stripped text', () => {
+    expect(textView('a<i>&#32;</i>b')).toEqual({ text: 'a b', offsets: [0, 4, 13] });
+  });
+
+  it('maps a reference it leaves verbatim character by character', () => {
+    expect(textView('a&foo;b&#99999999;')).toEqual({
+      text: 'a&foo;b&#99999999;',
+      offsets: Array.from({ length: 18 }, (_, k) => k),
+    });
+  });
+
+  it('keeps a "<" that no ">" closes as text, as stripTags does', () => {
+    expect(textView('3 < 4 &lt;')).toEqual({ text: '3 < 4 <', offsets: [0, 1, 2, 3, 4, 5, 6] });
+  });
+
+  it('gives the same text as stripHtml before its whitespace collapse', () => {
+    const html = '<div>Zonnebloemen</div><br><i>Sun&#32;flowers</i> 1 < 2';
+    expect(textView(html).text.replace(/\s+/g, ' ').trim()).toBe(stripHtml(html));
   });
 });
 
