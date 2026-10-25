@@ -15,7 +15,7 @@ import { metFetcher } from '../src/fetchers/met.js';
 import { wikimediaFetcher } from '../src/fetchers/wikimedia.js';
 import { createColorExtractor, isSafeImageUrl } from '../src/color/extract.js';
 import { parseDisplayDate } from '../src/dateParser.js';
-import { sanitizeTitle, stripHtml, textView } from '../src/fetchers/sanitize.js';
+import { decodeEntities, sanitizeTitle, stripHtml, textView } from '../src/fetchers/sanitize.js';
 import type { Artwork } from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -608,6 +608,78 @@ describe('textView: the text stripHtml reads, with where each character came fro
   it('gives the same text as stripHtml before its whitespace collapse', () => {
     const html = '<div>Zonnebloemen</div><br><i>Sun&#32;flowers</i> 1 < 2';
     expect(textView(html).text.replace(/\s+/g, ' ').trim()).toBe(stripHtml(html));
+  });
+
+  it('decodes an escaped reference once, as stripHtml does', () => {
+    expect(textView('a&amp;#32;b').text).toBe('a&#32;b');
+    expect(stripHtml('a&amp;#32;b')).toBe('a&#32;b');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HTML decodes a character reference once. Decoding in successive passes
+// turns "&amp;#32;" into a space and "&amp;lt;" into "<", which the page shows
+// as the literal text "&#32;" and "&lt;". The text view and stripHtml must
+// also read the same text, so a marker found in one is found in the other.
+// ---------------------------------------------------------------------------
+
+describe('decodeEntities: one pass, shared with the text view', () => {
+  it('leaves the reference an escaped ampersand spells, rather than decoding it again', () => {
+    expect(decodeEntities('&amp;lt;i&amp;gt;')).toBe('&lt;i&gt;');
+    expect(decodeEntities('&amp;#32;&amp;#x20;&amp;amp;')).toBe('&#32;&#x20;&amp;');
+  });
+
+  // Markup built from the pieces that exercise the tag walk and every
+  // reference form, including references behind an escaped ampersand.
+  const PIECES = [
+    'a', 'Z', '7', ' ', '\t', '\n', ';', '#', 'x', '&', '<', '>', '/', '"', '=',
+    '<i>', '</i>', '<br>', '<div>', '</div>', '<span style="display:none">', '</span>',
+    '<p class="q">', '<x <y>', '< ', '&amp;', '&lt;', '&gt;', '&quot;', '&apos;',
+    '&nbsp;', '&AMP;', '&foo;', '&#32;', '&#x20;', '&#X41;', '&#160;', '&#128512;',
+    '&#99999999;', '&#xD800;', '&#x110000;', '&amp;#32;', '&amp;#x3A;', '&amp;lt;',
+    '&amp;amp;', '&&#35;32;', '&#38;#32;',
+  ];
+
+  // A fixed-seed generator, so a failure names an input that reproduces.
+  function markup(seed: number, count: number): string[] {
+    let state = seed >>> 0;
+    const next = (): number => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    return Array.from({ length: count }, () => {
+      let s = '';
+      const pieces = Math.floor(next() * 24);
+      for (let k = 0; k < pieces; k++) s += PIECES[Math.floor(next() * PIECES.length)];
+      return s;
+    });
+  }
+
+  const CASES = markup(0x5eed, 3000);
+
+  // Each check lists the inputs it fails on, so a failure names them all.
+  it('reads the same text in textView as in stripHtml, before its whitespace collapse', () => {
+    const differ = CASES.filter((html) => textView(html).text.replace(/\s+/g, ' ').trim() !== stripHtml(html));
+    expect(differ).toEqual([]);
+  });
+
+  it('maps every character textView reads to a position in the markup, in order', () => {
+    const misplaced = CASES.filter((html) => {
+      const { text, offsets } = textView(html);
+      return (
+        offsets.length !== text.length ||
+        offsets.some((at, k) => at < 0 || at >= html.length || (k > 0 && at < offsets[k - 1]))
+      );
+    });
+    expect(misplaced).toEqual([]);
+  });
+
+  it('decodes any text with its ampersands escaped back to that text', () => {
+    const changed = CASES.filter((text) => decodeEntities(text.replace(/&/g, '&amp;')) !== text);
+    expect(changed).toEqual([]);
   });
 });
 

@@ -32,11 +32,22 @@ function decodeCodePoint(ref: string, codePoint: number): string {
   return String.fromCodePoint(codePoint);
 }
 
+// A named, decimal or hexadecimal character reference.
+const ENTITY_RE = /&(?:([a-z]+)|#(\d+)|#x([0-9a-f]+));/gi;
+
+// The text one ENTITY_RE match stands for, or the reference itself when it is
+// left verbatim (an unknown name, or a number that is not a scalar value).
+function decodeReference(ref: string, name?: string, dec?: string, hex?: string): string {
+  if (name !== undefined) return HTML_ENTITIES[name.toLowerCase()] ?? ref;
+  return decodeCodePoint(ref, dec !== undefined ? parseInt(dec, 10) : parseInt(hex ?? '', 16));
+}
+
+// One pass, as HTML decodes: the text a reference produces is never read
+// again, so "&amp;#32;" is the literal text "&#32;", not a space.
 export function decodeEntities(s: string): string {
-  return s
-    .replace(/&([a-z]+);/gi, (m, name: string) => HTML_ENTITIES[name.toLowerCase()] ?? m)
-    .replace(/&#(\d+);/g, (m, code: string) => decodeCodePoint(m, parseInt(code, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (m, hex: string) => decodeCodePoint(m, parseInt(hex, 16)));
+  return s.replace(ENTITY_RE, (ref: string, name?: string, dec?: string, hex?: string) =>
+    decodeReference(ref, name, dec, hex),
+  );
 }
 
 // Remove HTML tags with a single linear pass instead of a `/<[^>]*>/g` global
@@ -111,10 +122,8 @@ function stripTags(s: string): string {
 // The text stripHtml reads, before its whitespace collapse, with the index in
 // `s` that each character came from. A caller that finds something in the text
 // can then act on the markup at the same place. Tags follow stripTags, and
-// each character reference is decoded once with decodeEntities' tables, after
-// the tags are gone, as stripHtml does.
-const ENTITY_RE = /&(?:([a-z]+)|#(\d+)|#x([0-9a-f]+));/gi;
-
+// each character reference is decoded once with decodeEntities' own per-match
+// function, after the tags are gone, as stripHtml does.
 export function textView(s: string): { text: string; offsets: number[] } {
   let stripped = '';
   const strippedFrom: number[] = [];
@@ -138,10 +147,7 @@ export function textView(s: string): { text: string; offsets: number[] } {
   };
   for (const m of stripped.matchAll(ENTITY_RE)) {
     const [ref, name, dec, hex] = m;
-    const decoded =
-      name !== undefined
-        ? (HTML_ENTITIES[name.toLowerCase()] ?? ref)
-        : decodeCodePoint(ref, dec !== undefined ? parseInt(dec, 10) : parseInt(hex, 16));
+    const decoded = decodeReference(ref, name, dec, hex);
     if (decoded === ref) continue; // left verbatim, kept with the text around it
     keep(i, m.index);
     text += decoded;

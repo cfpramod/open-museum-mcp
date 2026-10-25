@@ -1241,6 +1241,21 @@ describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
     });
   }
 
+  // "&amp;#32;" decodes once, to the literal text "&#32;", which is not
+  // whitespace, so there is no marker: the title shows what the page shows.
+  it('finds no marker where an escaped reference stands between the keyword and "QS:"', () => {
+    const visible = accepted(withExtField('ObjectName', 'Sun label&amp;#32;QS:Len,"S" ALT LEAK'));
+    expect(visible.title).toBe('Sun label&#32;QS:Len,"S" ALT LEAK');
+    const hidden = accepted(
+      withExtField(
+        'ObjectName',
+        '<div>Sun</div><div style="display: none;">label&amp;#32;QS:Len,"S"</div>' +
+          '<br><b>Alternative title(s): </b><br> <div>ALT LEAK</div>',
+      ),
+    );
+    expect(hidden.title).toBe('Sun Alternative title(s): ALT LEAK');
+  });
+
   it('sees a marker after a "<" that no ">" follows, which the text view kept as text', () => {
     const a = accepted(
       withExtField('ObjectName', 'Lilies 3 < 4 label QS:Lfr,"x" Alternative title(s): ALT LEAK'),
@@ -1334,6 +1349,11 @@ describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
     expect(accepted(withExtField('Artist', 'Jan<br/>Steen')).artist.name).toBe('Jan Steen');
     const a = accepted(withExtField('Artist', '<span title="a" / style="display:none">x</span>Jan Steen'));
     expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('keeps an element whose style value only becomes display:none if a reference is decoded twice', () => {
+    const a = accepted(withExtField('Artist', 'Rembrandt <span style="display&amp;#58;none">van Rijn</span>'));
+    expect(a.artist.name).toBe('Rembrandt van Rijn');
   });
 
   it('hides an element whose style value spells a character as a reference, as a browser decodes it', () => {
