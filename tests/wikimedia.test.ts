@@ -1373,3 +1373,84 @@ describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
     expect(a.artist.name).toBe('Jan Steen');
   });
 });
+
+// Commons escapes markup that wikitext does not allow, so an uploader's literal
+// `<a href="...">` reaches the API as `&lt;a href="..."&gt;`. stripHtml removes
+// real tags before it decodes entities, so without a second pass the decoded
+// tag reaches the wire as text. The fixture is a real record verbatim
+// (File:Out Of The East.djvu): its escaped anchor wraps a real one, so a
+// decode-then-strip order would still leave `" rel="nofollow">` behind.
+describe('Wikimedia mapper: entity-escaped markup is removed after decoding', () => {
+  function withExtField(field: string, value: string): unknown {
+    const raw = fixture('wikimedia-accepted-cc0.json') as {
+      query: { pages: Array<{ imageinfo: Array<{ extmetadata: Record<string, unknown> }> }> };
+    };
+    raw.query.pages[0].imageinfo[0].extmetadata[field] = { value, source: 'commons-desc-page' };
+    return raw;
+  }
+
+  function accepted(raw: unknown) {
+    const result = wikimediaFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    return result.artwork;
+  }
+
+  it('removes the escaped anchor from a real description and keeps its text', () => {
+    const a = accepted(fixture('wikimedia-accepted-escaped-markup.json'));
+    expect(a.id).toBe('wikimedia:59145303');
+    expect(a.description).toContain('Book Source: Digital Library of India Item 2015.45846');
+    expect(a.description).not.toMatch(/<\/?a\b/);
+    expect(a.description).not.toContain('nofollow');
+    expect(a.title).toBe('OUT OF THE EAST');
+    expect(a.artist.name).toBe('Lafcadio Hearn');
+  });
+
+  for (const field of ['ObjectName', 'Artist', 'ImageDescription']) {
+    it(`removes an escaped tag pair from ${field}`, () => {
+      const a = accepted(
+        withExtField(field, '&lt;a href="https://example.org/x"&gt;Kept text&lt;/a&gt; &lt;br/&gt;tail'),
+      );
+      const value = field === 'ObjectName' ? a.title : field === 'Artist' ? a.artist.name : a.description;
+      expect(value).toBe('Kept text tail');
+    });
+  }
+
+  it('leaves a space where an escaped line break or block tag stood, as a real one does', () => {
+    const a = accepted(withExtField('ImageDescription', 'First line&lt;br&gt;second&lt;/p&gt;&lt;p&gt;third'));
+    expect(a.description).toBe('First line second third');
+  });
+
+  it('matches escaped tag names in any case', () => {
+    const a = accepted(
+      withExtField('ImageDescription', 'First&lt;BR&gt;second &lt;A HREF="https://example.org/x"&gt;link&lt;/A&gt;'),
+    );
+    expect(a.description).toBe('First second link');
+  });
+
+  it('removes a closing tag with the longest element name', () => {
+    const a = accepted(withExtField('ImageDescription', '&lt;blockquote&gt;Quoted&lt;/blockquote&gt;after'));
+    expect(a.description).toBe('Quoted after');
+  });
+
+  it('keeps decoded angle brackets that do not form an HTML tag', () => {
+    for (const text of ['&lt;untitled&gt;', '5 &lt; 6 and 7 &gt; 3', 'a &lt;-&gt; b', '&lt;Hearn&gt;', '&lt;i.e.&gt;', '&lt;a-z&gt;']) {
+      const a = accepted(withExtField('ImageDescription', text));
+      expect(a.description).toBe(
+        text.replace(/&lt;/g, '<').replace(/&gt;/g, '>'),
+      );
+    }
+  });
+
+  it('keeps an escaped tag that is never closed', () => {
+    const a = accepted(withExtField('ImageDescription', 'Before &lt;a href="https://example.org/x" after'));
+    expect(a.description).toBe('Before <a href="https://example.org/x" after');
+  });
+
+  it('removes escaped tags in linear time on a 100k run with no closing ">"', () => {
+    const raw = withExtField('ImageDescription', '&lt;a '.repeat(20_000));
+    const start = performance.now();
+    wikimediaFetcher.normalize(raw);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+});
