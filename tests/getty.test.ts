@@ -120,7 +120,7 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
     return { ...(fixture('getty-object-accepted.json') as Record<string, unknown>), shows: [{ id: showsId }] };
   }
 
-  it('does NOT fetch shows[0].id when its host is not *.getty.edu (SSRF vector)', async () => {
+  it('does NOT fetch shows[0].id when its host is not data.getty.edu (SSRF vector)', async () => {
     const objectUrl = 'http://169.254.169.254/latest/meta-data/iam/security-credentials/';
     const calls: string[] = [];
     globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
@@ -137,52 +137,74 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
     expect(raw.media).toBeNull();
   });
 
-  it('does NOT fetch a plausible-but-wrong lookalike host (evil-getty.edu / getty.edu.evil.com)', async () => {
-    for (const lookalike of ['https://evil-getty.edu/x', 'https://media.getty.edu.evil.com/x', 'https://xgetty.edu/x']) {
-      const calls: string[] = [];
-      globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-        const url = String(input);
-        calls.push(url);
-        return new Response(JSON.stringify(objectFixtureWithShowsId(lookalike)), { status: 200 });
-      }) as unknown as typeof fetch;
+  const MEDIA_ID = 'b2296365-f0ee-5fe7-91fb-2d4b2b683ade';
+  const MEDIA_URL = `https://data.getty.edu/media/image/${MEDIA_ID}`;
 
+  // Records each fetched URL; serves the media fixture for the exact media URL
+  // and the object (whose only `shows` entry is showsId) for everything else.
+  function serveShowsId(showsId: string): string[] {
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      if (url === MEDIA_URL) return new Response(JSON.stringify(fixture('getty-media-accepted.json')), { status: 200 });
+      return new Response(JSON.stringify(objectFixtureWithShowsId(showsId)), { status: 200 });
+    }) as unknown as typeof fetch;
+    return calls;
+  }
+
+  it('does NOT fetch a host other than data.getty.edu, or a non-https or credentialed URL', async () => {
+    // Each carries the real media-image path, so only the origin checks can refuse it.
+    for (const refused of [
+      `https://evil-getty.edu/media/image/${MEDIA_ID}`,
+      `https://data.getty.edu.evil.com/media/image/${MEDIA_ID}`,
+      `https://xgetty.edu/media/image/${MEDIA_ID}`,
+      `https://media.getty.edu/media/image/${MEDIA_ID}`,
+      `https://getty.edu/media/image/${MEDIA_ID}`,
+      `http://169.254.169.254/media/image/${MEDIA_ID}`,
+      `http://data.getty.edu/media/image/${MEDIA_ID}`,
+      `https://data.getty.edu:8443/media/image/${MEDIA_ID}`,
+      `https://user@data.getty.edu/media/image/${MEDIA_ID}`,
+      `https://user:pass@data.getty.edu/media/image/${MEDIA_ID}`,
+      `https://:pass@data.getty.edu/media/image/${MEDIA_ID}`,
+    ]) {
+      const calls = serveShowsId(refused);
       const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
-      expect(calls).toHaveLength(1);
+      expect(calls, refused).toHaveLength(1);
       expect(raw.media).toBeNull();
     }
   });
 
-  it('DOES fetch a legitimate media.getty.edu URL (no coverage loss from the guard)', async () => {
-    const mediaUrl = 'https://media.getty.edu/museum/collection/media/12345';
-    let mediaFetched = false;
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url === mediaUrl) {
-        mediaFetched = true;
-        return new Response(JSON.stringify(fixture('getty-media-accepted.json')), { status: 200 });
-      }
-      return new Response(JSON.stringify(objectFixtureWithShowsId(mediaUrl)), { status: 200 });
-    }) as unknown as typeof fetch;
+  it('does NOT fetch a data.getty.edu media URL with a query, fragment, case change or non-UUID id', async () => {
+    for (const refused of [
+      `${MEDIA_URL}?x=1`,
+      `${MEDIA_URL}#f`,
+      `https://data.getty.edu/Media/Image/${MEDIA_ID}`,
+      `https://data.getty.edu/media/image/${MEDIA_ID.toUpperCase()}`,
+      'https://data.getty.edu/media/image/a%2F..%2Fx',
+      `${MEDIA_URL};x`,
+      `${MEDIA_URL}/`,
+    ]) {
+      const calls = serveShowsId(refused);
+      const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
+      expect(calls, refused).toHaveLength(1);
+      expect(raw.media).toBeNull();
+    }
+  });
 
+  it('DOES fetch the data.getty.edu media image URL, exactly as listed', async () => {
+    const calls = serveShowsId(MEDIA_URL);
     const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
-    expect(mediaFetched).toBe(true);
+    expect(calls[1]).toBe(MEDIA_URL);
     expect(raw.media).not.toBeNull();
   });
 
-  it('DOES fetch the bare getty.edu apex host (no subdomain)', async () => {
-    const mediaUrl = 'https://getty.edu/museum/collection/media/12345';
-    let mediaFetched = false;
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url === mediaUrl) {
-        mediaFetched = true;
-        return new Response(JSON.stringify(fixture('getty-media-accepted.json')), { status: 200 });
-      }
-      return new Response(JSON.stringify(objectFixtureWithShowsId(mediaUrl)), { status: 200 });
-    }) as unknown as typeof fetch;
-
-    await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb');
-    expect(mediaFetched).toBe(true);
+  it('fetches the URL rebuilt from origin and path, so a bare "?" or "#" is not sent', async () => {
+    for (const listed of [`${MEDIA_URL}?`, `${MEDIA_URL}#`]) {
+      const calls = serveShowsId(listed);
+      await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb');
+      expect(calls[1], listed).toBe(MEDIA_URL);
+    }
   });
 
   it('does NOT fetch a malformed shows[0].id that fails URL parsing', async () => {
@@ -194,6 +216,85 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
     }) as unknown as typeof fetch;
 
     const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
+    expect(calls).toHaveLength(1);
+    expect(raw.media).toBeNull();
+  });
+});
+
+describe('Getty getRaw: the image is the first `shows` entry that is a media image, not shows[0]', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  // Serves one real object record and its real media entity; any other URL is a 404.
+  function serve(objectName: string, mediaUrl: string, mediaName: string): string[] {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        calls.push(url);
+        if (url.includes('/museum/collection/object/')) {
+          return new Response(JSON.stringify(fixture(objectName)), { status: 200 });
+        }
+        if (url === mediaUrl) return new Response(JSON.stringify(fixture(mediaName)), { status: 200 });
+        return new Response('not found', { status: 404 });
+      }),
+    );
+    return calls;
+  }
+
+  it('opens the image when shows[0] is the subject-terms item and the media image after it is CC0 (real: A Peacock, 83.MR.173.41v)', async () => {
+    const mediaUrl = 'https://data.getty.edu/media/image/a8f22509-9a55-5328-a2dc-dda0b250a4e0';
+    const calls = serve('getty-object-accepted-image-not-first.json', mediaUrl, 'getty-media-accepted-image-not-first.json');
+
+    const raw = await gettyFetcher.getRaw('getty:11271ba2-af4a-4062-aba3-35bc24c5428e');
+
+    expect(calls).toEqual([
+      'https://data.getty.edu/museum/collection/object/11271ba2-af4a-4062-aba3-35bc24c5428e',
+      mediaUrl,
+    ]);
+    const result = gettyFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.imageOpenAccess).toBe(true);
+    expect(result.artwork.imageUrls.full).toMatch(/^https:\/\/media\.getty\.edu\/iiif\/image\/.+\/full\/max\/0\/default\.jpg$/);
+    expect(result.artwork.license.type).toBe('CC0');
+  });
+
+  it('keeps the image closed when the media image after shows[0] is not CC0 (real: Lake George, 93.XM.25.33, NoC-US)', async () => {
+    const mediaUrl = 'https://data.getty.edu/media/image/c1825d0a-2817-5c09-b269-bfd78045704e';
+    const calls = serve('getty-object-accepted-image-not-first-noc-us.json', mediaUrl, 'getty-media-rejected-noc-us.json');
+
+    const raw = await gettyFetcher.getRaw('getty:901b2961-d6a2-44d1-a30c-7ea6e04788a6');
+
+    expect(calls[1]).toBe(mediaUrl);
+    const result = gettyFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.metadataOpenAccess).toBe(true);
+    expect(result.artwork.imageOpenAccess).toBe(false);
+    expect(result.artwork.imageUrls.full).toBe('');
+    expect(result.artwork.imageUrls.thumbnail).toBeUndefined();
+  });
+
+  it('never fetches a getty.edu `shows` entry that is not a media image, and fetches nothing when no media image is listed', async () => {
+    const subjects = 'https://data.getty.edu/museum/collection/object/11271ba2-af4a-4062-aba3-35bc24c5428e/subjects';
+    // The media-image path must be the whole path, not a segment inside another one.
+    const mediaId = 'a8f22509-9a55-5328-a2dc-dda0b250a4e0';
+    const shows = [subjects, `${subjects}/media/image/${mediaId}`, `https://data.getty.edu/media/image/${mediaId}/extra`].map(
+      (id) => ({ id }),
+    );
+    const object = { ...(fixture('getty-object-accepted-image-not-first.json') as Record<string, unknown>), shows };
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        calls.push(String(input));
+        return new Response(JSON.stringify(object), { status: 200 });
+      }),
+    );
+
+    const raw = (await gettyFetcher.getRaw('getty:11271ba2-af4a-4062-aba3-35bc24c5428e')) as { media: unknown };
+
     expect(calls).toHaveLength(1);
     expect(raw.media).toBeNull();
   });
