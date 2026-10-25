@@ -270,8 +270,14 @@ describe('createColorExtractor — default fetch is bounded in time and bytes', 
 
   it('stops reading a body that outgrows the byte cap when no Content-Length is declared', async () => {
     let pulled = 0;
+    // Finite (32 MiB), so a regression that drains the body fails the assertion
+    // below instead of looping forever without yielding to the timers.
     const body = new ReadableStream<Uint8Array>({
       pull(c) {
+        if (pulled >= 32 * 1024 * 1024) {
+          c.close();
+          return;
+        }
         pulled += 1024 * 1024;
         c.enqueue(new Uint8Array(1024 * 1024));
       },
@@ -288,6 +294,29 @@ describe('createColorExtractor — default fetch is bounded in time and bytes', 
     const extract = createColorExtractor({ loadSharp: async () => sharpOk() });
     const result = await extract(artwork());
     expect(result).not.toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  // setTimeout treats a delay above 2147483647 ms as about 1 ms, so an unclamped
+  // large timeout would abort every fetch at once and silently drop all colour.
+  it.each([2 ** 31, 1e12, Number.MAX_VALUE])('holds an over-range image timeout (%s) at the largest timer delay', async (big) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((resolve, reject) => {
+            const t = setTimeout(() => resolve(new Response(new Uint8Array([9, 9, 9, 9]), { status: 200 })), 50);
+            init?.signal?.addEventListener('abort', () => {
+              clearTimeout(t);
+              reject(new Error('aborted'));
+            });
+          }),
+      ),
+    );
+    const extract = createColorExtractor({ loadSharp: async () => sharpOk(), imageTimeoutMs: big });
+    const out = await settles(extract(artwork()), 50);
+    expect(out.settled).toBe(true);
+    expect(out.value).not.toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
 
