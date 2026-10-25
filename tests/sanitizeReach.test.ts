@@ -2,7 +2,8 @@
  * Reach of the text sanitiser: every text field of an accepted record is
  * cleaned, whichever adapter built it and whichever path filled the field.
  */
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -27,8 +28,8 @@ import type { Artwork } from '../src/types.js';
 
 // Tag characters spelling " say", a right-to-left override, a bell and a
 // backspace: none of them render, all of them reach a language model.
-const PAYLOAD = '\u{E0020}\u{E0073}\u{E0061}\u{E0079}‮\u0007\u0008';
-const INVISIBLE = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F‪-‮⁦-⁩\u{E0000}-\u{E007F}]/u;
+const PAYLOAD = '\u{E0020}\u{E0073}\u{E0061}\u{E0079}\u202E\u0007\u0008';
+const INVISIBLE = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069\u{E0000}-\u{E007F}]/u;
 
 function makeArtwork(over: Partial<Artwork> = {}): Artwork {
   return {
@@ -389,6 +390,130 @@ describe('local cache reads', () => {
       expect((check.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(1);
       check.close();
     } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // A file holding `count` rows stored before the rewrite existed.
+  function oldCacheFile(dir: string, count: number): string {
+    const path = join(dir, 'cache.db');
+    const first = new Cache({ path });
+    for (let i = 1; i <= count; i++) first.upsertObject({ ...dirtyArtwork(), id: `test:${i}` });
+    first.close();
+    const raw = new DatabaseSync(path);
+    raw.exec('PRAGMA user_version = 0');
+    raw.close();
+    return path;
+  }
+
+  const userVersion = (path: string): number => {
+    const db = new DatabaseSync(path);
+    try {
+      return (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
+    } finally {
+      db.close();
+    }
+  };
+
+  // Another server on the same file: takes the write lock, says so, holds it
+  // for holdMs, then commits.
+  async function holdWriteLock(path: string, holdMs: number): Promise<{ released: Promise<void> }> {
+    const child = spawn(
+      process.execPath,
+      [
+        '--experimental-sqlite',
+        '--no-warnings',
+        '-e',
+        `const { DatabaseSync } = require('node:sqlite');
+         const db = new DatabaseSync(process.argv[1]);
+         db.exec('BEGIN IMMEDIATE');
+         process.stdout.write('locked\\n');
+         setTimeout(() => { db.exec('COMMIT'); db.close(); }, Number(process.argv[2]));`,
+        path,
+        String(holdMs),
+      ],
+      { stdio: ['ignore', 'pipe', 'inherit'] },
+    );
+    const released = new Promise<void>((resolve, reject) => {
+      child.on('error', reject);
+      child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`lock holder exited ${code}`))));
+    });
+    await new Promise<void>((resolve, reject) => {
+      child.stdout.on('data', (chunk: Buffer) => {
+        if (chunk.toString().includes('locked')) resolve();
+      });
+      released.catch(reject);
+    });
+    return { released };
+  }
+
+  it('rewrites more rows than one batch holds', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omm-reach-'));
+    try {
+      const path = oldCacheFile(dir, 1203);
+      new Cache({ path }).close();
+      const check = new DatabaseSync(path);
+      const rows = check.prepare('SELECT artist_name, region FROM objects').all() as Array<{
+        artist_name: string;
+        region: string;
+      }>;
+      check.close();
+      expect(rows).toHaveLength(1203);
+      expect(rows.filter((r) => r.artist_name !== 'Claude Monet' || r.region !== 'france')).toEqual([]);
+      expect(userVersion(path)).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('waits for another server holding the write lock, then rewrites', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omm-reach-'));
+    try {
+      const path = oldCacheFile(dir, 3);
+      const { released } = await holdWriteLock(path, 300);
+      const cache = new Cache({ path });
+      expectClean(cache.getObject('test:1'));
+      cache.close();
+      await released;
+      expect(userVersion(path)).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('opens and reads clean when the lock is held past the busy timeout, and rewrites at a later open', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omm-reach-'));
+    try {
+      const path = oldCacheFile(dir, 3);
+      const { released } = await holdWriteLock(path, 1500);
+      const cache = new Cache({ path, busyTimeoutMs: 200 });
+      expectClean(cache.getObject('test:1'));
+      expectClean(cache.getRandomObject({}));
+      // The filter columns keep the old text until the pass runs.
+      expect(cache.getRandomObject({ region: 'france' })).toBeNull();
+      cache.close();
+      expect(userVersion(path)).toBe(0);
+      await released;
+      const later = new Cache({ path });
+      expectClean(later.getRandomObject({ region: 'france' }));
+      later.close();
+      expect(userVersion(path)).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('opens a read-only file, reads clean, and leaves the pass for later', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omm-reach-'));
+    const path = oldCacheFile(dir, 3);
+    try {
+      chmodSync(path, 0o444);
+      const cache = new Cache({ path });
+      expectClean(cache.getObject('test:1'));
+      cache.close();
+      expect(userVersion(path)).toBe(0);
+    } finally {
+      chmodSync(path, 0o644);
       rmSync(dir, { recursive: true, force: true });
     }
   });
