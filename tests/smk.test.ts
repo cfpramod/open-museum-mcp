@@ -88,13 +88,13 @@ describe('SMK search query construction', () => {
 
   it('pushes public_domain + has_image filters server-side and parses object_number ids', async () => {
     let capturedUrl = '';
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       capturedUrl = String(input);
       return new Response(
         JSON.stringify({ items: [{ object_number: 'KMS3352' }, { object_number: 'KKSgb8919' }] }),
         { status: 200 },
       );
-    }) as unknown as typeof fetch;
+    }));
     const ids = await smkFetcher.search('hammershøi', 5);
     const decoded = decodeURIComponent(capturedUrl);
     expect(decoded).toContain('[public_domain:true]');
@@ -105,10 +105,10 @@ describe('SMK search query construction', () => {
 
   it('omits the has_image filter when hasImage is false', async () => {
     let capturedUrl = '';
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       capturedUrl = String(input);
       return new Response(JSON.stringify({ items: [] }), { status: 200 });
-    }) as unknown as typeof fetch;
+    }));
     await smkFetcher.search('q', 5, { hasImage: false });
     const decoded = decodeURIComponent(capturedUrl);
     expect(decoded).toContain('[public_domain:true]');
