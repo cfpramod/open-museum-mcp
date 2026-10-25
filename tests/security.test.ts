@@ -537,6 +537,48 @@ describe('stripHtml — polynomial-ReDoS guard (CodeQL js/polynomial-redos)', ()
 });
 
 // ---------------------------------------------------------------------------
+// Line breaks and block boundaries separate words. A browser renders `a<br>b`
+// and `<div>a</div><div>b</div>` on two lines; deleting the tag outright fused
+// the two words into one ("De triomf van de DoodsThe Triumph of Death" on a
+// Commons title). Inline tags still join with nothing, so markup inside a
+// word ("Mon<i>et</i>") keeps the word whole.
+// ---------------------------------------------------------------------------
+
+describe('stripHtml: line breaks and block boundaries separate words', () => {
+  it('separates words across a line break, in every spelling', () => {
+    expect(stripHtml('a<br>b')).toBe('a b');
+    expect(stripHtml('a<br/>b')).toBe('a b');
+    expect(stripHtml('a<br />b')).toBe('a b');
+    expect(stripHtml('a<BR>b')).toBe('a b');
+    expect(stripHtml('a<hr>b')).toBe('a b');
+  });
+
+  it('separates words across closing and opening block tags', () => {
+    expect(stripHtml('<p>one</p><p>two</p>')).toBe('one two');
+    expect(stripHtml('one<div>two</div>')).toBe('one two');
+    expect(stripHtml('<ul><li>one</li><li>two</li></ul>')).toBe('one two');
+    expect(stripHtml('<table><tr><td>a</td><td>b</td></tr></table>')).toBe('a b');
+    expect(stripHtml('<h2>Head</h2>Body')).toBe('Head Body');
+  });
+
+  it('separates the two lines of a Commons {{title}} template', () => {
+    expect(stripHtml('<div>NL</div><br><i><a href="x">EN</a></i>')).toBe('NL EN');
+  });
+
+  it('joins across inline tags with nothing, so words stay whole', () => {
+    expect(stripHtml('Mon<i>et</i>')).toBe('Monet');
+    expect(stripHtml('<b>Van</b> Gogh')).toBe('Van Gogh');
+    expect(stripHtml('a<span>b</span>c')).toBe('abc');
+    expect(stripHtml('<bdi>Name</bdi>')).toBe('Name');
+    expect(stripHtml('x<pre-x>y')).toBe('xy');
+  });
+
+  it('collapses the separators a run of block tags leaves behind', () => {
+    expect(stripHtml('<div><p>one</p></div><br><br><div>two</div>')).toBe('one two');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Numeric character references outside the Unicode range must not throw.
 // String.fromCodePoint raises RangeError above 0x10FFFF, so one malformed
 // escape in a museum field would make normalize() throw and hide a clear work.

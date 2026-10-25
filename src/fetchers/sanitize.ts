@@ -48,6 +48,30 @@ function decodeEntities(s: string): string {
 // preserves the regex's exact semantics: it strips each `<` up to the FIRST
 // following `>`, and leaves an unclosed trailing `<…` (no `>`) verbatim, exactly
 // as `/<[^>]*>/` would (it can't match without a closing `>`).
+//
+// A removed tag leaves a space when it ends a line or a block (opening or
+// closing), because a browser puts what follows on a new line: `a<br>b` and
+// `<div>a</div><div>b</div>` read as two words, not one. Inline tags leave
+// nothing, so markup inside a word ("Mon<i>et</i>") keeps the word whole.
+// stripHtml's whitespace collapse folds the runs this leaves behind.
+const SEPARATING_TAGS = new Set([
+  'br', 'hr', 'p', 'div', 'li', 'ul', 'ol', 'dl', 'dt', 'dd',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption',
+  'blockquote', 'pre', 'section', 'article', 'header', 'footer', 'aside', 'nav', 'main',
+  'figure', 'figcaption', 'address',
+]);
+
+// The element name of the tag `s.slice(lt, gt + 1)`, lower-cased: the run of
+// characters after `<` (and an optional `/`) up to whitespace, `/` or `>`.
+export function tagNameAt(s: string, lt: number, gt: number): string {
+  let i = lt + 1;
+  if (s[i] === '/') i++;
+  const start = i;
+  while (i < gt && s[i] !== '/' && s[i] !== ' ' && s[i] !== '\t' && s[i] !== '\n' && s[i] !== '\r' && s[i] !== '\f') i++;
+  return s.slice(start, i).toLowerCase();
+}
+
 function stripTags(s: string): string {
   let out = '';
   let i = 0;
@@ -64,6 +88,7 @@ function stripTags(s: string): string {
       out += s.slice(lt);
       break;
     }
+    if (SEPARATING_TAGS.has(tagNameAt(s, lt, gt))) out += ' ';
     i = gt + 1; // skip the '<…>' tag
   }
   return out;

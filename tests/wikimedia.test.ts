@@ -1039,3 +1039,176 @@ describe('Wikimedia mapper: tag stripping is linear on unclosed "<" runs', () =>
     });
   }
 });
+
+// Commons renders extmetadata from wiki templates, so the HTML carries layout
+// the reader never sees as text. Two live records (both saved verbatim as
+// fixtures) showed the effect: the {{title}} template puts the original-language
+// title and its English translation on two lines, which fused into one word,
+// and the {{Unknown}} template appends a hidden copy of its own label, which
+// doubled the artist name.
+describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
+  function withExtField(field: string, value: string): unknown {
+    const raw = fixture('wikimedia-accepted-cc0.json') as {
+      query: { pages: Array<{ imageinfo: Array<{ extmetadata: Record<string, unknown> }> }> };
+    };
+    raw.query.pages[0].imageinfo[0].extmetadata[field] = { value, source: 'commons-desc-page' };
+    return raw;
+  }
+
+  function accepted(raw: unknown) {
+    const result = wikimediaFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') throw new Error('expected an accepted record');
+    return result.artwork;
+  }
+
+  it('titles a {{title}} template record as the original title with the English in parentheses', () => {
+    const a = accepted(fixture('wikimedia-accepted-title-template.json'));
+    expect(a.id).toBe('wikimedia:74450965');
+    expect(a.title).toBe('De triomf van de Doods (The Triumph of Death)');
+    expect(a.artist.name).toBe('Pieter Brueghel the Elder');
+  });
+
+  it('drops the hidden copy {{Unknown}} appends to the artist label', () => {
+    const a = accepted(fixture('wikimedia-accepted-hidden-span.json'));
+    expect(a.id).toBe('wikimedia:152447317');
+    expect(a.artist.name).toBe('Unknown author');
+    expect(a.artist.attributionType).toBe('anonymous');
+  });
+
+  it('titles a Wikidata-driven record as original (English) and leaves out the alternative titles', () => {
+    const a = accepted(fixture('wikimedia-accepted-alternative-title.json'));
+    expect(a.id).toBe('wikimedia:11452106');
+    expect(a.title).toBe("Dama con l'ermelli (Lady with an Ermine)");
+  });
+
+  it('ends the title at the hidden Wikidata label block, as the text marker did before', () => {
+    const a = accepted(
+      withExtField(
+        'ObjectName',
+        '<div>Zonnebloemen</div><div style="display: none;">label QS:Len,"Sunflowers"</div>' +
+          '<br><b>Alternative title(s): </b><br> <div>Vase with Fifteen Sunflowers</div>',
+      ),
+    );
+    expect(a.title).toBe('Zonnebloemen');
+  });
+
+  it('reads an italic translation wrapped in layout elements after the line break', () => {
+    const a = accepted(
+      withExtField(
+        'ObjectName',
+        '<div>Italian: <div lang="it"><i>Girasoli</i></div></div><br>' +
+          '<div style="font-weight:bold"><div lang="en"><i>Sunflowers</i></div></div>',
+      ),
+    );
+    expect(a.title).toBe('Girasoli (Sunflowers)');
+  });
+
+  it('keeps a line break followed by a layout element without italics as a plain separator', () => {
+    const a = accepted(withExtField('ObjectName', '<div>Zonnebloemen</div><br><div>Arles, 1888</div>'));
+    expect(a.title).toBe('Zonnebloemen Arles, 1888');
+  });
+
+  it('gives one title, without parentheses, when the translation repeats the original', () => {
+    const a = accepted(withExtField('ObjectName', '<div>Sunflowers</div><br><i>Sunflowers</i>'));
+    expect(a.title).toBe('Sunflowers');
+  });
+
+  it('gives the original title alone when the translation line is empty', () => {
+    const a = accepted(withExtField('ObjectName', '<div>Zonnebloemen</div><br><i></i>'));
+    expect(a.title).toBe('Zonnebloemen');
+  });
+
+  it('keeps a line break that is not followed by an italic translation as a plain separator', () => {
+    const a = accepted(withExtField('ObjectName', 'Zonnebloemen<br>Arles, 1888'));
+    expect(a.title).toBe('Zonnebloemen Arles, 1888');
+  });
+
+  it('does not read an <img> after the line break as an italic translation', () => {
+    const a = accepted(withExtField('ObjectName', 'Zonnebloemen<br><img src="x">Sunflowers'));
+    expect(a.title).toBe('Zonnebloemen Sunflowers');
+  });
+
+  it('drops the Wikidata marker from the translation line too', () => {
+    const a = accepted(
+      withExtField('ObjectName', '<div>Zonnebloemen</div><br><i>Sunflowers</i> title QS:P1476,nl:"Zonnebloemen"'),
+    );
+    expect(a.title).toBe('Zonnebloemen (Sunflowers)');
+  });
+
+  it('drops a hidden element together with everything nested inside it', () => {
+    const a = accepted(
+      withExtField('Artist', 'Jan Steen<div style="display:none"><span>Jan</span> <span>Steen</span></div>'),
+    );
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('drops a hidden element nested in an element of the same name', () => {
+    const a = accepted(
+      withExtField('Artist', '<span>Jan <span style="display: none">x</span>Steen</span>'),
+    );
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('drops a hidden element that contains an element of its own name, up to its own close', () => {
+    const a = accepted(
+      withExtField('Artist', 'Jan Steen<span style="display:none"><span>Jan</span> Steen</span>'),
+    );
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('drops a hidden void or self-closing element without swallowing the text after it', () => {
+    const a = accepted(
+      withExtField(
+        'ImageDescription',
+        'Oil on canvas.<img style="display:none" src="x"> Signed<span style="display:none"/> lower left.',
+      ),
+    );
+    expect(a.description).toBe('Oil on canvas. Signed lower left.');
+  });
+
+  it('keeps an element whose attribute name only ends in "style"', () => {
+    const a = accepted(withExtField('Artist', '<span data-style="display:none">Jan Steen</span>'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('does not read an italic inside a bold element after the line break as a translation', () => {
+    const a = accepted(withExtField('ObjectName', 'Zonnebloemen<br><b><i>Arles</i></b>'));
+    expect(a.title).toBe('Zonnebloemen Arles');
+  });
+
+  it('does not read an italic in the next block as a translation when the line break ends its own block', () => {
+    const a = accepted(withExtField('ObjectName', '<div>Zonnebloemen<br></div><div><i>Arles</i></div>'));
+    expect(a.title).toBe('Zonnebloemen Arles');
+  });
+
+  it('drops an unclosed hidden element to the end of the field, as a browser would', () => {
+    const a = accepted(withExtField('Artist', 'Jan Steen<span style="DISPLAY : NONE">Jan Steen'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('keeps elements whose style only mentions another display value', () => {
+    const a = accepted(withExtField('Artist', '<span style="display:inline-block">Jan Steen</span>'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('keeps an element whose non-style attribute happens to say display:none', () => {
+    const a = accepted(withExtField('Artist', '<span title="display:none">Jan Steen</span>'));
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+
+  it('drops hidden text from the description as well', () => {
+    const a = accepted(
+      withExtField('ImageDescription', 'Oil on canvas.<span style="display:none">Oil on canvas.</span>'),
+    );
+    expect(a.description).toBe('Oil on canvas.');
+  });
+
+  it('stays linear on a long run of nested hidden elements', () => {
+    const open = '<span style="display:none">'.repeat(20_000);
+    const start = performance.now();
+    const a = accepted(withExtField('Artist', `Jan Steen${open}x`));
+    expect(performance.now() - start).toBeLessThan(1000);
+    expect(a.artist.name).toBe('Jan Steen');
+  });
+});
