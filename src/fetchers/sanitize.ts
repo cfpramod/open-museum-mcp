@@ -7,6 +7,8 @@
  * before it reaches the wire. Strict default: strip then cap, never the
  * reverse (capping first could leave a trailing open tag). Control characters
  * are removed too, except the whitespace controls, which collapse to a space.
+ * Unicode tag characters and bidirectional embeddings, overrides and isolates
+ * are removed as well: they hide or reorder text without showing it.
  *
  * Field caps (chosen to be generous for legitimate data while bounding the
  * token surface area for any single field in LLM context):
@@ -102,10 +104,22 @@ function stripTags(s: string): string {
 // `full_record` kept the whole string.
 const CONTROL_CHARS = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F]/g;
 
+// Format characters that change what a field says without being seen. Tag
+// characters (U+E0000-U+E007F) mirror ASCII and render as nothing, so a field
+// can carry an instruction a reader never sees but a language model reads.
+// Bidirectional embeddings, overrides and isolates (U+202A-U+202E,
+// U+2066-U+2069) reorder the display, so the text shown is not the text
+// stored. Removed after decoding, like the controls. Bidirectional marks
+// (U+200E, U+200F, U+061C), the zero-width joiners and variation selectors
+// stay: right-to-left titles, Persian and Indic scripts and ideographic
+// variants depend on them.
+const HIDDEN_FORMAT_CHARS = /[\u202A-\u202E\u2066-\u2069\u{E0000}-\u{E007F}]/gu;
+
 export function stripHtml(s: string): string {
   return decodeEntities(stripTags(s))
     .replace(C1_CHARS, mapWindows1252)
     .replace(CONTROL_CHARS, '')
+    .replace(HIDDEN_FORMAT_CHARS, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
