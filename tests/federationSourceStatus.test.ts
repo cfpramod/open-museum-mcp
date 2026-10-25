@@ -4,6 +4,7 @@ import { classifyFailure, sanitizeSourceError } from '../src/core/sourceStatus.j
 import { totalFailureResult } from '../src/totalFailure.js';
 import type { Fetcher } from '../src/fetchers/types.js';
 import type { Artwork } from '../src/types.js';
+import { BOUNDED_CEILING, growthRatioOf } from './helpers/growth.js';
 
 function makeArtwork(id: string): Artwork {
   const code = id.slice(0, id.indexOf(':'));
@@ -309,21 +310,23 @@ describe('credentials hidden by an encoding are still redacted', () => {
 });
 
 describe('redaction cost is bounded whatever a source sends back', () => {
-  const hostile: Array<[string, string]> = [
-    ['a long run of name characters', 'a-'.repeat(16000)],
-    ['a long run with a marker at the end', `${'a'.repeat(30000)}key`],
-    ['a long query-like run', `?${'a'.repeat(30000)}`],
-    ['a long run of ampersand parameters', `?${'k&'.repeat(15000)}`],
-    ['a long run of escaped quotes', '\\"'.repeat(15000)],
-    ['a long run of percent escapes', '%41'.repeat(15000)],
+  // Each shape is built at a size `n`, about the length of the message.
+  const hostile: Array<[string, (n: number) => string]> = [
+    ['a long run of name characters', (n) => 'a-'.repeat(n / 2)],
+    ['a long run with a marker at the end', (n) => `${'a'.repeat(n)}key`],
+    ['a long query-like run', (n) => `?${'a'.repeat(n)}`],
+    ['a long run of ampersand parameters', (n) => `?${'k&'.repeat(n / 2)}`],
+    ['a long run of escaped quotes', (n) => '\\"'.repeat(n / 2)],
+    ['a long run of percent escapes', (n) => '%41'.repeat(n / 3)],
   ];
 
-  it.each(hostile)('finishes fast on %s', (_label, message) => {
-    const started = performance.now();
-    const out = sanitizeSourceError(new Error(message));
-    expect(performance.now() - started).toBeLessThan(250);
-    expect(out.length).toBeLessThanOrEqual(300);
-  });
+  const error = (shape: (n: number) => string) => (n: number) => new Error(shape(n));
+
+  // 7,500 and 30,000 chars are both past the scan limit, so the cost should not grow.
+  it.each(hostile)('stops growing past the scan limit on %s', (_label, shape) => {
+    expect(sanitizeSourceError(new Error(shape(30_000))).length).toBeLessThanOrEqual(300);
+    expect(growthRatioOf(error(shape), sanitizeSourceError, 30_000)).toBeLessThan(BOUNDED_CEILING);
+  }, 60_000);
 
   it('still redacts a credential inside the scanned window of a long message', () => {
     const out = sanitizeSourceError(new Error(`apikey=SECRETVALUE ${'x'.repeat(30000)}`));

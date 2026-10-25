@@ -1030,14 +1030,14 @@ describe('Wikimedia mapper: tag stripping is linear on unclosed "<" runs', () =>
   }
 
   for (const field of ['ObjectName', 'Artist', 'ImageDescription']) {
-    it(`normalizes a 100k unclosed-"<" ${field} in under 1s`, () => {
-      const raw = withExtField(field, `<b>Kept</b> ${UNCLOSED}`);
-      const start = performance.now();
-      const result = wikimediaFetcher.normalize(raw);
-      const elapsed = performance.now() - start;
-      expect(elapsed).toBeLessThan(1000);
-      expect(result.status).toBe('accepted');
-    });
+    it(`normalizes a 100k unclosed-"<" ${field} in linear time`, () => {
+      expect(wikimediaFetcher.normalize(withExtField(field, `<b>Kept</b> ${UNCLOSED}`)).status).toBe('accepted');
+      const ratio = growthRatio(
+        (size) => wikimediaFetcher.normalize(withExtField(field, `<b>Kept</b> ${'<'.repeat(size)}`)),
+        UNCLOSED.length,
+      );
+      expect(ratio).toBeLessThan(LINEAR_CEILING);
+    }, 60_000);
   }
 });
 

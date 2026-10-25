@@ -17,6 +17,7 @@ import { createColorExtractor, isSafeImageUrl } from '../src/color/extract.js';
 import { parseDisplayDate } from '../src/dateParser.js';
 import { decodeEntities, sanitizeTitle, stripHtml, textView } from '../src/fetchers/sanitize.js';
 import type { Artwork } from '../src/types.js';
+import { BOUNDED_CEILING, growthRatioOf, LINEAR_CEILING } from './helpers/growth.js';
 
 // ---------------------------------------------------------------------------
 // Test data helpers
@@ -494,13 +495,13 @@ describe('decompression bomb guard — uncompressed pixel cap', () => {
 // ---------------------------------------------------------------------------
 
 describe('parseDisplayDate — algorithmic-complexity DoS guard', () => {
-  it('returns {null,null} in <50ms for a 10k-char input (no catastrophic backtracking)', () => {
-    const start = performance.now();
-    const result = parseDisplayDate('A'.repeat(10_000));
-    const elapsed = performance.now() - start;
-    expect(result).toEqual({ yearStart: null, yearEnd: null });
-    expect(elapsed).toBeLessThan(50);
-  });
+  it('returns {null,null} for a 10k-char input, at a cost that stops growing past the input cap', () => {
+    expect(parseDisplayDate('A'.repeat(10_000))).toEqual({ yearStart: null, yearEnd: null });
+    // 2,500 and 10,000 chars are both past the cap, so the cost should not grow.
+    const ratio = growthRatioOf((n) => 'A'.repeat(n), parseDisplayDate, 10_000);
+    expect(ratio).toBeLessThan(BOUNDED_CEILING);
+  }, 60_000);
+
 
   it('returns {null,null} for an input beyond DATE_INPUT_MAX that is not a date', () => {
     const result = parseDisplayDate('X'.repeat(200));
@@ -517,18 +518,13 @@ describe('parseDisplayDate — algorithmic-complexity DoS guard', () => {
 describe('stripHtml — polynomial-ReDoS guard (CodeQL js/polynomial-redos)', () => {
   it('strips a 100k-char all-"<" payload in linear time', () => {
     // A `<[^>]*>` global replace is O(n²) on this input: measured 2.1s at 40k
-    // chars, so over 10s at 100k. The linear scan takes well under 1ms. The
-    // ceiling sits far from both, so host load (one run measured 28x slower
-    // than usual) cannot fail it and a quadratic regression cannot pass it.
-    // The payload stays small enough that a regression fails here rather than
-    // hanging the run: synchronous regex work cannot be interrupted by a timeout.
-    const payload = '<'.repeat(100_000);
-    const start = performance.now();
-    const out = sanitizeTitle(payload);
-    const elapsed = performance.now() - start;
-    expect(elapsed).toBeLessThan(1000);
-    expect(out.length).toBeLessThanOrEqual(256);
-  });
+    // chars, so over 10s at 100k. The payload stays small enough that a
+    // regression fails here rather than hanging the run: synchronous regex work
+    // cannot be interrupted by a timeout.
+    expect(sanitizeTitle('<'.repeat(100_000)).length).toBeLessThanOrEqual(256);
+    const ratio = growthRatioOf((n) => '<'.repeat(n), sanitizeTitle, 100_000);
+    expect(ratio).toBeLessThan(LINEAR_CEILING);
+  }, 60_000);
 
   it('still strips tags and decodes entities in legitimate short text', () => {
     expect(sanitizeTitle('<b>Sunflowers</b> &amp; Co.')).toBe('Sunflowers & Co.');
