@@ -138,7 +138,13 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
   });
 
   it('does NOT fetch a plausible-but-wrong lookalike host (evil-getty.edu / getty.edu.evil.com)', async () => {
-    for (const lookalike of ['https://evil-getty.edu/x', 'https://media.getty.edu.evil.com/x', 'https://xgetty.edu/x']) {
+    // Each carries the real media-image path, so only the host check can refuse it.
+    for (const lookalike of [
+      'https://evil-getty.edu/media/image/x',
+      'https://media.getty.edu.evil.com/media/image/x',
+      'https://xgetty.edu/media/image/x',
+      'http://169.254.169.254/media/image/x',
+    ]) {
       const calls: string[] = [];
       globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
         const url = String(input);
@@ -153,7 +159,7 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
   });
 
   it('DOES fetch a legitimate media.getty.edu URL (no coverage loss from the guard)', async () => {
-    const mediaUrl = 'https://media.getty.edu/museum/collection/media/12345';
+    const mediaUrl = 'https://media.getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade';
     let mediaFetched = false;
     globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
@@ -170,7 +176,7 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
   });
 
   it('DOES fetch the bare getty.edu apex host (no subdomain)', async () => {
-    const mediaUrl = 'https://getty.edu/museum/collection/media/12345';
+    const mediaUrl = 'https://getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade';
     let mediaFetched = false;
     globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
@@ -194,6 +200,82 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
     }) as unknown as typeof fetch;
 
     const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
+    expect(calls).toHaveLength(1);
+    expect(raw.media).toBeNull();
+  });
+});
+
+describe('Getty getRaw: the image is the first `shows` entry that is a media image, not shows[0]', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  // Serves one real object record and its real media entity; any other URL is a 404.
+  function serve(objectName: string, mediaUrl: string, mediaName: string): string[] {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        calls.push(url);
+        if (url.includes('/museum/collection/object/')) {
+          return new Response(JSON.stringify(fixture(objectName)), { status: 200 });
+        }
+        if (url === mediaUrl) return new Response(JSON.stringify(fixture(mediaName)), { status: 200 });
+        return new Response('not found', { status: 404 });
+      }),
+    );
+    return calls;
+  }
+
+  it('opens the image when shows[0] is the subject-terms item and the media image after it is CC0 (real: A Peacock, 83.MR.173.41v)', async () => {
+    const mediaUrl = 'https://data.getty.edu/media/image/a8f22509-9a55-5328-a2dc-dda0b250a4e0';
+    const calls = serve('getty-object-accepted-image-not-first.json', mediaUrl, 'getty-media-accepted-image-not-first.json');
+
+    const raw = await gettyFetcher.getRaw('getty:11271ba2-af4a-4062-aba3-35bc24c5428e');
+
+    expect(calls).toEqual([
+      'https://data.getty.edu/museum/collection/object/11271ba2-af4a-4062-aba3-35bc24c5428e',
+      mediaUrl,
+    ]);
+    const result = gettyFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.imageOpenAccess).toBe(true);
+    expect(result.artwork.imageUrls.full).toMatch(/^https:\/\/media\.getty\.edu\/iiif\/image\/.+\/full\/max\/0\/default\.jpg$/);
+    expect(result.artwork.license.type).toBe('CC0');
+  });
+
+  it('keeps the image closed when the media image after shows[0] is not CC0 (real: Lake George, 93.XM.25.33, NoC-US)', async () => {
+    const mediaUrl = 'https://data.getty.edu/media/image/c1825d0a-2817-5c09-b269-bfd78045704e';
+    const calls = serve('getty-object-accepted-image-not-first-noc-us.json', mediaUrl, 'getty-media-rejected-noc-us.json');
+
+    const raw = await gettyFetcher.getRaw('getty:901b2961-d6a2-44d1-a30c-7ea6e04788a6');
+
+    expect(calls[1]).toBe(mediaUrl);
+    const result = gettyFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.metadataOpenAccess).toBe(true);
+    expect(result.artwork.imageOpenAccess).toBe(false);
+    expect(result.artwork.imageUrls.full).toBe('');
+    expect(result.artwork.imageUrls.thumbnail).toBeUndefined();
+  });
+
+  it('never fetches a getty.edu `shows` entry that is not a media image, and fetches nothing when no media image is listed', async () => {
+    const subjects = 'https://data.getty.edu/museum/collection/object/11271ba2-af4a-4062-aba3-35bc24c5428e/subjects';
+    // The media-image path must be the whole path, not a segment inside another one.
+    const shows = [subjects, `${subjects}/media/image/x`, 'https://data.getty.edu/media/image/x/extra'].map((id) => ({ id }));
+    const object = { ...(fixture('getty-object-accepted-image-not-first.json') as Record<string, unknown>), shows };
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        calls.push(String(input));
+        return new Response(JSON.stringify(object), { status: 200 });
+      }),
+    );
+
+    const raw = (await gettyFetcher.getRaw('getty:11271ba2-af4a-4062-aba3-35bc24c5428e')) as { media: unknown };
+
     expect(calls).toHaveLength(1);
     expect(raw.media).toBeNull();
   });

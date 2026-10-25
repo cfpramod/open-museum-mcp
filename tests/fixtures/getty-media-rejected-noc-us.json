@@ -1,0 +1,197 @@
+{
+  "@context": "https://linked.art/ns/v1/linked-art.json",
+  "id": "https://data.getty.edu/media/image/c1825d0a-2817-5c09-b269-bfd78045704e",
+  "type": "VisualItem",
+  "_label": "Media for Emil Zoler, Georgia O'Keeffe, Paul Rosenfeld, Lake George",
+  "shown_by": [
+    {
+      "id": "https://data.getty.edu/museum/collection/object/901b2961-d6a2-44d1-a30c-7ea6e04788a6",
+      "type": "HumanMadeObject",
+      "_label": "Emil Zoler, Georgia O'Keeffe, Paul Rosenfeld, Lake George"
+    }
+  ],
+  "identified_by": [
+    {
+      "id": "https://data.getty.edu/media/image/c1825d0a-2817-5c09-b269-bfd78045704e/name",
+      "type": "Name",
+      "_label": "Title",
+      "classified_as": [
+        {
+          "id": "http://vocab.getty.edu/aat/300417193",
+          "type": "Type",
+          "_label": "Titles (General, Names)"
+        }
+      ],
+      "content": "Media for Emil Zoler, Georgia O'Keeffe, Paul Rosenfeld, Lake George"
+    }
+  ],
+  "digitally_shown_by": [
+    {
+      "id": "https://data.getty.edu/media/image/c1825d0a-2817-5c09-b269-bfd78045704e/digital_object/efab88a2-346a-c18d-998c-f025235b215a",
+      "type": "DigitalObject",
+      "_label": "Main View - Full Front  for Media for Emil Zoler, Georgia O'Keeffe, Paul Rosenfeld, Lake George",
+      "classified_by": [
+        {
+          "id": "http://vocab.getty.edu/aat/300215302",
+          "type": "Type",
+          "_label": "digital images"
+        }
+      ],
+      "format": "image/tiff",
+      "dimension": [
+        {
+          "id": "https://data.getty.edu/media/image/c1825d0a-2817-5c09-b269-bfd78045704e/digital_object/efab88a2-346a-c18d-998c-f025235b215a/height",
+          "type": "Dimension",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300055644",
+              "type": "Type",
+              "_label": "Height"
+            }
+          ],
+          "value": 3162,
+          "unit": {
+            "id": "http://vocab.getty.edu/aat/300266190",
+            "type": "MeasurementUnit",
+            "_label": "pixels"
+          }
+        },
+        {
+          "id": "https://data.getty.edu/media/image/c1825d0a-2817-5c09-b269-bfd78045704e/digital_object/efab88a2-346a-c18d-998c-f025235b215a/width",
+          "type": "Dimension",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300055647",
+              "type": "Type",
+              "_label": "Width"
+            }
+          ],
+          "value": 4704,
+          "unit": {
+            "id": "http://vocab.getty.edu/aat/300266190",
+            "type": "MeasurementUnit",
+            "_label": "pixels"
+          }
+        }
+      ],
+      "access_point": [
+        {
+          "id": "https://media.getty.edu/iiif/image/d754197a-cee8-4f16-bec9-ccabbbcc0582",
+          "type": "DigitalObject",
+          "_label": "IIIF Image API for the image",
+          "conforms_to": "http://iiif.io/api/image",
+          "format": "application/json",
+          "classified_as": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/iiif-image",
+              "type": "Type",
+              "_label": "IIIF image service"
+            }
+          ]
+        },
+        {
+          "id": "https://media.getty.edu/iiif/image/d754197a-cee8-4f16-bec9-ccabbbcc0582/full/!600,600/0/default.jpg",
+          "type": "DigitalObject",
+          "_label": "Thumbnail for the image",
+          "format": "image/jpeg",
+          "classified_as": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/thumbnail",
+              "type": "Type",
+              "_label": "thumbnail image"
+            }
+          ]
+        },
+        {
+          "id": "https://media.getty.edu/iiif/image/d754197a-cee8-4f16-bec9-ccabbbcc0582/full/max/0/default.jpg",
+          "type": "DigitalObject",
+          "_label": "Full-resolution version of the image",
+          "format": "image/jpeg",
+          "classified_as": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/full-resolution",
+              "type": "Type",
+              "_label": "full resolution image"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "subject_to": [
+    {
+      "id": "https://data.getty.edu/media/image/c1825d0a-2817-5c09-b269-bfd78045704e/rights",
+      "type": "Right",
+      "_label": "Rights for Media for Emil Zoler, Georgia O'Keeffe, Paul Rosenfeld, Lake George",
+      "classified_as": [
+        {
+          "type": "Type",
+          "_label": "No Copyright - United States",
+          "id": "https://rightsstatements.org/vocab/NoC-US/1.0/",
+          "classified_as": [
+            {
+              "type": "Type",
+              "_label": "Rights Statement",
+              "id": "https://data.getty.edu/local/thesaurus/rights-statement"
+            },
+            {
+              "_deprecated": {
+                "reason": "Consolidation of local thesaurus terms.",
+                "replacement": "Filter on `Rights Statement` (https://data.getty.edu/local/thesaurus/rights-statement) instead.",
+                "since": "2023-08-13"
+              },
+              "type": "Type",
+              "_label": "RightsStatement.org Statement",
+              "id": "https://data.getty.edu/local/thesaurus/rightsstatement-org-statement"
+            }
+          ]
+        },
+        {
+          "type": "Type",
+          "_label": "zoom",
+          "id": "https://data.getty.edu/local/thesaurus/clearance/zoom",
+          "classified_as": [
+            {
+              "type": "Type",
+              "_label": "local clearance level",
+              "id": "https://data.getty.edu/local/thesaurus/clearance-level"
+            }
+          ]
+        }
+      ],
+      "possessed_by": [
+        {
+          "id": "http://vocab.getty.edu/ulan/500115988",
+          "type": "Group",
+          "_label": "The J. Paul Getty Museum, Los Angeles"
+        }
+      ]
+    }
+  ],
+  "subject_of": [
+    {
+      "id": "https://data.getty.edu/media/image/c1825d0a-2817-5c09-b269-bfd78045704e/description",
+      "type": "LinguisticObject",
+      "value": "Full Front ",
+      "classified_as": [
+        {
+          "type": "Type",
+          "_label": "descriptive note",
+          "id": "http://vocab.getty.edu/aat/300435416"
+        }
+      ]
+    },
+    {
+      "id": "https://data.getty.edu/media/image/c1825d0a-2817-5c09-b269-bfd78045704e/texts/alt_text",
+      "type": "LinguisticObject",
+      "value": "Main View",
+      "classified_as": [
+        {
+          "type": "Type",
+          "_label": "Alternative text",
+          "id": "https://data.getty.edu/local/thesaurus/alt-text"
+        }
+      ]
+    }
+  ]
+}

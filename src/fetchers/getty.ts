@@ -30,7 +30,7 @@ function idFromUri(uri: string): string {
   return segments[segments.length - 1] ?? '';
 }
 
-// SSRF guard for the media hydration fetch below: `shows[0].id` is an
+// SSRF guard for the media hydration fetch below: a `shows[].id` is an
 // upstream-derived URL (Getty's own object JSON tells us where to fetch the
 // media entity), and this is the ONLY fetcher in the engine that follows an
 // upstream-influenceable URL server-side; every peer constructs its
@@ -50,6 +50,17 @@ function isGettyMediaHost(uri: string): boolean {
   } catch {
     return false;
   }
+}
+
+// `shows` lists every VisualItem the object shows, not only images. On many
+// records shows[0] is the object's own subject-terms item
+// (`.../object/<uuid>/subjects`), also on data.getty.edu, and the media image
+// comes after it. Only a `media/image/<uuid>` entity carries image rights, so
+// the image is the first entry with that path, wherever it sits.
+const MEDIA_IMAGE_PATH = /^\/media\/image\/[^/]+$/;
+function isGettyMediaImage(uri: string): boolean {
+  if (!isGettyMediaHost(uri)) return false;
+  return MEDIA_IMAGE_PATH.test(new URL(uri).pathname);
 }
 
 const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
@@ -178,15 +189,18 @@ SELECT DISTINCT ?obj WHERE {
     if (!res.ok) throw new Error(`Getty get failed for ${id}: ${res.status}`);
     const object = await res.json();
 
-    // Hydrate only the PRIMARY (first `shows`) image for rights + IIIF URLs —
-    // bounding this fetcher to at most one extra HTTP round trip per record,
-    // same order of magnitude as any other federated adapter's per-object cost.
+    // Hydrate only the PRIMARY (first media image in `shows`) for rights + IIIF
+    // URLs, bounding this fetcher to at most one extra HTTP round trip per
+    // record, same order of magnitude as any other federated adapter's
+    // per-object cost.
     const shows = Array.isArray((object as Record<string, unknown>)?.shows)
       ? ((object as Record<string, unknown>).shows as Array<Record<string, unknown>>)
       : [];
-    const firstImageUri = asOptionalString(shows[0]?.id);
+    const firstImageUri = shows
+      .map((s) => asOptionalString(s?.id))
+      .find((uri): uri is string => uri !== undefined && isGettyMediaImage(uri));
     let media: unknown = null;
-    if (firstImageUri && isGettyMediaHost(firstImageUri)) {
+    if (firstImageUri) {
       try {
         const mediaRes = await httpGet(firstImageUri, { headers: JSON_ACCEPT });
         if (mediaRes.ok) media = await mediaRes.json();
