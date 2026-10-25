@@ -15,7 +15,12 @@
  *   title        ≤ 256 chars   — longest known real artwork title is ~200 chars
  *   description  ≤ 1024 chars  — prose summaries; museum object descriptions
  *   artistName   ≤ 200 chars   — full attribution strings incl. birth/death
+ *
+ * The remaining text fields have caps of their own below, and
+ * sanitizeArtworkText applies all of them to the finished record.
  */
+
+import type { Artwork } from '../types.js';
 
 const HTML_ENTITIES: Record<string, string> = {
   amp: '&',
@@ -115,13 +120,21 @@ const CONTROL_CHARS = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F]/g;
 // variants depend on them.
 const HIDDEN_FORMAT_CHARS = /[\u202A-\u202E\u2066-\u2069\u{E0000}-\u{E007F}]/gu;
 
-export function stripHtml(s: string): string {
-  return decodeEntities(stripTags(s))
+// The character-level half of stripHtml: map C1, remove controls and hidden
+// format characters, collapse whitespace. It decodes nothing, so applying it
+// to its own output, or to stripHtml's, changes nothing. That is what lets
+// sanitizeArtworkText run over fields an adapter has already sanitized.
+export function cleanText(s: string): string {
+  return s
     .replace(C1_CHARS, mapWindows1252)
     .replace(CONTROL_CHARS, '')
     .replace(HIDDEN_FORMAT_CHARS, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+export function stripHtml(s: string): string {
+  return cleanText(decodeEntities(stripTags(s)));
 }
 
 function cap(s: string, maxLen: number): string {
@@ -131,6 +144,74 @@ function cap(s: string, maxLen: number): string {
 export const TITLE_MAX = 256;
 export const DESCRIPTION_MAX = 1024;
 export const ARTIST_NAME_MAX = 200;
+// Caps for the other upstream text fields, set well above the longest value
+// in about 14,700 cached records: medium 803, dimensions 302, display date 200,
+// object type, period, region and tags all under 60.
+export const MEDIUM_MAX = 1024;
+export const DIMENSIONS_MAX = 512;
+export const SHORT_TEXT_MAX = 256;
+
+/**
+ * Sanitize an upstream text field that has no dedicated function: strip
+ * markup, decode references, clean characters, then cap.
+ */
+export function sanitizeText(s: string, maxLen: number): string {
+  return cap(stripHtml(s), maxLen);
+}
+
+function cleanRequired(s: string, maxLen: number, fallback: string): string {
+  return cap(cleanText(s), maxLen) || fallback;
+}
+
+function cleanOptional(s: string | undefined, maxLen: number): string | undefined {
+  if (s === undefined) return undefined;
+  return cap(cleanText(s), maxLen) || undefined;
+}
+
+function cleanNullable(s: string | null, maxLen: number): string | null {
+  if (s === null) return null;
+  return cap(cleanText(s), maxLen) || null;
+}
+
+/**
+ * The last step of every adapter's normalize(): clean and cap every text
+ * field of the record, whatever path the adapter took to fill it. Adapters
+ * still decode their own fields, since only they know whether a source sends
+ * markup; this pass decodes nothing and is idempotent, so a field the adapter
+ * already sanitized comes through unchanged. A field that cleans to nothing
+ * takes the same fallback the adapters use.
+ *
+ * Two fields are left as the source sent them: `license.rawValue`, which the
+ * clearance manifest quotes as the value the source API returned, and
+ * `provenance`, whose `raw` is verbatim by definition.
+ */
+export function sanitizeArtworkText(artwork: Artwork): Artwork {
+  const { artist } = artwork;
+  return {
+    ...artwork,
+    museum: {
+      ...artwork.museum,
+      name: cleanRequired(artwork.museum.name, SHORT_TEXT_MAX, artwork.museum.code),
+    },
+    title: cleanRequired(artwork.title, TITLE_MAX, '(Untitled)'),
+    artist: {
+      ...artist,
+      name: cleanRequired(artist.name, ARTIST_NAME_MAX, 'Unknown'),
+      nationality: cleanOptional(artist.nationality, ARTIST_NAME_MAX),
+      lifespan: cleanOptional(artist.lifespan, ARTIST_NAME_MAX),
+    },
+    displayDate: cap(cleanText(artwork.displayDate), SHORT_TEXT_MAX),
+    medium: cap(cleanText(artwork.medium), MEDIUM_MAX),
+    region: cleanNullable(artwork.region, SHORT_TEXT_MAX),
+    period: cleanNullable(artwork.period, SHORT_TEXT_MAX),
+    description: cleanOptional(artwork.description, DESCRIPTION_MAX),
+    objectType: cleanOptional(artwork.objectType, SHORT_TEXT_MAX),
+    dimensions: cleanOptional(artwork.dimensions, DIMENSIONS_MAX),
+    rawTags: artwork.rawTags
+      ?.map((t) => cap(cleanText(t), SHORT_TEXT_MAX))
+      .filter((t) => t !== ''),
+  };
+}
 
 export function sanitizeTitle(s: string): string {
   return cap(stripHtml(s), TITLE_MAX);

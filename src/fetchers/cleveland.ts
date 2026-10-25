@@ -4,6 +4,7 @@ import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mapp
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, Model3D, ValidationResult } from '../types.js';
 import {
+  accepted,
   asFiniteNumber,
   asOptionalString,
   asString,
@@ -13,7 +14,7 @@ import {
   pickMaxResolution,
   rejectFor,
 } from './helpers.js';
-import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeDescription, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const CLEVELAND_API = 'https://openaccess-api.clevelandart.org/api';
@@ -96,7 +97,7 @@ export const clevelandFetcher: Fetcher = {
       return reject(id, 'cleveland: missing or non-integer id', raw);
     }
 
-    const displayDate = asString(r.creation_date);
+    const displayDate = sanitizeText(asString(r.creation_date), SHORT_TEXT_MAX);
     const earliest = asFiniteNumber(r.creation_date_earliest);
     const latest = asFiniteNumber(r.creation_date_latest);
     // Cleveland publishes earliest/latest year fields directly. Trust those
@@ -119,8 +120,8 @@ export const clevelandFetcher: Fetcher = {
     const parsed = parseCreatorDescription(description);
     const cleanName = cleanArtistName(parsed.name);
 
-    const birth = asString(primary?.birth_year);
-    const death = asString(primary?.death_year);
+    const birth = sanitizeText(asString(primary?.birth_year), SHORT_TEXT_MAX);
+    const death = sanitizeText(asString(primary?.death_year), SHORT_TEXT_MAX);
     const lifespan = birth || death ? `${birth}–${death}`.replace(/^–|–$/g, '') : undefined;
 
     const cultureArr = Array.isArray(r.culture) ? (r.culture as unknown[]) : [];
@@ -228,7 +229,7 @@ export const clevelandFetcher: Fetcher = {
       displayDate,
       yearStart: dateRange.yearStart,
       yearEnd: dateRange.yearEnd,
-      medium: asString(r.technique),
+      medium: sanitizeText(asString(r.technique), MEDIUM_MAX),
       mediumCategory: normalizeMedium(asString(r.technique)),
       region,
       period: null,
@@ -248,11 +249,11 @@ export const clevelandFetcher: Fetcher = {
         apiUrl: `${CLEVELAND_API}/artworks/${objectId}`,
         pageUrl: asString(r.url),
       },
-      description: asOptionalString(r.accession_number),
+      description: asOptionalString(sanitizeDescription(asString(r.accession_number))),
       ...(models3d ? { models3d } : {}),
       ...(provenance ? { provenance } : {}),
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };

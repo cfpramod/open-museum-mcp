@@ -3,8 +3,16 @@ import { validateSmkLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asOptionalString, asString, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
-import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import {
+  accepted,
+  asFiniteNumber,
+  asOptionalString,
+  asString,
+  httpGet,
+  pickMaxResolution,
+  rejectFor,
+} from './helpers.js';
+import { SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // SMK — Statens Museum for Kunst (National Gallery of Denmark). Keyless REST API
@@ -110,7 +118,7 @@ export const smkFetcher: Fetcher = {
     const prod = Array.isArray(r.production_date) && r.production_date[0] && typeof r.production_date[0] === 'object'
       ? (r.production_date[0] as Record<string, unknown>)
       : undefined;
-    const displayDate = prod ? asString(prod.period) : '';
+    const displayDate = prod ? sanitizeText(asString(prod.period), SHORT_TEXT_MAX) : '';
     const yStart = prod ? isoYear(prod.start) : null;
     const yEnd = prod ? isoYear(prod.end) : null;
     const dateRange = yStart !== null || yEnd !== null
@@ -123,12 +131,12 @@ export const smkFetcher: Fetcher = {
     const attributionType = detectAttributionType(primaryName);
     const cleanName = cleanArtistName(primaryName);
 
-    const techniques = Array.isArray(r.techniques) ? (r.techniques as unknown[]).map(asString).filter(Boolean) : [];
+    const techniques = Array.isArray(r.techniques) ? (r.techniques as unknown[]).map((t) => sanitizeText(asString(t), SHORT_TEXT_MAX)).filter(Boolean) : [];
     const medium = techniques.join(', ');
 
     const objectNames = Array.isArray(r.object_names) ? r.object_names : [];
     const firstObjectName = objectNames[0] && typeof objectNames[0] === 'object'
-      ? asString((objectNames[0] as Record<string, unknown>).name)
+      ? sanitizeText(asString((objectNames[0] as Record<string, unknown>).name), SHORT_TEXT_MAX)
       : '';
 
     const width = asFiniteNumber(r.image_width) ?? undefined;
@@ -172,6 +180,6 @@ export const smkFetcher: Fetcher = {
       description: asOptionalString(firstObjectName),
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };

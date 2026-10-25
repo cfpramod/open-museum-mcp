@@ -4,8 +4,8 @@ import { validateWellcomeLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asString, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
-import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import { accepted, asString, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
+import { SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // Wellcome Collection — keyless Catalogue API (api.wellcomecollection.org) over a
@@ -167,7 +167,7 @@ export const wellcomeFetcher: Fetcher = {
       return reject(id, 'wellcome: no IIIF image resolved', raw);
     }
 
-    const displayDate = productionDate(work);
+    const displayDate = sanitizeText(productionDate(work), SHORT_TEXT_MAX);
     const dateRange = parseDisplayDate(displayDate);
 
     const contributor = sanitizeArtistName(firstContributor(work));
@@ -213,6 +213,6 @@ export const wellcomeFetcher: Fetcher = {
       description: undefined,
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };
