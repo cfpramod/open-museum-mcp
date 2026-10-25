@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { wikimediaFetcher } from '../src/fetchers/wikimedia.js';
+import { growthRatio, LINEAR_CEILING } from './helpers/growth.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -1205,12 +1206,11 @@ describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
   });
 
   it('stays linear on a long run of nested hidden elements', () => {
-    const open = '<span style="display:none">'.repeat(20_000);
-    const start = performance.now();
-    const a = accepted(withExtField('Artist', `Jan Steen${open}x`));
-    expect(performance.now() - start).toBeLessThan(1000);
-    expect(a.artist.name).toBe('Jan Steen');
-  });
+    const value = (count: number): string => `Jan Steen${'<span style="display:none">'.repeat(count)}x`;
+    const ratio = growthRatio((count) => wikimediaFetcher.normalize(withExtField('Artist', value(count))), 20_000);
+    expect(ratio).toBeLessThan(LINEAR_CEILING);
+    expect(accepted(withExtField('Artist', value(20_000))).artist.name).toBe('Jan Steen');
+  }, 60_000);
 
   // The marker used to be matched on the stripped, decoded text, where a tag
   // between "label" and "QS:" left nothing and a whitespace entity read as a
@@ -1289,14 +1289,13 @@ describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
     ['markers inside one attribute', 'label QS:'],
   ]) {
     it(`finds the marker in linear time on a 1 MB run of ${what}`, () => {
-      const value = `<span title="${unit.repeat(Math.ceil(1_000_000 / unit.length))}">Sun</span>`;
-      const plain = unit.repeat(Math.ceil(1_000_000 / unit.length));
-      for (const field of [value, plain]) {
-        const start = performance.now();
-        wikimediaFetcher.normalize(withExtField('ObjectName', field));
-        expect(performance.now() - start).toBeLessThan(1000);
+      const run = (size: number): string => unit.repeat(Math.ceil(size / unit.length));
+      const shapes = [(size: number) => `<span title="${run(size)}">Sun</span>`, run];
+      for (const shape of shapes) {
+        const ratio = growthRatio((size) => wikimediaFetcher.normalize(withExtField('ObjectName', shape(size))), 1_000_000);
+        expect(ratio).toBeLessThan(LINEAR_CEILING);
       }
-    });
+    }, 60_000);
   }
 
   it('reads an italic translation after an earlier plain line break', () => {
@@ -1310,11 +1309,11 @@ describe('Wikimedia mapper: template layout in ObjectName and Artist', () => {
   });
 
   it('stays linear on many line breaks that are not translations', () => {
-    const value = `Sun${('<br>' + '<span>'.repeat(50)).repeat(1_000)}`;
-    const start = performance.now();
-    accepted(withExtField('ObjectName', value));
-    expect(performance.now() - start).toBeLessThan(1000);
-  });
+    const value = (count: number): string => `Sun${('<br>' + '<span>'.repeat(50)).repeat(count)}`;
+    const ratio = growthRatio((count) => wikimediaFetcher.normalize(withExtField('ObjectName', value(count))), 1_000);
+    expect(ratio).toBeLessThan(LINEAR_CEILING);
+    expect(accepted(withExtField('ObjectName', value(1_000))).title).toBe('Sun');
+  }, 60_000);
 
   it('does not read "style=" inside another attribute value as a style attribute', () => {
     const a = accepted(withExtField('Artist', '<span title="a style=display:none">Rembrandt</span>'));
