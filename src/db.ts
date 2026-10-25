@@ -80,6 +80,7 @@ function parseRecord(json: string): Artwork | null {
  */
 export class Cache {
   private db: DatabaseSync;
+  private busyTimeoutMs: number;
 
   constructor(config: CacheConfig) {
     if (!existsSync(dirname(config.path))) {
@@ -89,7 +90,8 @@ export class Cache {
     this.db = new DatabaseSync(config.path);
     // Set before anything else touches the file, so every statement below
     // waits for another server's transaction instead of failing at once.
-    this.db.exec(`PRAGMA busy_timeout = ${Math.max(0, Math.floor(config.busyTimeoutMs ?? DEFAULT_BUSY_TIMEOUT_MS))}`);
+    this.busyTimeoutMs = Math.max(0, Math.floor(config.busyTimeoutMs ?? DEFAULT_BUSY_TIMEOUT_MS));
+    this.setBusyTimeout(this.busyTimeoutMs);
     if (!fileExisted) {
       // Tighten file mode immediately on creation so the cache (which can
       // include rights metadata, snapshots of museum responses, etc.) isn't
@@ -105,12 +107,50 @@ export class Cache {
     // Housekeeping at open is best-effort: if another server keeps the write
     // lock past the busy timeout, or the file is read-only, the cache still
     // opens. Reads treat expired rows as misses either way.
+    //
+    // Every step that takes the write lock shares one busy timeout, so an open
+    // waits for another server at most once in total, not once per step.
+    const deadline = performance.now() + this.busyTimeoutMs;
+    try {
+      this.pruneAtOpen(deadline);
+      this.resanitizeStoredText(deadline);
+    } finally {
+      this.setBusyTimeout(this.busyTimeoutMs);
+    }
+  }
+
+  private setBusyTimeout(ms: number): void {
+    this.db.exec(`PRAGMA busy_timeout = ${ms}`);
+  }
+
+  // Takes the write lock, waiting no later than deadline. False if it could not.
+  private beginBefore(deadline: number): boolean {
+    this.setBusyTimeout(Math.max(0, Math.ceil(deadline - performance.now())));
+    try {
+      this.db.exec('BEGIN IMMEDIATE');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private rollback(): void {
+    try {
+      this.db.exec('ROLLBACK');
+    } catch {
+      // SQLite has already ended the transaction (on an I/O or full-disk error).
+    }
+  }
+
+  // Both deletes in one transaction, so the prune takes the lock once.
+  private pruneAtOpen(deadline: number): void {
+    if (!this.beginBefore(deadline)) return;
     try {
       this.pruneExpired();
+      this.db.exec('COMMIT');
     } catch {
-      // Left for the next open.
+      this.rollback();
     }
-    this.resanitizeStoredText();
   }
 
   // Rows written before every text field was sanitised hold characters the
@@ -121,16 +161,17 @@ export class Cache {
   // The pass runs in batches of RESANITIZE_BATCH rows, each its own
   // transaction, so another server on the same file waits for one batch at
   // most. user_version is set in the transaction that finishes the last
-  // batch. If a batch cannot take the write lock within the busy timeout, or
-  // the file is read-only, or a batch fails, that batch changes nothing, the
-  // batches before it stay (each is complete on its own), and the pass starts
-  // again at the next open. parseRecord cleans every read meanwhile.
+  // batch. If a batch cannot take the write lock before deadline (whatever is
+  // left of the open's one busy timeout), or the file is read-only, or a batch
+  // fails, that batch changes nothing, the batches before it stay (each is
+  // complete on its own), and the pass starts again at the next open.
+  // parseRecord cleans every read meanwhile.
   //
   // Not covered: a row written into the same file by an older version of this
   // server, after the pass has gone past it or finished. Its full_record is
   // still cleaned on read, but its filter columns keep the old text until the
   // row is next fetched or expires.
-  private resanitizeStoredText(): void {
+  private resanitizeStoredText(deadline: number): void {
     const version = () => (this.db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
     if (version() >= TEXT_SANITIZED_VERSION) return;
     const select = this.db.prepare('SELECT id, full_record FROM objects WHERE id > ? ORDER BY id LIMIT ?');
@@ -140,11 +181,7 @@ export class Cache {
     );
     let after = '';
     for (;;) {
-      try {
-        this.db.exec('BEGIN IMMEDIATE');
-      } catch {
-        return;
-      }
+      if (!this.beginBefore(deadline)) return;
       try {
         // Another server may have finished the pass while this one waited.
         if (version() >= TEXT_SANITIZED_VERSION) {
@@ -166,11 +203,7 @@ export class Cache {
         this.db.exec('COMMIT');
         if (last) return;
       } catch {
-        try {
-          this.db.exec('ROLLBACK');
-        } catch {
-          // SQLite has already ended the transaction (on an I/O or full-disk error).
-        }
+        this.rollback();
         return;
       }
     }

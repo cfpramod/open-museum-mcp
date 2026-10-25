@@ -485,8 +485,12 @@ describe('local cache reads', () => {
     const dir = mkdtempSync(join(tmpdir(), 'omm-reach-'));
     try {
       const path = oldCacheFile(dir, 3);
-      const { released } = await holdWriteLock(path, 1500);
-      const cache = new Cache({ path, busyTimeoutMs: 200 });
+      const { released } = await holdWriteLock(path, 3000);
+      const started = performance.now();
+      const cache = new Cache({ path, busyTimeoutMs: 500 });
+      // One wait per open: the prune and the rewrite share the timeout, they
+      // do not each wait for it in turn.
+      expect(performance.now() - started).toBeLessThan(900);
       expectClean(cache.getObject('test:1'));
       expectClean(cache.getRandomObject({}));
       // The filter columns keep the old text until the pass runs.
@@ -498,6 +502,23 @@ describe('local cache reads', () => {
       expectClean(later.getRandomObject({ region: 'france' }));
       later.close();
       expect(userVersion(path)).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('waits the full busy timeout for later writes after an open that used up its wait', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omm-reach-'));
+    try {
+      const path = oldCacheFile(dir, 3);
+      const first = await holdWriteLock(path, 1000);
+      const cache = new Cache({ path, busyTimeoutMs: 500 });
+      await first.released;
+      const second = await holdWriteLock(path, 200);
+      expect(() => cache.upsertObject({ ...dirtyArtwork(), id: 'test:4' })).not.toThrow();
+      await second.released;
+      expectClean(cache.getObject('test:4'));
+      cache.close();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
