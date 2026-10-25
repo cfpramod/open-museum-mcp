@@ -81,11 +81,28 @@ function stripQsMetadata(s: string): string {
 // Cut the raw HTML at the first marker, before hidden elements are dropped, so
 // the title still ends where the marker block begins. The hidden element the
 // cut leaves open is then dropped to the end of the field.
-const QS_MARKER_RE = /(?:title|label)\s*QS:/;
+//
+// The marker used to be matched on the stripped, decoded text, where a tag
+// between the keyword and "QS:" left nothing and a whitespace entity read as
+// whitespace, so the raw match accepts all three there. The alternatives start
+// with different characters, and a tag runs from `<` to `>` without crossing
+// another `<`, so an unclosed `<` ends at the next one; the search stays linear.
+// It recognises tags and removes nothing. A marker inside a tag (an attribute
+// value) was never text and is skipped, so the cut never leaves a tag open.
+const QS_MARKER_RE =
+  /(?:title|label)(?:\s|&(?:nbsp|#0*(?:9|10|13|32|160)|#[xX]0*(?:9|[aA]|[dD]|20|[aA]0));|<[^<>]*>)*QS:/g;
 
 function cutAtQsMarker(html: string): string {
-  const at = html.search(QS_MARKER_RE);
-  return at === -1 ? html : html.slice(0, at);
+  let scanned = 0;
+  let inTag = false;
+  for (const m of html.matchAll(QS_MARKER_RE)) {
+    for (; scanned < m.index; scanned++) {
+      if (html[scanned] === '<') inTag = true;
+      else if (html[scanned] === '>') inTag = false;
+    }
+    if (!inTag) return html.slice(0, m.index);
+  }
+  return html;
 }
 
 // Commons surfaces multilingual ObjectName as `<Language>: <native form>`,
@@ -124,31 +141,40 @@ const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr',
 ]);
 
+function isSpace(c: string | undefined): boolean {
+  return c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f';
+}
+
+// Walk the tag's attributes in order, stepping over each value whole, so
+// "style=" inside another attribute's quoted value is never read as the style
+// attribute. The first style attribute decides, as in a browser.
 function isHiddenByStyle(tag: string): boolean {
   const lower = tag.toLowerCase();
-  let at = lower.indexOf('style');
-  while (at !== -1) {
-    const before = lower[at - 1];
-    let i = at + 'style'.length;
-    while (lower[i] === ' ' || lower[i] === '\t' || lower[i] === '\n') i++;
-    if ((before === ' ' || before === '\t' || before === '\n') && lower[i] === '=') {
-      i++;
-      while (lower[i] === ' ' || lower[i] === '\t' || lower[i] === '\n') i++;
-      const quote = lower[i];
-      let end: number;
-      if (quote === '"' || quote === "'") {
-        i++;
-        end = lower.indexOf(quote, i);
-      } else {
-        end = i;
-        while (end < lower.length && lower[end] !== ' ' && lower[end] !== '>') end++;
-      }
-      const value = lower.slice(i, end === -1 ? lower.length - 1 : end);
-      return value.split(/\s+/).join('').includes('display:none');
+  let i = 1;
+  while (i < lower.length && !isSpace(lower[i]) && lower[i] !== '>' && lower[i] !== '/') i++;
+  for (;;) {
+    while (isSpace(lower[i]) || lower[i] === '/') i++;
+    if (i >= lower.length || lower[i] === '>') return false;
+    const nameStart = i;
+    while (i < lower.length && !isSpace(lower[i]) && lower[i] !== '=' && lower[i] !== '>' && lower[i] !== '/') i++;
+    const name = lower.slice(nameStart, i);
+    while (isSpace(lower[i])) i++;
+    if (lower[i] !== '=') continue;
+    i++;
+    while (isSpace(lower[i])) i++;
+    let value: string;
+    const quote = lower[i];
+    if (quote === '"' || quote === "'") {
+      const end = lower.indexOf(quote, i + 1);
+      value = lower.slice(i + 1, end === -1 ? lower.length - 1 : end);
+      i = end === -1 ? lower.length : end + 1;
+    } else {
+      const start = i;
+      while (i < lower.length && !isSpace(lower[i]) && lower[i] !== '>') i++;
+      value = lower.slice(start, i);
     }
-    at = lower.indexOf('style', at + 1);
+    if (name === 'style') return value.split(/\s+/).join('').includes('display:none');
   }
-  return false;
 }
 
 // Index just past the close of the element named `name` whose opening tag ends
@@ -201,8 +227,8 @@ function dropHiddenElements(html: string): string {
 // elements first:
 //   <div>Italian: <div lang="it"><i>...</i></div></div><br><div><div lang="en"><i>Lady with an Ermine</i>
 // Only a `<br>` followed by an `<i>`, directly or inside opening `<div>` and
-// `<span>` tags, counts; any other line break is ordinary layout and is left
-// to stripHtml.
+// `<span>` tags, counts; any other line break is ordinary layout, left to
+// stripHtml, and the scan moves on to the next one.
 function splitTitleTranslation(html: string): { original: string; translation: string } | undefined {
   let pos = 0;
   for (;;) {
@@ -215,10 +241,10 @@ function splitTitleTranslation(html: string): { original: string; translation: s
       for (;;) {
         while (html[next] === ' ' || html[next] === '\t' || html[next] === '\n' || html[next] === '\r') next++;
         const nextGt = html[next] === '<' && html[next + 1] !== '/' ? html.indexOf('>', next + 1) : -1;
-        if (nextGt === -1) return undefined;
+        if (nextGt === -1) break;
         const name = tagNameAt(html, next, nextGt);
         if (name === 'i') return { original: html.slice(0, lt), translation: html.slice(gt + 1) };
-        if (name !== 'div' && name !== 'span') return undefined;
+        if (name !== 'div' && name !== 'span') break;
         next = nextGt + 1;
       }
     }
