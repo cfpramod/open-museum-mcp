@@ -12,7 +12,7 @@ import {
   pickMaxResolution,
   rejectFor,
 } from './helpers.js';
-import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { DIMENSIONS_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, buildCreditLine, optionalText, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // Smithsonian Open Access (EDAN) API. ~3–4M CC0 objects across the
@@ -542,6 +542,15 @@ export const smithsonianFetcher: Fetcher = {
       },
       description: asOptionalString(
         sanitizeTitle(pickByLabel(freetextEntries(content, 'objectType'), new Set(['type']))),
+      ),
+      dimensions: optionalText(
+        pickByLabel(freetextEntries(content, 'physicalDescription'), new Set(['dimensions'])),
+        (s) => sanitizeText(s, DIMENSIONS_MAX),
+      ),
+      creditLine: buildCreditLine(
+        unitName,
+        pickByLabel(freetextEntries(content, 'creditLine'), new Set(['credit line'])),
+        pickByLabel(freetextEntries(content, 'identifier'), new Set(['object number'])),
       ),
     };
 

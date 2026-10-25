@@ -455,3 +455,28 @@ describe('Smithsonian non-Western curation deepening (unit pass + expanded art f
     }
   });
 });
+
+describe('Smithsonian dimensions and credit line', () => {
+  it('reads Dimensions, Credit Line and Object number from freetext, held by the data source unit', () => {
+    const result = smithsonianFetcher.normalize(fixture('smithsonian-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBe('length: 15 in. (38.0 cm)');
+    expect(result.artwork.creditLine).toEqual({
+      holder: 'Smithsonian American Art Museum',
+      fund: 'Smithsonian American Art Museum, Gift of John Gellatly',
+      accession: '1929.8.175.19',
+    });
+  });
+
+  it('omits both when the freetext carries neither', () => {
+    const raw = clone('smithsonian-accepted.json');
+    const content = ((raw.response ?? raw) as { content: { freetext: Record<string, unknown> } }).content;
+    content.freetext.physicalDescription = [{ label: 'Medium', content: 'faience and glass' }];
+    delete content.freetext.creditLine;
+    delete content.freetext.identifier;
+    const result = smithsonianFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBeUndefined();
+    expect(result.artwork.creditLine).toBeUndefined();
+  });
+});

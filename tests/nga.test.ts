@@ -145,3 +145,12 @@ describe('NGA bundle-loader seam (createNgaFetcher)', () => {
     expect(typeof core.createNgaFetcher).toBe('function');
   });
 });
+
+describe('nga dimensions and credit line', () => {
+  it('omits both: the bundle this adapter ships carries neither field', () => {
+    const result = ngaFetcher.normalize(fixture('nga-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBeUndefined();
+    expect(result.artwork.creditLine).toBeUndefined();
+  });
+});

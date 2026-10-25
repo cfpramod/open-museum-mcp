@@ -26,7 +26,7 @@ import {
   pickMaxResolution,
   rejectFor,
 } from './helpers.js';
-import { SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { DIMENSIONS_MAX, SHORT_TEXT_MAX, buildCreditLine, optionalText, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const ID_RESOLVER = 'https://id.rijksmuseum.nl';
@@ -37,6 +37,10 @@ const PRINT_FLOOR_PX = 3000;
 // Getty AAT classifiers used by the Rijks Linked-Art records.
 const AAT_PRIMARY_TITLE = '300404670';
 const AAT_LANG_EN = '300388277';
+const AAT_DIMENSION_STATEMENT = '300435430';
+// "Acknowledgments": where the Rijksmuseum publishes its credit line
+// ("Purchased with the support of the Vereniging Rembrandt").
+const AAT_ACKNOWLEDGMENTS = '300026687';
 
 const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
   rejectFor('rijksmuseum', id, reason, rawSnapshot);
@@ -69,6 +73,23 @@ function pickTitle(object: Record<string, unknown>): string {
       .some((l) => str(l.id).includes(AAT_LANG_EN)),
   );
   return str((english ?? pool[0])?.content);
+}
+
+/**
+ * Content of the `referred_to_by` statement classified as `aat`, preferring the
+ * English-language one, as {@link pickTitle} does. Undefined when none exists.
+ */
+function pickStatement(object: Record<string, unknown>, aat: string): string | undefined {
+  const pool = arr(object.referred_to_by)
+    .filter(isObj)
+    .filter((n) => classifierIds(n).some((id) => id.includes(aat)) && str(n.content).length > 0);
+  const english = pool.find((n) =>
+    arr(n.language)
+      .filter(isObj)
+      .some((l) => str(l.id).includes(AAT_LANG_EN)),
+  );
+  const chosen = english ?? pool[0];
+  return chosen ? str(chosen.content) : undefined;
 }
 
 /** Collect creator display names from produced_by(.part[]).carried_out_by[]. */
@@ -333,6 +354,8 @@ export const rijksmuseumFetcher: Fetcher = {
         apiUrl: `${ID_RESOLVER}/${id.replace(/^rijksmuseum:/, '')}`,
         pageUrl: `https://www.rijksmuseum.nl/en/collection/${objectNumber(object)}`,
       },
+      dimensions: optionalText(pickStatement(object, AAT_DIMENSION_STATEMENT), (s) => sanitizeText(s, DIMENSIONS_MAX)),
+      creditLine: buildCreditLine('Rijksmuseum', pickStatement(object, AAT_ACKNOWLEDGMENTS), objectNumber(object)),
     };
     return accepted(artwork);
   },

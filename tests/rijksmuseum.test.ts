@@ -98,3 +98,37 @@ describe('Rijksmuseum direct (Linked-Art + Micrio IIIF) normalization', () => {
     expect(rijksmuseumFetcher.normalize({}).status).toBe('rejected');
   });
 });
+
+describe('Rijksmuseum dimensions and credit line', () => {
+  it('reads the English dimension statement, acknowledgment and object number verbatim', () => {
+    const result = rijksmuseumFetcher.normalize(fixture());
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBe('height 45.5 cm x width 41 cm');
+    expect(result.artwork.creditLine).toEqual({
+      holder: 'Rijksmuseum',
+      fund: 'Purchased with the support of the Vereniging Rembrandt',
+      accession: 'SK-A-2344',
+    });
+  });
+
+  it('falls back to the Dutch statement when no English one is published', () => {
+    const b = fixture();
+    const object = b.object as { referred_to_by: Array<{ language?: Array<{ id: string }> }> };
+    object.referred_to_by = object.referred_to_by.filter(
+      (n) => !(n.language ?? []).some((l) => l.id.includes('300388277')),
+    );
+    const result = rijksmuseumFetcher.normalize(b);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBe('hoogte 45,5 cm x breedte 41 cm');
+    expect(result.artwork.creditLine?.fund).toBe('Aankoop met steun van de Vereniging Rembrandt');
+  });
+
+  it('omits dimensions and keeps the object number when no statements are published', () => {
+    const b = fixture();
+    delete (b.object as Record<string, unknown>).referred_to_by;
+    const result = rijksmuseumFetcher.normalize(b);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBeUndefined();
+    expect(result.artwork.creditLine).toEqual({ holder: 'Rijksmuseum', accession: 'SK-A-2344' });
+  });
+});

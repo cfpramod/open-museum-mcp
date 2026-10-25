@@ -1039,3 +1039,12 @@ describe('Wikimedia mapper: tag stripping is linear on unclosed "<" runs', () =>
     });
   }
 });
+
+describe('wikimedia dimensions and credit line', () => {
+  it('omits both: the Commons Credit field names the image source, not the holder', () => {
+    const result = wikimediaFetcher.normalize(fixture('wikimedia-accepted-bruegel.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBeUndefined();
+    expect(result.artwork.creditLine).toBeUndefined();
+  });
+});

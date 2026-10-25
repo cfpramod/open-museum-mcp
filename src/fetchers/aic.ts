@@ -12,7 +12,7 @@ import {
   isValidPositiveInt,
   rejectFor,
 } from './helpers.js';
-import { DIMENSIONS_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { DIMENSIONS_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, buildCreditLine, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const AIC_API = 'https://api.artic.edu/api/v1';
@@ -51,6 +51,9 @@ export const AIC_FIELDS = [
   // clause above.
   'artwork_type_title',
   'dimensions',
+  // The credit line and accession number, also under the CC0 clause.
+  'credit_line',
+  'main_reference_number',
   'image_id',
   'thumbnail',
   // One string per record; the payload survives the 10x fields trim comfortably.
@@ -238,6 +241,7 @@ export const aicFetcher: Fetcher = {
       // museum's object-type term, which is what consumers of that field wanted.
       objectType: asOptionalString(sanitizeText(asString(r.artwork_type_title), SHORT_TEXT_MAX)),
       dimensions: asOptionalString(sanitizeText(asString(r.dimensions), DIMENSIONS_MAX)),
+      creditLine: buildCreditLine('Art Institute of Chicago', r.credit_line, r.main_reference_number),
       ...(provenance ? { provenance } : {}),
     };
 
