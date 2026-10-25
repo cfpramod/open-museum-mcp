@@ -137,8 +137,16 @@ export function stripHtml(s: string): string {
   return cleanText(decodeEntities(stripTags(s)));
 }
 
+// Cut to at most maxLen UTF-16 units without splitting a surrogate pair,
+// then drop any space the cut leaves at the end. Its output is never longer
+// than maxLen, never ends in a space and holds no lone surrogate it did not
+// receive, so capping it again (as sanitizeArtworkText does after an adapter
+// has) changes nothing.
 function cap(s: string, maxLen: number): string {
-  return s.length > maxLen ? s.slice(0, maxLen) : s;
+  if (s.length <= maxLen) return s;
+  const last = s.charCodeAt(maxLen - 1);
+  const end = last >= 0xd800 && last <= 0xdbff ? maxLen - 1 : maxLen;
+  return s.slice(0, end).trimEnd();
 }
 
 export const TITLE_MAX = 256;

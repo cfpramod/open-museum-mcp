@@ -27,11 +27,30 @@ export interface CacheConfig {
  * notArtist is an exact-match exclusion list against the canonical
  * `artist_name` column.
  */
+// user_version once every stored row's text has been through the sanitiser.
+const TEXT_SANITIZED_VERSION = 1;
+
 export interface DiscoverFilter {
   region?: string;
   period?: string;
   notArtist?: string[];
   museumCode?: string;
+}
+
+/**
+ * Every stored record is read back through here. A malformed row (manual DB
+ * tinkering, OS-level corruption, schema drift from a prior version) is a
+ * cache miss; the next write overwrites it. A record cached before every text
+ * field was sanitised is cleaned on the way out, so it does not serve its old
+ * text for the rest of its lifetime. The pass is idempotent, so a record that
+ * is already clean comes back unchanged.
+ */
+function parseRecord(json: string): Artwork | null {
+  try {
+    return sanitizeArtworkText(JSON.parse(json) as Artwork);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -50,22 +69,6 @@ export interface DiscoverFilter {
  * The DB file is created with mode 0o600. Parameterized statements only —
  * no string-concatenated SQL paths.
  */
-/**
- * Every stored record is read back through here. A malformed row (manual DB
- * tinkering, OS-level corruption, schema drift from a prior version) is a
- * cache miss; the next write overwrites it. A record cached before every text
- * field was sanitised is cleaned on the way out, so it does not serve its old
- * text for the rest of its lifetime. The pass is idempotent, so a record that
- * is already clean comes back unchanged.
- */
-function parseRecord(json: string): Artwork | null {
-  try {
-    return sanitizeArtworkText(JSON.parse(json) as Artwork);
-  } catch {
-    return null;
-  }
-}
-
 export class Cache {
   private db: DatabaseSync;
 
@@ -88,6 +91,49 @@ export class Cache {
     this.db.exec('PRAGMA journal_mode = WAL');
     this.init();
     this.pruneExpired();
+    this.resanitizeStoredText();
+  }
+
+  // Rows written before every text field was sanitised hold characters the
+  // sanitiser now removes, in full_record and in the columns that
+  // getRandomObject filters on and listTraditions counts. Rewrite them once,
+  // so a tag listed by list_traditions is one discover_random can find.
+  // user_version records that the pass has run; parseRecord still cleans on
+  // every read. If the rewrite fails (another process holds the lock, a
+  // read-only file) it is rolled back and retried on the next open, and the
+  // cache works as before meanwhile.
+  private resanitizeStoredText(): void {
+    const version = () => (this.db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
+    if (version() >= TEXT_SANITIZED_VERSION) return;
+    try {
+      this.db.exec('BEGIN IMMEDIATE');
+    } catch {
+      return;
+    }
+    try {
+      if (version() < TEXT_SANITIZED_VERSION) {
+        const rows = this.db.prepare('SELECT id, full_record FROM objects').all() as Array<{
+          id: string;
+          full_record: string;
+        }>;
+        const update = this.db.prepare(
+          `UPDATE objects SET title = ?, artist_name = ?, display_date = ?, medium = ?, region = ?, period = ?,
+             full_record = ? WHERE id = ?`,
+        );
+        for (const row of rows) {
+          const art = parseRecord(row.full_record);
+          if (!art) continue;
+          const json = JSON.stringify(art);
+          if (json === row.full_record) continue;
+          update.run(art.title, art.artist.name, art.displayDate, art.medium, art.region, art.period, json, row.id);
+        }
+        // PRAGMA takes no bound parameters; the literal matches TEXT_SANITIZED_VERSION.
+        this.db.exec('PRAGMA user_version = 1');
+      }
+      this.db.exec('COMMIT');
+    } catch {
+      this.db.exec('ROLLBACK');
+    }
   }
 
   private init(): void {

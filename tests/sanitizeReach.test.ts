@@ -5,6 +5,7 @@
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { createFederation } from '../src/core/index.js';
 import { Cache } from '../src/db.js';
@@ -12,10 +13,14 @@ import type { CacheStore } from '../src/core/index.js';
 import {
   cleanText,
   sanitizeArtworkText,
+  sanitizeText,
   stripHtml,
+  ARTIST_NAME_MAX,
+  DESCRIPTION_MAX,
   DIMENSIONS_MAX,
   MEDIUM_MAX,
   SHORT_TEXT_MAX,
+  TITLE_MAX,
 } from '../src/fetchers/sanitize.js';
 import type { Fetcher } from '../src/fetchers/types.js';
 import type { Artwork } from '../src/types.js';
@@ -194,12 +199,71 @@ describe('sanitizeArtworkText', () => {
   });
 });
 
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+describe('caps', () => {
+  const caps = { TITLE_MAX, DESCRIPTION_MAX, ARTIST_NAME_MAX, MEDIUM_MAX, DIMENSIONS_MAX, SHORT_TEXT_MAX };
+
+  for (const [name, max] of Object.entries(caps)) {
+    it(`${name}: a cut that lands after a space does not leave it`, () => {
+      const out = sanitizeText(`${'a'.repeat(max - 1)} x`, max);
+      expect(out).toBe('a'.repeat(max - 1));
+      expect(sanitizeText(out, max)).toBe(out);
+    });
+
+    it(`${name}: a cut never splits a surrogate pair`, () => {
+      const out = sanitizeText(`${'a'.repeat(max - 1)}\u{1F40E}z`, max);
+      expect(LONE_SURROGATE.test(out)).toBe(false);
+      expect(out).toBe('a'.repeat(max - 1));
+    });
+  }
+
+  it('one pass of sanitizeArtworkText equals two when every field is cut at its cap', () => {
+    const atCap = (max: number) => `${'a'.repeat(max - 1)} \u{1F40E}`;
+    const once = sanitizeArtworkText(
+      makeArtwork({
+        title: atCap(TITLE_MAX),
+        artist: { name: atCap(ARTIST_NAME_MAX), lifespan: atCap(ARTIST_NAME_MAX), attributionType: 'named' },
+        medium: atCap(MEDIUM_MAX),
+        description: atCap(DESCRIPTION_MAX),
+        dimensions: atCap(DIMENSIONS_MAX),
+        objectType: atCap(SHORT_TEXT_MAX),
+        displayDate: atCap(SHORT_TEXT_MAX),
+        rawTags: [atCap(SHORT_TEXT_MAX)],
+      }),
+    );
+    expect(sanitizeArtworkText(once)).toEqual(once);
+    for (const [field, value] of Object.entries(textFields(once))) {
+      if (typeof value !== 'string') continue;
+      expect(value.endsWith(' '), field).toBe(false);
+      expect(LONE_SURROGATE.test(value), field).toBe(false);
+    }
+  });
+});
+
 describe('every adapter returns accepted records through accepted()', () => {
+  // Only accepted() may spell the accepted status, in any quoting, so a
+  // bypass cannot hide behind a different quote or a variable named status.
+  const spellsAccepted = (src: string) => /(['"`])accepted\1/.test(src);
+
+  it('the scan recognises every way of spelling the status', () => {
+    for (const bypass of [
+      "return { status: 'accepted', artwork };",
+      'return { status: "accepted", artwork };',
+      'return { status: `accepted`, artwork };',
+      "const status = 'accepted' as const;\nreturn { status, artwork };",
+      "return { artwork, status : 'accepted' };",
+    ]) {
+      expect(spellsAccepted(bypass), bypass).toBe(true);
+    }
+    expect(spellsAccepted('return accepted(artwork);')).toBe(false);
+  });
+
   it('no adapter builds an accepted result itself', () => {
     const dir = join(import.meta.dirname, '..', 'src', 'fetchers');
-    const offenders = readdirSync(dir)
+    const offenders = readdirSync(dir, { recursive: true, encoding: 'utf8' })
       .filter((f) => f.endsWith('.ts') && f !== 'helpers.ts')
-      .filter((f) => /status:\s*'accepted'/.test(readFileSync(join(dir, f), 'utf8')));
+      .filter((f) => spellsAccepted(readFileSync(join(dir, f), 'utf8')));
     expect(offenders).toEqual([]);
   });
 });
@@ -273,6 +337,60 @@ describe('local cache reads', () => {
       expect(regions.map((t) => t.tag)).toEqual(['france']);
       expect(periods.map((t) => t.tag)).toEqual(['impressionism']);
     });
+  });
+
+  it('counts a clean tag and a dirty tag that cleans to it together', () => {
+    withDirtyRow((cache) => {
+      cache.upsertObject(makeArtwork({ id: 'test:2', region: 'france' }));
+      const france = cache.listTraditions().regions.find((t) => t.tag === 'france');
+      expect(france?.coverage).toEqual({ test: 2 });
+    });
+  });
+
+  it('does not list a tag made only of removed characters', () => {
+    withDirtyRow((cache) => {
+      cache.upsertObject(makeArtwork({ id: 'test:3', region: PAYLOAD, period: PAYLOAD }));
+      const { regions, periods } = cache.listTraditions();
+      expect(regions.map((t) => t.tag)).toEqual(['france']);
+      expect(periods.map((t) => t.tag)).toEqual(['impressionism']);
+    });
+  });
+
+  it('rewrites old rows when the cache opens, so a listed tag can be discovered', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omm-reach-'));
+    try {
+      const path = join(dir, 'cache.db');
+      const first = new Cache({ path });
+      first.upsertObject({ ...dirtyArtwork(), period: dirty('impressionism') });
+      first.close();
+      // Simulate a file written before the rewrite existed.
+      const raw = new DatabaseSync(path);
+      raw.exec('PRAGMA user_version = 0');
+      raw.close();
+
+      const cache = new Cache({ path });
+      const { regions, periods } = cache.listTraditions();
+      expect(regions.map((t) => t.tag)).toEqual(['france']);
+      expect(periods.map((t) => t.tag)).toEqual(['impressionism']);
+      expectClean(cache.getRandomObject({ region: 'france' }));
+      expectClean(cache.getRandomObject({ period: 'impressionism' }));
+      expect(cache.getRandomObject({ notArtist: ['Claude Monet'] })).toBeNull();
+      cache.close();
+
+      const check = new DatabaseSync(path);
+      const row = check.prepare('SELECT region, artist_name, full_record FROM objects').get() as {
+        region: string;
+        artist_name: string;
+        full_record: string;
+      };
+      expect(row.region).toBe('france');
+      expect(row.artist_name).toBe('Claude Monet');
+      expect(INVISIBLE.test(row.full_record.replace(/\\u[0-9a-fA-F]{4}/g, (m) => JSON.parse(`"${m}"`)))).toBe(false);
+      expect((check.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(1);
+      check.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('parses a stored record in one place only', () => {
