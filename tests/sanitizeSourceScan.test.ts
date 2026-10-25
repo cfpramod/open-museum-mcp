@@ -6,8 +6,16 @@ import { describe, expect, it } from 'vitest';
 // Museum text is decoded and stripped in exactly one place, src/fetchers/sanitize.ts.
 // A second copy drifts from it: the Wikimedia adapter once carried its own
 // stripper whose `/<[^>]*>/g` replace was quadratic on unclosed `<`, after the
-// shared one had been made linear. This scan fails on any second sanitiser in
-// src/, so a fix to the shared one cannot be bypassed by a local copy.
+// shared one had been made linear. This scan fails when a file other than
+// sanitize.ts builds characters from code points (by any access to
+// fromCodePoint or fromCharCode), declares a helper named like a tag stripper
+// or entity decoder, writes a tag-stripping regex, builds a RegExp from a
+// string that starts with `<`, or replaces entity text such as `&amp;`.
+//
+// It is a text scan, line by line, and the limit is real: a name assembled at
+// runtime (String['from' + 'CodePoint']), a regex source assembled from parts
+// that do not start with `<`, or a helper whose name says nothing about HTML
+// is not seen. It is a floor that catches copies and near-copies, not a proof.
 
 const here = dirname(fileURLToPath(import.meta.url));
 const srcRoot = join(here, '../src');
@@ -28,22 +36,43 @@ interface Rule {
   pattern: RegExp;
 }
 
+// An identifier that names a markup or entity cleaner: a verb such as strip,
+// remove, clean, sanitise, decode or unescape, later followed by html, tag,
+// markup or entit (stripHtml, removeTags, cleanMarkup, decodeEntities), or an
+// HTML_ENTITIES table.
+const SANITISER_NAME =
+  '\\w*(?:(?:strip|remove|clean|saniti[sz]|decode|unescape)\\w*?(?:html|tags?|markup|entit)|html_?entit)\\w*';
+
 const RULES: Rule[] = [
   // Building characters from numbers is how an entity decoder is written.
   { name: 'String.fromCodePoint', pattern: /\bString\s*\.\s*fromCodePoint\b/ },
   { name: 'String.fromCharCode', pattern: /\bString\s*\.\s*fromCharCode\b/ },
+  // Any other reach for the same functions: String['fromCodePoint'],
+  // `const { fromCodePoint } = String`, or `.fromCodePoint(` on the line after
+  // `String`.
+  { name: 'fromCodePoint or fromCharCode by another route', pattern: /\bfrom(?:CodePoint|CharCode)\b/ },
   // A declaration of the shared helpers' names, or a renamed variant of them.
   // Imports and calls of the shared stripHtml are fine and do not match.
   {
     name: 'a second sanitiser declaration',
-    pattern: /\b(?:function\*?|const|let|var|class)\s+\w*(?:strip_?html|decode_?entit|html_?entit|strip_?tags)\w*/i,
+    pattern: new RegExp(`\\b(?:function\\*?|const|let|var|class)\\s+${SANITISER_NAME}`, 'i'),
   },
   {
     name: 'a sanitiser method or property',
-    pattern: /\b\w*(?:strip_?html|decode_?entit|html_?entit|strip_?tags)\w*\s*(?::|=(?!=)|\([^)]*\)\s*(?::[^{;]+)?\{)/i,
+    pattern: new RegExp(`\\b${SANITISER_NAME}\\s*(?::|=(?!=)|\\([^)]*\\)\\s*(?::[^{;]+)?\\{)`, 'i'),
   },
-  // The tag regex the shared stripper replaced: quadratic on a run of unclosed `<`.
-  { name: 'the <[^>]*> tag regex', pattern: /<\[\^>\][*+]>/ },
+  // The tag regex the shared stripper replaced was quadratic on a run of
+  // unclosed `<`. Every variant of it has "anything but `>`" with an unbounded
+  // quantifier, or `<` then a dot with one: <[^>]*>, <[^<>]+>, <\/?\w[^>]{0,}>,
+  // <.*?>.
+  { name: 'a tag-stripping regex', pattern: /\[\^[^\]]*>[^\]]*\]\s*[*+{]|<\.[*+{]/ },
+  // The same regex written as a string so that the literal above does not appear.
+  { name: 'a RegExp built from a string starting with <', pattern: /\bRegExp\s*\(\s*['"`]</ },
+  // A named or numeric entity decoder needs neither of the above.
+  {
+    name: 'an entity replace',
+    pattern: /\.replace(?:All)?\s*\(\s*(?:\/|['"`])&(?:#|[a-z]+;)/i,
+  },
 ];
 
 // Uses that match a rule but are not sanitisers. Each is pinned to its exact line
@@ -90,7 +119,7 @@ describe('one sanitiser: no second HTML decoder or stripper in src/', () => {
   it('sanitize.ts still holds the helpers the scan protects', () => {
     const sanitize = sources.find((s) => s.file === SANITIZE)!.src;
     expect(scan(SANITIZE, sanitize).map((v) => v.rule)).toEqual(
-      expect.arrayContaining(['String.fromCodePoint', 'a second sanitiser declaration', 'the <[^>]*> tag regex']),
+      expect.arrayContaining(['String.fromCodePoint', 'a second sanitiser declaration', 'a tag-stripping regex']),
     );
   });
 
@@ -124,10 +153,43 @@ describe('the scan rules catch the shapes they name', () => {
     ['  decodeEntities(s: string): string {', 'a sanitiser method or property'],
     ['  stripHtml: (s) => s,', 'a sanitiser method or property'],
     ['obj.stripTags = local;', 'a sanitiser method or property'],
-    ["const text = raw.replace(/<[^>]*>/g, '');", 'the <[^>]*> tag regex'],
-    ["const text = raw.replace(new RegExp('<[^>]+>', 'g'), '');", 'the <[^>]*> tag regex'],
+    ["const f = String['fromCodePoint'];", 'fromCodePoint or fromCharCode by another route'],
+    ['const { fromCodePoint } = String;', 'fromCodePoint or fromCharCode by another route'],
+    ['  .fromCharCode(code);', 'fromCodePoint or fromCharCode by another route'],
+    ['function removeTags(s: string): string {', 'a second sanitiser declaration'],
+    ['const cleanMarkup = (s: string) => s;', 'a second sanitiser declaration'],
+    ['export function sanitiseHtml(s: string) {', 'a second sanitiser declaration'],
+    ['const unescapeEntities = (s: string) => s;', 'a second sanitiser declaration'],
+    ["const text = raw.replace(/<[^>]*>/g, '');", 'a tag-stripping regex'],
+    ["const text = raw.replace(/<[^>]{0,}>/g, '');", 'a tag-stripping regex'],
+    ["const text = raw.replace(/<.*?>/g, '');", 'a tag-stripping regex'],
+    ["const text = raw.replace(/<[^<>]*>/g, '');", 'a tag-stripping regex'],
+    ["const text = raw.replace(/<\\/?[a-z][^>]+>/gi, '');", 'a tag-stripping regex'],
+    ["const text = raw.replace(new RegExp('<[^>]+>', 'g'), '');", 'a tag-stripping regex'],
+    ["const re = new RegExp('<' + '[^>]*>', 'g');", 'a tag-stripping regex'],
+    ["const re = new RegExp('<' + inner + '>', 'g');", 'a RegExp built from a string starting with <'],
+    ["const t = s.replace(/&amp;/g, '&').replace(/&lt;/g, '<');", 'an entity replace'],
+    ["const t = s.replaceAll('&quot;', '\"');", 'an entity replace'],
+    ['const t = s.replace(/&#(\\d+);/g, (_, n) => n);', 'an entity replace'],
   ])('%s', (line, rule) => {
     expect(caught(line)).toContain(rule);
+  });
+
+  it('catches a String.fromCodePoint call split across two lines', () => {
+    expect(caught('const c = String\n  .fromCodePoint(n);').length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    'const decodedTitle = title.trim();',
+    'function stripPrefix(s: string): string {',
+    'const tagline = record.subtitle;',
+    'const pairs: Array<[string, number]> = [];',
+    "const query = params.join('&');",
+    "const name = s.replace(/&/g, ' and ');",
+    "const re = new RegExp('^' + prefix);",
+    'if (a.length < b.length * 2) return;',
+  ])('leaves a look-alike line alone: %s', (line) => {
+    expect(caught(line)).toEqual([]);
   });
 
   it.each([
