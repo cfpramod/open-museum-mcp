@@ -747,7 +747,7 @@ describe('stripHtml: invisible format characters', () => {
 });
 
 // ---------------------------------------------------------------------------
-// C2 regression: redirect TOCTOU \u2014 defaultFetchImage must re-validate Location
+// C2 regression: redirect TOCTOU — defaultFetchImage must re-validate Location
 // ---------------------------------------------------------------------------
 
 describe('SSRF guard — redirect bypass prevention (C2)', () => {
