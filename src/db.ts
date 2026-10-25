@@ -1,6 +1,7 @@
 import { chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { cleanText, sanitizeArtworkText } from './fetchers/sanitize.js';
 import type { Artwork, Tradition } from './types.js';
 
 const OBJECT_TTL_DAYS = 90;
@@ -49,6 +50,22 @@ export interface DiscoverFilter {
  * The DB file is created with mode 0o600. Parameterized statements only —
  * no string-concatenated SQL paths.
  */
+/**
+ * Every stored record is read back through here. A malformed row (manual DB
+ * tinkering, OS-level corruption, schema drift from a prior version) is a
+ * cache miss; the next write overwrites it. A record cached before every text
+ * field was sanitised is cleaned on the way out, so it does not serve its old
+ * text for the rest of its lifetime. The pass is idempotent, so a record that
+ * is already clean comes back unchanged.
+ */
+function parseRecord(json: string): Artwork | null {
+  try {
+    return sanitizeArtworkText(JSON.parse(json) as Artwork);
+  } catch {
+    return null;
+  }
+}
+
 export class Cache {
   private db: DatabaseSync;
 
@@ -203,11 +220,7 @@ export class Cache {
     const sql = `SELECT full_record FROM objects ${where} ORDER BY RANDOM() LIMIT 1`;
     const row = this.db.prepare(sql).get(...params) as { full_record: string } | undefined;
     if (!row) return null;
-    try {
-      return JSON.parse(row.full_record) as Artwork;
-    } catch {
-      return null;
-    }
+    return parseRecord(row.full_record);
   }
 
   getObject(id: string): Artwork | null {
@@ -216,14 +229,7 @@ export class Cache {
       | undefined;
     if (!row) return null;
     if (this.isExpired(row.cached_at, OBJECT_TTL_DAYS)) return null;
-    try {
-      return JSON.parse(row.full_record) as Artwork;
-    } catch {
-      // A malformed row (manual DB tinkering, OS-level corruption, schema
-      // drift from a prior version) shouldn't poison the request — treat it
-      // as a cache miss; the next write will overwrite the row.
-      return null;
-    }
+    return parseRecord(row.full_record);
   }
 
   putQuery(cacheKey: string, ids: string[]): void {
@@ -300,12 +306,17 @@ export class Cache {
 
     const byTag = new Map<string, Record<string, number>>();
     for (const row of rows) {
+      // A row cached before region and period were sanitised can hold
+      // characters the sanitiser now removes, so clean the tag here too.
+      // Two raw tags that clean to the same text merge their counts.
+      const tag = cleanText(row.tag);
+      if (tag === '') continue;
       // Object.create(null) prevents prototype pollution if a future
       // museum_code value ever collides with a built-in property name
       // (`__proto__`, `constructor`, `toString`).
-      const existing = byTag.get(row.tag) ?? Object.create(null);
-      existing[row.museum_code] = row.cnt;
-      byTag.set(row.tag, existing);
+      const existing = byTag.get(tag) ?? Object.create(null);
+      existing[row.museum_code] = (existing[row.museum_code] ?? 0) + row.cnt;
+      byTag.set(tag, existing);
     }
 
     return Array.from(byTag.entries())

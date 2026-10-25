@@ -2,10 +2,12 @@
  * Reach of the text sanitiser: every text field of an accepted record is
  * cleaned, whichever adapter built it and whichever path filled the field.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createFederation } from '../src/core/index.js';
+import { Cache } from '../src/db.js';
 import type { CacheStore } from '../src/core/index.js';
 import {
   cleanText,
@@ -229,6 +231,54 @@ describe('federation cache reads', () => {
     for (const [field, value] of Object.entries(textFields(out.artwork))) {
       expect(typeof value === 'string' && INVISIBLE.test(value), field).toBe(false);
     }
+  });
+});
+
+describe('local cache reads', () => {
+  // A row written before every text field was sanitised, stored as it was.
+  function withDirtyRow(fn: (cache: Cache) => void): void {
+    const dir = mkdtempSync(join(tmpdir(), 'omm-reach-'));
+    try {
+      const cache = new Cache({ path: join(dir, 'cache.db') });
+      cache.upsertObject(dirtyArtwork());
+      fn(cache);
+      cache.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  const expectClean = (a: Artwork | null) => {
+    expect(a).not.toBeNull();
+    for (const [field, value] of Object.entries(textFields(a as Artwork))) {
+      expect(typeof value === 'string' && INVISIBLE.test(value), field).toBe(false);
+    }
+  };
+
+  it('getObject cleans the stored record', () => {
+    withDirtyRow((cache) => expectClean(cache.getObject('test:1')));
+  });
+
+  it('getRandomObject cleans the stored record', () => {
+    withDirtyRow((cache) => expectClean(cache.getRandomObject({})));
+  });
+
+  it('listTraditions cleans region and period tags', () => {
+    withDirtyRow((cache) => {
+      const { regions, periods } = cache.listTraditions();
+      for (const t of [...regions, ...periods]) {
+        expect(INVISIBLE.test(t.tag), t.tag).toBe(false);
+        expect(INVISIBLE.test(t.label), t.label).toBe(false);
+      }
+      expect(regions.map((t) => t.tag)).toEqual(['france']);
+      expect(periods.map((t) => t.tag)).toEqual(['impressionism']);
+    });
+  });
+
+  it('parses a stored record in one place only', () => {
+    const src = readFileSync(join(import.meta.dirname, '..', 'src', 'db.ts'), 'utf8');
+    expect(src.match(/JSON\.parse\(/g)?.length).toBe(2); // parseRecord + the query-cache id list
+    expect(src).not.toMatch(/JSON\.parse\(row\.full_record/);
   });
 });
 
