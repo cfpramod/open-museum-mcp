@@ -1447,10 +1447,89 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
     expect(a.description).toBe('Before <a href="https://example.org/x" after');
   });
 
-  it('removes escaped tags in linear time on a 100k run with no closing ">"', () => {
-    const raw = withExtField('ImageDescription', '&lt;a '.repeat(20_000));
-    const start = performance.now();
-    wikimediaFetcher.normalize(raw);
-    expect(performance.now() - start).toBeLessThan(1000);
+  // Escapes `<` and `>` so the text reaches the second pass, as Commons sends it.
+  const escaped = (text: string): string => text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // Element names that can be spelled from the property test's alphabet, plus
+  // the common ones; kept here rather than read from the fetcher, so a name
+  // dropped from the fetcher's list fails this test instead of passing it.
+  const ELEMENT_NAMES = new Set(['a', 'b', 'i', 'p', 's', 'br', 'tr', 'rp', 'rt', 'abbr', 'script', 'img', 'div', 'span', 'iframe', 'style']);
+
+  // The guarantee: no `<name` or `</name`, for an HTML element name, followed
+  // by whitespace, `/` or `>` and with a `>` somewhere after it.
+  function formsElementTag(text: string): boolean {
+    for (const m of text.matchAll(/<\/?([a-z][a-z0-9]*)[\s/>]/gi)) {
+      if (ELEMENT_NAMES.has(m[1].toLowerCase()) && text.indexOf('>', m.index + 1) !== -1) return true;
+    }
+    return false;
+  }
+
+  // Removing a tag joins the text on either side of it. A `<` kept as text
+  // can then meet the rest of an element name and form a tag that was not in
+  // the source: `<scr<script>ipt>` would become `<script>`.
+  for (const [input, expected] of [
+    ['<scr<script>ipt>alert(1)</scr</script>ipt>', 'Before alert(1)'],
+    ['<<a>a href="https://evil.example">x<</a>/a>', 'Before x'],
+    ['<im<b>g src=x onerror=alert(1)>', 'Before'],
+    ['<<b>i>bold<<b>/i>', 'Before bold'],
+    ['<a<br>>', 'Before'],
+  ]) {
+    it(`does not join kept text into a new tag: ${input}`, () => {
+      const a = accepted(withExtField('ImageDescription', escaped(`Before ${input}`)));
+      expect(a.description).toBe(expected);
+      expect(formsElementTag(a.description ?? '')).toBe(false);
+    });
+  }
+
+  it('breaks a tag still standing after nesting deeper than the repeated pass reaches', () => {
+    let nested = '<script>';
+    for (let k = 0; k < 12; k++) nested = `<scr${nested}ipt>`;
+    const a = accepted(withExtField('ImageDescription', escaped(`Before ${nested}alert(1)`)));
+    expect(formsElementTag(a.description ?? '')).toBe(false);
+    expect(a.description).not.toMatch(/<script/i);
+    expect(a.description).toContain('alert(1)');
   });
+
+  it('never leaves an element tag in title, artist or description, over random markup', () => {
+    // mulberry32: a fixed seed keeps a failure reproducible.
+    let seed = 0x5eed206;
+    const random = (): number => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const alphabet = '<>/abiprsct ';
+    for (let n = 0; n < 3000; n++) {
+      let text = '';
+      const length = 1 + Math.floor(random() * 24);
+      for (let c = 0; c < length; c++) text += alphabet[Math.floor(random() * alphabet.length)];
+      for (const field of ['ObjectName', 'Artist', 'ImageDescription']) {
+        const a = accepted(withExtField(field, escaped(`Text ${text}`)));
+        const value = field === 'ObjectName' ? a.title : field === 'Artist' ? a.artist.name : (a.description ?? '');
+        expect(formsElementTag(value), `${field}: ${JSON.stringify(text)} -> ${JSON.stringify(value)}`).toBe(false);
+      }
+    }
+  }, 60_000);
+
+  // Each shape drives one branch of the pass once per repeat: an unclosed tag
+  // (the early exit), a removed tag, a kept `<`, a removed separating tag, and
+  // nesting deep enough to reach the final sweep. The repeat count keeps a
+  // quadratic pass to seconds, so a regression fails here instead of hanging.
+  const repeats = 4_000;
+  for (const [what, unit] of [
+    ['unclosed tags', '&lt;a '],
+    ['removed tags', '&lt;a&gt;'],
+    ['kept "<"', '&lt;x'],
+    ['removed line breaks', '&lt;br&gt;x'],
+    ['nested tags', escaped(`${'<scr'.repeat(6)}<script>${'ipt>'.repeat(6)}`)],
+  ]) {
+    it(`removes escaped tags in linear time on a run of ${what}`, () => {
+      const ratio = growthRatio(
+        (count) => wikimediaFetcher.normalize(withExtField('ImageDescription', `x ${unit.repeat(count)}`)),
+        repeats,
+      );
+      expect(ratio).toBeLessThan(LINEAR_CEILING);
+    }, 60_000);
+  }
 });

@@ -46,16 +46,18 @@ const HTML_ELEMENTS = new Set(
 // the optional '/' and the character after the name.
 const TAG_HEAD_MAX = 12;
 
-// Commons escapes markup that wikitext does not allow, so an uploader's literal
-// `<a href="...">` arrives as `&lt;a href="..."&gt;`. stripHtml strips real
-// tags before it decodes, so the decoded tag would reach the wire as text. This
-// second pass runs on stripHtml's output and removes `<` up to the first `>`
-// when it opens an HTML element, with stripTags' rules: one linear scan, a tag
-// that ends a line or a block leaves a space, and an unclosed `<…` tail is kept
-// verbatim. Decoding again first would not help:
-// the escaped anchor on File:Out Of The East.djvu wraps a real one, so a
-// decode-then-strip order leaves `" rel="nofollow">` behind.
-function stripEscapedTags(s: string): string {
+// The element name a `<` at `lt` opens, or null when it opens none.
+function elementAt(s: string, lt: number): string | null {
+  const head = /^\/?([a-z][a-z0-9]*)[\s/>]/i.exec(s.slice(lt + 1, lt + 1 + TAG_HEAD_MAX));
+  if (!head) return null;
+  const name = head[1].toLowerCase();
+  return HTML_ELEMENTS.has(name) ? name : null;
+}
+
+// One linear scan that removes `<` up to the first `>` when it opens an HTML
+// element, with stripTags' rules: a tag that ends a line or a block leaves a
+// space, and an unclosed `<…` tail is kept verbatim.
+function removeElementTags(s: string): string {
   let out = '';
   let i = 0;
   while (i < s.length) {
@@ -64,8 +66,8 @@ function stripEscapedTags(s: string): string {
       out += s.slice(i);
       break;
     }
-    const head = /^\/?([a-z][a-z0-9]*)[\s/>]/i.exec(s.slice(lt + 1, lt + 1 + TAG_HEAD_MAX));
-    if (!head || !HTML_ELEMENTS.has(head[1].toLowerCase())) {
+    const name = elementAt(s, lt);
+    if (name === null) {
       out += s.slice(i, lt + 1);
       i = lt + 1;
       continue;
@@ -76,9 +78,46 @@ function stripEscapedTags(s: string): string {
       break;
     }
     out += s.slice(i, lt);
-    if (SEPARATING_TAGS.has(head[1].toLowerCase())) out += ' ';
+    if (SEPARATING_TAGS.has(name)) out += ' ';
     i = gt + 1;
   }
+  return out;
+}
+
+// Removing a tag joins the text on either side of it, so a `<` kept as text
+// can meet the rest of an element name: `<scr<script>ipt>` becomes `<script>`.
+// Each repeat peels one such layer; source text nests no deeper than this.
+const ESCAPED_TAG_PASSES = 4;
+
+// Commons escapes markup that wikitext does not allow, so an uploader's literal
+// `<a href="...">` arrives as `&lt;a href="..."&gt;`. stripHtml strips real
+// tags before it decodes, so the decoded tag would reach the wire as text. This
+// second pass runs on stripHtml's output. Decoding again first would not help:
+// the escaped anchor on File:Out Of The East.djvu wraps a real one, so a
+// decode-then-strip order leaves `" rel="nofollow">` behind.
+//
+// The result never holds an element tag: after the repeats, any `<` that still
+// opens an element and has a `>` after it gets a space after it, which only
+// splits text and so cannot form a tag of its own. Every step is linear.
+function stripEscapedTags(s: string): string {
+  let text = s;
+  for (let pass = 0; pass < ESCAPED_TAG_PASSES; pass++) {
+    const next = removeElementTags(text);
+    if (next === text) break;
+    text = next;
+  }
+  const lastGt = text.lastIndexOf('>');
+  let out = '';
+  let i = 0;
+  let lt = text.indexOf('<');
+  while (lt !== -1 && lt < lastGt) {
+    if (elementAt(text, lt) !== null) {
+      out += text.slice(i, lt + 1) + ' ';
+      i = lt + 1;
+    }
+    lt = text.indexOf('<', lt + 1);
+  }
+  out += text.slice(i);
   return out.replace(/\s+/g, ' ').trim();
 }
 
