@@ -1,0 +1,131 @@
+name: Source health
+
+# Federated search tolerates a failing source, so a museum retiring an endpoint
+# (the Met's v1 search returning 410) or re-keying its API (Getty's SPARQL
+# endpoint returning 401) reads as "no results" and nothing raises an error.
+# This runs one real query per source through the PUBLISHED package, the same
+# code users run, and opens a tracking issue when any source fails.
+
+on:
+  schedule:
+    - cron: '17 6 * * *' # daily, 06:17 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  TRACKING_ISSUE_TITLE: 'A museum source is failing its live check'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the published package into a clean directory
+        run: |
+          mkdir probe
+          cp scripts/source-health.mjs probe/
+          cd probe
+          npm init -y >/dev/null
+          npm install open-museum-mcp@latest
+          echo "version=$(node -p "require('./node_modules/open-museum-mcp/package.json').version")" >> "$GITHUB_OUTPUT"
+        id: install
+
+      # Two steps so the API keys reach only the step that needs them: the
+      # keyless sources run with no secrets in their environment at all.
+      - name: Query keyless sources
+        id: keyless
+        working-directory: probe
+        env:
+          NODE_OPTIONS: --experimental-sqlite
+        run: |
+          set +e
+          node source-health.mjs --scope keyless > ../report-keyless.txt 2>../stderr-keyless.txt
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          cat ../report-keyless.txt
+
+      - name: Query key-gated sources
+        id: keyed
+        working-directory: probe
+        env:
+          NODE_OPTIONS: --experimental-sqlite
+          EUROPEANA_API_KEY: ${{ secrets.EUROPEANA_API_KEY }}
+          SMITHSONIAN_API_KEY: ${{ secrets.SMITHSONIAN_API_KEY }}
+          HARVARD_API_KEY: ${{ secrets.HARVARD_API_KEY }}
+        run: |
+          set +e
+          node source-health.mjs --scope keyed > ../report-keyed.txt 2>../stderr-keyed.txt
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+          cat ../report-keyed.txt
+
+      - name: Close any open tracking issue (no source failing)
+        if: steps.keyless.outputs.exit == '0' && steps.keyed.outputs.exit == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing=$(gh issue list --state open --search "in:title \"${TRACKING_ISSUE_TITLE}\"" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            {
+              echo "No source is failing against \`open-museum-mcp@${{ steps.install.outputs.version }}\`. Every source that could be checked passed; sources that were skipped or read a bundled snapshot were not verified live:"
+              echo
+              echo '```'
+              tail -n 1 report-keyless.txt
+              tail -n 1 report-keyed.txt
+              echo '```'
+              echo
+              echo "Closing."
+            } > close.md
+            gh issue comment "$existing" --body-file close.md
+            gh issue close "$existing"
+          fi
+
+      - name: Open or update the tracking issue (a source is failing)
+        if: steps.keyless.outputs.exit != '0' || steps.keyed.outputs.exit != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "At least one source failed its live check against \`open-museum-mcp@${{ steps.install.outputs.version }}\`:"
+            echo
+            echo '```'
+            cat report-keyless.txt report-keyed.txt
+            echo '```'
+            echo
+            skipped=$(grep -h '^SKIP' report-keyless.txt report-keyed.txt || true)
+            if [ -n "$skipped" ]; then
+              echo "Not checked at all (no key), so their health is unknown:"
+              echo
+              echo '```'
+              echo "$skipped"
+              echo '```'
+              echo
+            fi
+            if [ -s stderr-keyless.txt ] || [ -s stderr-keyed.txt ]; then
+              echo "Script stderr:"
+              echo
+              echo '```'
+              cat stderr-keyless.txt stderr-keyed.txt
+              echo '```'
+              echo
+            fi
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "This re-checks daily and closes itself once no source is failing."
+          } > body.md
+          existing=$(gh issue list --state open --search "in:title \"${TRACKING_ISSUE_TITLE}\"" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file body.md
+          else
+            gh issue create --title "$TRACKING_ISSUE_TITLE" --body-file body.md
+          fi
+
+      - name: Fail the run so the failure is visible in the Actions tab
+        if: steps.keyless.outputs.exit != '0' || steps.keyed.outputs.exit != '0'
+        run: exit 1

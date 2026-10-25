@@ -198,3 +198,50 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
     expect(raw.media).toBeNull();
   });
 });
+
+describe('Getty search: the SPARQL endpoint now requires an access token', () => {
+  afterEach(() => vi.restoreAllMocks());
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  const unauthorized = () =>
+    new Response(
+      JSON.stringify({ errors: [{ status: 401, title: 'Wrong Authorization Token', detail: 'Authorization token is wrong or missing' }] }),
+      { status: 401, headers: { 'content-type': 'application/json' } },
+    );
+
+  it('fails with an explicit, actionable error on 401 instead of a bare status', async () => {
+    globalThis.fetch = vi.fn(async () => unauthorized()) as unknown as typeof fetch;
+    const err = await gettyFetcher.search('horse', 5).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.message).toContain('Getty search is unavailable');
+    expect(err?.message).toContain('HTTP 401');
+    expect(err?.message).toContain('Known Getty artworks can still be fetched by id');
+  });
+
+  it('treats 403 the same way', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('{}', { status: 403 })) as unknown as typeof fetch;
+    await expect(gettyFetcher.search('horse', 5)).rejects.toThrow(/Getty search is unavailable.*HTTP 403/);
+  });
+
+  it('keeps the plain failure message for other statuses', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('{}', { status: 500 })) as unknown as typeof fetch;
+    await expect(gettyFetcher.search('horse', 5)).rejects.toThrow('Getty SPARQL search failed: 500');
+  });
+
+  it('does not touch get-by-id: getRaw still reads the open object endpoint', async () => {
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      calls.push(String(input));
+      return new Response(JSON.stringify({ id: 'x' }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await gettyFetcher.getRaw('getty:0a2c0f3f-8d20-4a84-b3e3-5d1f6c4b0b1a');
+    expect(calls[0]).toContain('/museum/collection/object/');
+    expect(calls.some((u) => u.includes('/sparql'))).toBe(false);
+  });
+});

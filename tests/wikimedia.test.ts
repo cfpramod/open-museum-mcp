@@ -1011,3 +1011,31 @@ describe('Wikimedia non-displayable originals (image/tiff → displayable full +
     expect(iu.maxResolution).toEqual({ width: 1246, height: 800 });
   });
 });
+
+// Commons extmetadata is free text written by uploaders, and the mapper strips
+// HTML from it before any length cap applies. Tag stripping must stay linear on
+// a long run of unclosed '<' (a `/<[^>]*>/g` replace is quadratic on that input).
+// 100k chars: the linear pass takes well under 100ms; a quadratic pass takes
+// seconds on one field, so a regression fails the 1s ceiling quickly.
+describe('Wikimedia mapper: tag stripping is linear on unclosed "<" runs', () => {
+  const UNCLOSED = '<'.repeat(100_000);
+
+  function withExtField(field: string, value: string): unknown {
+    const raw = fixture('wikimedia-accepted-cc0.json') as {
+      query: { pages: Array<{ imageinfo: Array<{ extmetadata: Record<string, unknown> }> }> };
+    };
+    raw.query.pages[0].imageinfo[0].extmetadata[field] = { value, source: 'commons-desc-page' };
+    return raw;
+  }
+
+  for (const field of ['ObjectName', 'Artist', 'ImageDescription']) {
+    it(`normalizes a 100k unclosed-"<" ${field} in under 1s`, () => {
+      const raw = withExtField(field, `<b>Kept</b> ${UNCLOSED}`);
+      const start = performance.now();
+      const result = wikimediaFetcher.normalize(raw);
+      const elapsed = performance.now() - start;
+      expect(elapsed).toBeLessThan(1000);
+      expect(result.status).toBe('accepted');
+    });
+  }
+});

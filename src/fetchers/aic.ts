@@ -107,7 +107,7 @@ export const aicFetcher: Fetcher = {
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('fields', 'id');
 
-    const res = await httpGet(url);
+    const res = await httpGet(url, { signal: options.signal });
     if (!res.ok) throw new Error(`AIC search failed: ${res.status}`);
     const json = (await res.json()) as { data?: Array<{ id?: unknown }> };
     const data = json.data ?? [];

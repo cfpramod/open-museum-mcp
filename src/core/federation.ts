@@ -14,6 +14,7 @@ import { filterByYearRange } from '../yearFilter.js';
 import type { CacheStore } from './cache.js';
 import { wrapTier0, type Tier0Envelope } from './clearance/envelope.js';
 import { buildClearancePayload } from './clearance/manifest.js';
+import { failedSource, type SourceStatus } from './sourceStatus.js';
 
 // Museum IDs follow `<code>:<segment>(/<segment>)*`. Each segment is
 // alphanumeric, underscore, or hyphen. The four numeric-ID museums (Met,
@@ -28,6 +29,15 @@ export const ID_REGEX = /^[a-z]+:(?!.*\.\.)[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/
 // cap, we'd hammer the upstream and risk rate-limit errors. 8 is empirically
 // gentle and keeps wall-clock time within the same order of magnitude.
 const DEFAULT_FETCH_CONCURRENCY = 8;
+
+// Upper bound on one source's search. Measured live (2026-10-20), a source's
+// search answers in 40 ms to 1.2 s; 15 s is more than ten times the slowest, so
+// it never trims a healthy answer, and it keeps one hung upstream from holding
+// the whole federated query. The object fetches that follow a search (the
+// slow part of a cold facets call) are not covered by this bound.
+const DEFAULT_SOURCE_TIMEOUT_MS = 15_000;
+/** Largest delay `setTimeout` honours (2^31 - 1 ms, about 24.8 days); above it the timer fires at once. */
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 
 // Overfetch buffer: how many candidate IDs to pull per requested result before
 // the rights gate and image filter thin them down. Bumped from 2x to 3x after
@@ -74,6 +84,11 @@ export type SearchParams = z.infer<typeof SearchParamsSchema>;
 export interface SearchResult {
   count: number;
   results: Artwork[];
+  /**
+   * One entry per source queried. A source that errored or timed out is listed
+   * here with the reason; it is NOT silently folded into "no results".
+   */
+  sources: SourceStatus[];
 }
 
 /** One facet value and how many records in the query set carry it. */
@@ -99,6 +114,8 @@ export interface FacetResult {
   artist: FacetCount[];
   /** Colour families present, by count (descending). Records without colour are skipped. */
   colorFamily: FacetCount[];
+  /** One entry per source queried, as on {@link SearchResult}. */
+  sources: SourceStatus[];
 }
 
 // Cap on the artist facet — a swatch/chip list, not the full long tail.
@@ -130,11 +147,27 @@ export interface FederationOptions {
   /** Override the per-museum fetch concurrency cap (default 8). */
   concurrency?: number;
   /**
+   * Longest a single source's search may take, in milliseconds (default 15000).
+   * A source still running at the bound is aborted (its request is cancelled
+   * through `SearchOptions.signal`, and the federation stops waiting even if a
+   * fetcher ignores the signal) and reported as `timeout` in the result's
+   * `sources`, while the other sources answer normally. Must be a positive,
+   * finite number; `createFederation` throws a `RangeError` otherwise.
+   */
+  sourceTimeoutMs?: number;
+  /**
    * Invoked when a fetched record is rejected by its rights gate. Rejections
    * are expected — strict-default-deny is the project's spine — so this is a
    * diagnostic hook, not an error path. The MCP server logs to stderr here.
    */
   onReject?: (id: string, reason: string) => void;
+  /**
+   * Invoked once for each source whose search failed (error or timeout). Like
+   * {@link FederationOptions.onReject} it is a diagnostic hook: the failure is
+   * also returned in the result's `sources`. The message is already sanitised
+   * (no URLs beyond the origin, no keys, tokens, headers or stack traces).
+   */
+  onSourceFailure?: (source: SourceStatus) => void;
   /**
    * Engine version string stamped into a Clearance Manifest's
    * `verification.tool` provenance field. The host (MCP server) supplies its
@@ -209,8 +242,13 @@ function searchCacheKey(
   museum: string | undefined,
   hasImage: boolean,
   overFetch: number,
+  sources: string[],
 ): string {
-  return JSON.stringify({ q: query, m: museum ?? '*', hi: hasImage, of: overFetch });
+  // The sorted source codes are part of the key: a cached list is only valid for
+  // the exact set of sources that produced it. Without them, a source registered
+  // (or restored) after the entry was written would be reported `ok` for a query
+  // it never ran.
+  return JSON.stringify({ q: query, m: museum ?? '*', hi: hasImage, of: overFetch, s: [...sources].sort() });
 }
 
 // Merge per-museum ID lists round-robin (museum 0's first, museum 1's first,
@@ -303,10 +341,58 @@ function countArtists(arts: Artwork[]): FacetCount[] {
 export function createFederation(opts: FederationOptions): Federation {
   const { fetchers, cache } = opts;
   const concurrency = opts.concurrency ?? DEFAULT_FETCH_CONCURRENCY;
+  const requestedTimeoutMs = opts.sourceTimeoutMs ?? DEFAULT_SOURCE_TIMEOUT_MS;
+  if (!Number.isFinite(requestedTimeoutMs) || requestedTimeoutMs <= 0) {
+    throw new RangeError(`sourceTimeoutMs must be a positive, finite number of milliseconds (got ${String(requestedTimeoutMs)})`);
+  }
+  // setTimeout stores its delay in a signed 32-bit integer; anything larger fires
+  // after 1ms, which would time every source out at once. A bound that long means
+  // "effectively none", so it is held at the largest delay a timer accepts.
+  const sourceTimeoutMs = Math.min(requestedTimeoutMs, MAX_TIMER_DELAY_MS);
   const onReject = opts.onReject;
+  const onSourceFailure = opts.onSourceFailure;
   const engineVersion = opts.engineVersion ?? '0.0.0';
   const clock = opts.clock ?? (() => new Date().toISOString());
   const extractColor = opts.extractColor;
+
+  // The hook is a diagnostic for the host, never a gate: a hook that throws (or
+  // returns a rejecting promise) must not turn a partial failure into a failed
+  // search, so both are swallowed.
+  function notifySourceFailure(status: SourceStatus): void {
+    if (!onSourceFailure) return;
+    try {
+      const out: unknown = onSourceFailure(status);
+      if (out && typeof (out as PromiseLike<unknown>).then === 'function') {
+        void Promise.resolve(out).catch(() => undefined);
+      }
+    } catch {
+      // ignored by design
+    }
+  }
+
+  // One source's search under the time bound. At the bound the signal is aborted
+  // (so a cooperating fetcher tears its request down) AND the wait is abandoned
+  // (so a fetcher that ignores the signal cannot hold the federation either).
+  // The abort reason is a TimeoutError, which `classifyFailure` reads as `timeout`.
+  async function searchWithinBound(f: Fetcher, params: SearchParams, overFetch: number): Promise<string[]> {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const bound = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        const reason = new DOMException(`${f.code} search timed out after ${sourceTimeoutMs}ms`, 'TimeoutError');
+        controller.abort(reason);
+        reject(reason);
+      }, sourceTimeoutMs);
+    });
+    try {
+      return await Promise.race([
+        f.search(params.query, overFetch, { hasImage: params.has_image, signal: controller.signal }),
+        bound,
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   async function getArtwork(id: string): Promise<FetchOutcome> {
     if (!ID_REGEX.test(id)) {
@@ -376,7 +462,9 @@ export function createFederation(opts: FederationOptions): Federation {
   // Shared by search() (which then medium-filters + slices) and facets() (which
   // aggregates over it). Deliberately does NOT apply the medium filter or slice,
   // so the medium facet reflects every medium present in the query.
-  async function gatherCandidates(params: SearchParams): Promise<Artwork[]> {
+  async function gatherCandidates(
+    params: SearchParams,
+  ): Promise<{ candidates: Artwork[]; sources: SourceStatus[] }> {
     const fetcherList = params.museum
       ? fetchers[params.museum]
         ? [fetchers[params.museum]]
@@ -387,30 +475,49 @@ export function createFederation(opts: FederationOptions): Federation {
     }
 
     const overFetch = params.has_image ? params.limit * OVERFETCH_FACTOR : params.limit;
-    const cacheKey = searchCacheKey(params.query, params.museum, params.has_image, overFetch);
+    const cacheKey = searchCacheKey(
+      params.query,
+      params.museum,
+      params.has_image,
+      overFetch,
+      fetcherList.map((f) => f.code),
+    );
 
     let allIds = await cache.getQuery(cacheKey);
-    if (!allIds) {
+    let sources: SourceStatus[];
+    if (allIds) {
+      // A cached list is only ever written when every source answered (below),
+      // and the key carries the exact source set, so each queried source was ok
+      // when it was stored. No timing: nothing ran.
+      sources = fetcherList.map((f) => ({ museum: f.code, status: 'ok' as const }));
+    } else {
       // A fetcher's search can throw (museum outage, rate limit, network). We
       // degrade gracefully — a throwing fetcher contributes no ids and the rest
-      // of the federation still answers — but we must NOT cache a partial result:
+      // of the federation still answers — but the failure is reported in
+      // `sources` (and to onSourceFailure), never dropped: a dead museum must not
+      // read as "no results". We must also NOT cache a partial result:
       // `putQuery` has a 14-day TTL, so caching a list that's missing a museum's
       // contributions (or empty, if the only fetcher failed) would serve that
-      // degraded result for two weeks. Track failures and skip the write when any
-      // search threw, so the next call retries upstream.
-      let anySearchFailed = false;
-      const idLists = await Promise.all(
-        fetcherList.map((f) =>
-          f.search(params.query, overFetch, { hasImage: params.has_image }).catch(() => {
-            anySearchFailed = true;
-            return [] as string[];
-          }),
-        ),
+      // degraded result for two weeks. Skip the write when any search threw, so
+      // the next call retries upstream.
+      const settled = await Promise.all(
+        fetcherList.map(async (f): Promise<{ ids: string[]; status: SourceStatus }> => {
+          const started = Date.now();
+          try {
+            const ids = await searchWithinBound(f, params, overFetch);
+            return { ids, status: { museum: f.code, status: 'ok', ms: Date.now() - started } };
+          } catch (err) {
+            const status = failedSource(f.code, err, Date.now() - started);
+            notifySourceFailure(status);
+            return { ids: [], status };
+          }
+        }),
       );
-      allIds = interleaveRoundRobin(idLists);
+      sources = settled.map((r) => r.status);
+      allIds = interleaveRoundRobin(settled.map((r) => r.ids));
       // A genuine empty result (every fetcher resolved with no matches) is still
       // cacheable; only an actual failure suppresses the write.
-      if (!anySearchFailed) {
+      if (sources.every((s) => s.status === 'ok')) {
         await cache.putQuery(cacheKey, allIds);
       }
     }
@@ -426,11 +533,11 @@ export function createFederation(opts: FederationOptions): Federation {
       .map((r) => r.artwork);
     const filtered = accepted.filter((a) => !params.has_image || Boolean(a.imageUrls.full));
     const deduped = dedupeWikimediaUploads(filtered);
-    return filterByYearRange(deduped, params.year_min, params.year_max);
+    return { candidates: filterByYearRange(deduped, params.year_min, params.year_max), sources };
   }
 
   async function search(params: SearchParams): Promise<SearchResult> {
-    const dated = await gatherCandidates(params);
+    const { candidates: dated, sources } = await gatherCandidates(params);
     // Medium is a post-fetch filter on the normalized category (like the year
     // filter), not an upstream search constraint. Because it runs over the
     // bounded overfetch window, a medium that is sparse in that window can leave
@@ -472,18 +579,19 @@ export function createFederation(opts: FederationOptions): Federation {
     const page = ordered.slice(0, params.limit);
     const results = params.color ? page : page.sort((a, b) => a.id.localeCompare(b.id));
 
-    return { count: results.length, results };
+    return { count: results.length, results, sources };
   }
 
   async function facets(params: SearchParams): Promise<FacetResult> {
     // Override the caller's page `limit` with the larger facet sample window so
     // counts reflect a meaningful slice of the query, not one search page.
-    const candidates = await gatherCandidates({ ...params, limit: FACET_SAMPLE_SIZE });
+    const { candidates, sources } = await gatherCandidates({ ...params, limit: FACET_SAMPLE_SIZE });
     return {
       medium: countMedium(candidates),
       dateBucket: countDateBuckets(candidates),
       artist: countArtists(candidates),
       colorFamily: countColorFamily(candidates),
+      sources,
     };
   }
 

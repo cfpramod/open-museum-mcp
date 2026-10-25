@@ -12,6 +12,7 @@ import type { Fetcher } from './types.js';
 import { waltersFetcher } from './walters.js';
 import { wellcomeFetcher } from './wellcome.js';
 import { wikimediaFetcher } from './wikimedia.js';
+import { ycbaFetcher } from './ycba.js';
 
 /**
  * Static, per-source metadata a host needs to DESCRIBE the federation's
@@ -41,6 +42,7 @@ const ALL_FETCHERS: readonly Fetcher[] = [
   wellcomeFetcher,
   ngaFetcher,
   gettyFetcher,
+  ycbaFetcher,
   europeanaFetcher,
   smithsonianFetcher,
   harvardFetcher,

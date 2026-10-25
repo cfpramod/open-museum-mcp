@@ -117,6 +117,146 @@ describe('Met adapter search (relevance)', () => {
   });
 });
 
+describe('Met adapter search endpoint (v1.1, paginated)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // The Met retired `/public/collection/v1/search` (HTTP 410) and replaced it with
+  // the paginated `/v1.1/search`. These tests pin the request contract so a revert
+  // to the retired path, or a request the new endpoint would clamp, fails here.
+  function stubPages(all: number[], opts: { cap?: number } = {}) {
+    const requests: URL[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        const url = new URL(String(input));
+        requests.push(url);
+        const offset = Number(url.searchParams.get('offset') ?? 0);
+        const asked = Number(url.searchParams.get('limit') ?? 100);
+        const size = Math.min(asked, opts.cap ?? 500);
+        const objectIDs = all.slice(offset, offset + size);
+        return new Response(JSON.stringify({ total: all.length, objectIDs }), { status: 200 });
+      }),
+    );
+    return requests;
+  }
+
+  it('targets the v1.1 search path, never the retired v1 one', async () => {
+    const requests = stubPages([1, 2, 3]);
+    await metFetcher.search('horse', 5);
+    expect(requests).toHaveLength(1);
+    expect(requests[0].pathname).toBe('/public/collection/v1.1/search');
+  });
+
+  it('asks for exactly the requested count with an explicit offset', async () => {
+    const requests = stubPages(Array.from({ length: 300 }, (_, i) => i + 1));
+    const ids = await metFetcher.search('horse', 20);
+    expect(requests[0].searchParams.get('limit')).toBe('20');
+    expect(requests[0].searchParams.get('offset')).toBe('0');
+    expect(ids).toHaveLength(20);
+    expect(ids[0]).toBe('met:1');
+  });
+
+  it('pages past the 500-per-call ceiling and preserves upstream order', async () => {
+    const all = Array.from({ length: 1200 }, (_, i) => i + 1);
+    const requests = stubPages(all);
+    const ids = await metFetcher.search('horse', 1100);
+    expect(ids).toHaveLength(1100);
+    expect(ids[0]).toBe('met:1');
+    expect(ids[1099]).toBe('met:1100');
+    expect(requests.map((r) => r.searchParams.get('offset'))).toEqual(['0', '500', '1000']);
+    expect(requests.every((r) => Number(r.searchParams.get('limit')) <= 500)).toBe(true);
+  });
+
+  it('stops when the result set is exhausted instead of re-requesting', async () => {
+    const requests = stubPages([7, 8, 9]);
+    const ids = await metFetcher.search('rare query', 50);
+    expect(ids).toEqual(['met:7', 'met:8', 'met:9']);
+    expect(requests).toHaveLength(1);
+  });
+
+  it('returns an empty list for a query with no matches', async () => {
+    stubPages([]);
+    expect(await metFetcher.search('zxqwvk', 10)).toEqual([]);
+  });
+
+  it('treats a null objectIDs body as no matches', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ total: 0, objectIDs: null }), { status: 200 })),
+    );
+    expect(await metFetcher.search('nothing', 10)).toEqual([]);
+  });
+
+  it('drops malformed ids rather than emitting an id the route regex would reject', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ total: 4, objectIDs: [5, 'x', -1, null, 6] }), { status: 200 }),
+      ),
+    );
+    expect(await metFetcher.search('q', 10)).toEqual(['met:5', 'met:6']);
+  });
+
+  it('advances the next offset by the raw count the server sent, not the validated count', async () => {
+    // Page 1 carries a malformed ID. If the offset followed the validated count
+    // (2) rather than the raw count (3), page 2 would re-read from the wrong place.
+    const pages: Record<string, unknown[]> = { '0': [1, 'x', 2], '3': [3, 4, 5] };
+    const offsets: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        const offset = new URL(String(input)).searchParams.get('offset') ?? '0';
+        offsets.push(offset);
+        return new Response(JSON.stringify({ total: 6, objectIDs: pages[offset] ?? [] }), { status: 200 });
+      }),
+    );
+    const ids = await metFetcher.search('q', 5);
+    expect(offsets).toEqual(['0', '3']);
+    expect(ids).toEqual(['met:1', 'met:2', 'met:3', 'met:4', 'met:5']);
+  });
+
+  it('returns each id once when the same id ends one page and starts the next', async () => {
+    const pages: Record<string, number[]> = { '0': [1, 2, 3], '3': [3, 4, 5] };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        const offset = new URL(String(input)).searchParams.get('offset') ?? '0';
+        return new Response(JSON.stringify({ total: 6, objectIDs: pages[offset] ?? [] }), { status: 200 });
+      }),
+    );
+    const ids = await metFetcher.search('q', 5);
+    expect(ids).toEqual(['met:1', 'met:2', 'met:3', 'met:4', 'met:5']);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('surfaces a retired-endpoint response as an error, not as zero results', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ message: 'retired' }), { status: 410 })),
+    );
+    await expect(metFetcher.search('horse', 10)).rejects.toThrow(/Met search failed: 410/);
+  });
+
+  it('bounds the page loop if upstream keeps returning non-empty pages', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ total: 1e9, objectIDs: [1, 2, 3] }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await metFetcher.search('loop', 1_000_000);
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(10);
+  });
+
+  it('returns nothing for a non-positive limit without calling upstream', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await metFetcher.search('horse', 0)).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('Met adapter mediumCategory', () => {
   it('normalizes the raw `medium` field to the controlled vocab', () => {
     const result = metFetcher.normalize(fixture('met-tang-fixture.json'));

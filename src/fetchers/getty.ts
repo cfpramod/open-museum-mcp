@@ -152,7 +152,17 @@ SELECT DISTINCT ?obj WHERE {
 
     const url = new URL(SPARQL_ENDPOINT);
     url.searchParams.set('query', sparql);
-    const res = await httpGet(url, { headers: { Accept: 'application/sparql-results+json' } });
+    const res = await httpGet(url, { headers: { Accept: 'application/sparql-results+json' }, signal: options.signal });
+    if (res.status === 401 || res.status === 403) {
+      // Since 2026-10-12 data.getty.edu answers every unauthenticated SPARQL
+      // request with 401 "Wrong Authorization Token". Only search is gated:
+      // object lookups by known id (getRaw) are still open. We have no
+      // documented token, so say what happened rather than a bare status.
+      throw new Error(
+        `Getty search is unavailable: data.getty.edu now rejects unauthenticated SPARQL requests (HTTP ${res.status}). ` +
+          'Known Getty artworks can still be fetched by id; search needs an access token from the Getty.',
+      );
+    }
     if (!res.ok) throw new Error(`Getty SPARQL search failed: ${res.status}`);
     const json = (await res.json()) as { results?: { bindings?: Array<{ obj?: { value?: string } }> } };
     const bindings = json.results?.bindings ?? [];
