@@ -625,7 +625,21 @@ describe('stripHtml: control characters', () => {
 
   it('removes literal control characters, NUL included', () => {
     expect(stripHtml('Sun\u0000flowers')).toBe('Sunflowers');
-    expect(stripHtml('a\u0001\u0008\u000E\u001F\u007F\u0080\u0085\u009Fb')).toBe('ab');
+    expect(stripHtml('a\u0001\u0008\u000E\u001F\u007F\u0081\u008D\u008F\u0090\u009Db')).toBe('ab');
+  });
+
+  it('reads a literal C1 character exactly as its reference, 0x80-0x9F', () => {
+    for (let cp = 0x80; cp <= 0x9f; cp++) {
+      const literal = stripHtml(`a${String.fromCodePoint(cp)}b`);
+      expect(literal, `U+${cp.toString(16)}`).toBe(stripHtml(`a&#${cp};b`));
+      expect(literal, `U+${cp.toString(16)}`).toBe(stripHtml(`a&#x${cp.toString(16)};b`));
+    }
+  });
+
+  it('keeps words apart when windows-1252 text was decoded as Latin-1', () => {
+    expect(stripHtml('1900\u00961910')).toBe('1900\u20131910');
+    expect(stripHtml('Monet\u0092s')).toBe('Monet\u2019s');
+    expect(stripHtml('word\u0085word')).toBe('word\u2026word');
   });
 
   it('removes decoded control characters that are not whitespace', () => {
