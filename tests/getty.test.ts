@@ -120,7 +120,7 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
     return { ...(fixture('getty-object-accepted.json') as Record<string, unknown>), shows: [{ id: showsId }] };
   }
 
-  it('does NOT fetch shows[0].id when its host is not *.getty.edu (SSRF vector)', async () => {
+  it('does NOT fetch shows[0].id when its host is not data.getty.edu (SSRF vector)', async () => {
     const objectUrl = 'http://169.254.169.254/latest/meta-data/iam/security-credentials/';
     const calls: string[] = [];
     globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
@@ -137,58 +137,74 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
     expect(raw.media).toBeNull();
   });
 
-  it('does NOT fetch a plausible-but-wrong lookalike host (evil-getty.edu / getty.edu.evil.com)', async () => {
-    // Each carries the real media-image path, so only the host check can refuse it.
-    for (const lookalike of [
-      'https://evil-getty.edu/media/image/x',
-      'https://media.getty.edu.evil.com/media/image/x',
-      'https://xgetty.edu/media/image/x',
-      'http://169.254.169.254/media/image/x',
-    ]) {
-      const calls: string[] = [];
-      globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-        const url = String(input);
-        calls.push(url);
-        return new Response(JSON.stringify(objectFixtureWithShowsId(lookalike)), { status: 200 });
-      }) as unknown as typeof fetch;
+  const MEDIA_ID = 'b2296365-f0ee-5fe7-91fb-2d4b2b683ade';
+  const MEDIA_URL = `https://data.getty.edu/media/image/${MEDIA_ID}`;
 
+  // Records each fetched URL; serves the media fixture for the exact media URL
+  // and the object (whose only `shows` entry is showsId) for everything else.
+  function serveShowsId(showsId: string): string[] {
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      if (url === MEDIA_URL) return new Response(JSON.stringify(fixture('getty-media-accepted.json')), { status: 200 });
+      return new Response(JSON.stringify(objectFixtureWithShowsId(showsId)), { status: 200 });
+    }) as unknown as typeof fetch;
+    return calls;
+  }
+
+  it('does NOT fetch a host other than data.getty.edu, or a non-https or credentialed URL', async () => {
+    // Each carries the real media-image path, so only the origin checks can refuse it.
+    for (const refused of [
+      `https://evil-getty.edu/media/image/${MEDIA_ID}`,
+      `https://data.getty.edu.evil.com/media/image/${MEDIA_ID}`,
+      `https://xgetty.edu/media/image/${MEDIA_ID}`,
+      `https://media.getty.edu/media/image/${MEDIA_ID}`,
+      `https://getty.edu/media/image/${MEDIA_ID}`,
+      `http://169.254.169.254/media/image/${MEDIA_ID}`,
+      `http://data.getty.edu/media/image/${MEDIA_ID}`,
+      `https://data.getty.edu:8443/media/image/${MEDIA_ID}`,
+      `https://user@data.getty.edu/media/image/${MEDIA_ID}`,
+      `https://user:pass@data.getty.edu/media/image/${MEDIA_ID}`,
+      `https://:pass@data.getty.edu/media/image/${MEDIA_ID}`,
+    ]) {
+      const calls = serveShowsId(refused);
       const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
-      expect(calls).toHaveLength(1);
+      expect(calls, refused).toHaveLength(1);
       expect(raw.media).toBeNull();
     }
   });
 
-  it('DOES fetch a legitimate media.getty.edu URL (no coverage loss from the guard)', async () => {
-    const mediaUrl = 'https://media.getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade';
-    let mediaFetched = false;
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url === mediaUrl) {
-        mediaFetched = true;
-        return new Response(JSON.stringify(fixture('getty-media-accepted.json')), { status: 200 });
-      }
-      return new Response(JSON.stringify(objectFixtureWithShowsId(mediaUrl)), { status: 200 });
-    }) as unknown as typeof fetch;
+  it('does NOT fetch a data.getty.edu media URL with a query, fragment, case change or non-UUID id', async () => {
+    for (const refused of [
+      `${MEDIA_URL}?x=1`,
+      `${MEDIA_URL}#f`,
+      `https://data.getty.edu/Media/Image/${MEDIA_ID}`,
+      `https://data.getty.edu/media/image/${MEDIA_ID.toUpperCase()}`,
+      'https://data.getty.edu/media/image/a%2F..%2Fx',
+      `${MEDIA_URL};x`,
+      `${MEDIA_URL}/`,
+    ]) {
+      const calls = serveShowsId(refused);
+      const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
+      expect(calls, refused).toHaveLength(1);
+      expect(raw.media).toBeNull();
+    }
+  });
 
+  it('DOES fetch the data.getty.edu media image URL, exactly as listed', async () => {
+    const calls = serveShowsId(MEDIA_URL);
     const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
-    expect(mediaFetched).toBe(true);
+    expect(calls[1]).toBe(MEDIA_URL);
     expect(raw.media).not.toBeNull();
   });
 
-  it('DOES fetch the bare getty.edu apex host (no subdomain)', async () => {
-    const mediaUrl = 'https://getty.edu/media/image/b2296365-f0ee-5fe7-91fb-2d4b2b683ade';
-    let mediaFetched = false;
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url === mediaUrl) {
-        mediaFetched = true;
-        return new Response(JSON.stringify(fixture('getty-media-accepted.json')), { status: 200 });
-      }
-      return new Response(JSON.stringify(objectFixtureWithShowsId(mediaUrl)), { status: 200 });
-    }) as unknown as typeof fetch;
-
-    await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb');
-    expect(mediaFetched).toBe(true);
+  it('fetches the URL rebuilt from origin and path, so a bare "?" or "#" is not sent', async () => {
+    for (const listed of [`${MEDIA_URL}?`, `${MEDIA_URL}#`]) {
+      const calls = serveShowsId(listed);
+      await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb');
+      expect(calls[1], listed).toBe(MEDIA_URL);
+    }
   });
 
   it('does NOT fetch a malformed shows[0].id that fails URL parsing', async () => {
@@ -263,7 +279,10 @@ describe('Getty getRaw: the image is the first `shows` entry that is a media ima
   it('never fetches a getty.edu `shows` entry that is not a media image, and fetches nothing when no media image is listed', async () => {
     const subjects = 'https://data.getty.edu/museum/collection/object/11271ba2-af4a-4062-aba3-35bc24c5428e/subjects';
     // The media-image path must be the whole path, not a segment inside another one.
-    const shows = [subjects, `${subjects}/media/image/x`, 'https://data.getty.edu/media/image/x/extra'].map((id) => ({ id }));
+    const mediaId = 'a8f22509-9a55-5328-a2dc-dda0b250a4e0';
+    const shows = [subjects, `${subjects}/media/image/${mediaId}`, `https://data.getty.edu/media/image/${mediaId}/extra`].map(
+      (id) => ({ id }),
+    );
     const object = { ...(fixture('getty-object-accepted-image-not-first.json') as Record<string, unknown>), shows };
     const calls: string[] = [];
     vi.stubGlobal(

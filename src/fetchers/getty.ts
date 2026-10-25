@@ -37,30 +37,41 @@ function idFromUri(uri: string): string {
 // hydration URL from a fixed API host + a validated numeric/UUID id. `fetch`
 // on Node routes `localhost`/`169.254.169.254`/private ranges, so an
 // unvalidated host here is a real SSRF surface, not a Workers-inert one.
-// Positive host-allowlist (not a private-range blocklist): Getty's media
-// entities live at `media.getty.edu`/`data.getty.edu`, so requiring the
-// `getty.edu` apex or a subdomain of it costs zero real coverage. `endsWith`
-// is anchored on the literal `.` separator, so a lookalike like
-// `evil-getty.edu` or `media.getty.edu.evil.com` does not match.
-const GETTY_APEX_HOST = 'getty.edu';
-function isGettyMediaHost(uri: string): boolean {
-  try {
-    const host = new URL(uri).hostname;
-    return host === GETTY_APEX_HOST || host.endsWith(`.${GETTY_APEX_HOST}`);
-  } catch {
-    return false;
-  }
-}
-
+// Positive allowlist of one exact shape (not a private-range blocklist): every
+// media URL in the `shows` lists of 204 live records (288 URLs, 2026-10-25)
+// was `https://data.getty.edu/media/image/<lowercase uuid>` with no query or
+// fragment, so requiring exactly that costs no real coverage. The host is
+// compared whole, so a lookalike like `evil-getty.edu` or
+// `data.getty.edu.evil.com` does not match.
+//
 // `shows` lists every VisualItem the object shows, not only images. On many
 // records shows[0] is the object's own subject-terms item
 // (`.../object/<uuid>/subjects`), also on data.getty.edu, and the media image
 // comes after it. Only a `media/image/<uuid>` entity carries image rights, so
 // the image is the first entry with that path, wherever it sits.
-const MEDIA_IMAGE_PATH = /^\/media\/image\/[^/]+$/;
-function isGettyMediaImage(uri: string): boolean {
-  if (!isGettyMediaHost(uri)) return false;
-  return MEDIA_IMAGE_PATH.test(new URL(uri).pathname);
+//
+// Returns the URL to fetch, rebuilt from the parsed origin and path, so the
+// request never carries anything the checks did not see (a bare `?` or `#`
+// parses to an empty search or hash but stays in the raw string).
+const GETTY_MEDIA_HOST = 'data.getty.edu';
+const MEDIA_IMAGE_PATH = /^\/media\/image\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+function gettyMediaImageUrl(uri: string): string | undefined {
+  let u: URL;
+  try {
+    u = new URL(uri);
+  } catch {
+    return undefined;
+  }
+  const exact =
+    u.protocol === 'https:' &&
+    u.hostname === GETTY_MEDIA_HOST &&
+    u.port === '' &&
+    u.username === '' &&
+    u.password === '' &&
+    u.search === '' &&
+    u.hash === '' &&
+    MEDIA_IMAGE_PATH.test(u.pathname);
+  return exact ? `${u.origin}${u.pathname}` : undefined;
 }
 
 const reject = (id: string, reason: string, rawSnapshot: unknown): ValidationResult =>
@@ -140,7 +151,7 @@ function findDimensionValue(dimensions: unknown, label: string): number | undefi
 
 interface GettyRaw {
   object: unknown;
-  /** The primary (first `shows`) image's media entity, or null if none/unfetchable. */
+  /** The first media image in `shows`, as its media entity, or null if none/unfetchable. */
   media: unknown;
 }
 
@@ -197,8 +208,8 @@ SELECT DISTINCT ?obj WHERE {
       ? ((object as Record<string, unknown>).shows as Array<Record<string, unknown>>)
       : [];
     const firstImageUri = shows
-      .map((s) => asOptionalString(s?.id))
-      .find((uri): uri is string => uri !== undefined && isGettyMediaImage(uri));
+      .map((s) => gettyMediaImageUrl(asOptionalString(s?.id) ?? ''))
+      .find((url): url is string => url !== undefined);
     let media: unknown = null;
     if (firstImageUri) {
       try {
