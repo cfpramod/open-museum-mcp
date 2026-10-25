@@ -7,6 +7,10 @@
  *   3. Decompression bomb: uncompressed pixel cap before decode
  */
 
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { aicFetcher } from '../src/fetchers/aic.js';
 import { clevelandFetcher } from '../src/fetchers/cleveland.js';
@@ -14,6 +18,7 @@ import { europeanaFetcher } from '../src/fetchers/europeana.js';
 import { metFetcher } from '../src/fetchers/met.js';
 import { wikimediaFetcher } from '../src/fetchers/wikimedia.js';
 import { createColorExtractor, isSafeImageUrl } from '../src/color/extract.js';
+import { Cache } from '../src/db.js';
 import { parseDisplayDate } from '../src/dateParser.js';
 import { sanitizeTitle, stripHtml } from '../src/fetchers/sanitize.js';
 import type { Artwork } from '../src/types.js';
@@ -566,7 +571,6 @@ describe('stripHtml — numeric character references outside the Unicode range',
     expect(stripHtml('&#1114111;')).toBe(String.fromCodePoint(0x10ffff));
     expect(stripHtml('&#xD7FF;')).toBe(String.fromCodePoint(0xd7ff));
     expect(stripHtml('&#xE000;')).toBe(String.fromCodePoint(0xe000));
-    expect(stripHtml('x&#0;y')).toBe(`x${String.fromCodePoint(0)}y`);
   });
 
   it('still decodes ordinary references, including leading zeros and astral characters', () => {
@@ -582,6 +586,86 @@ describe('stripHtml — numeric character references outside the Unicode range',
     }).not.toThrow();
     accepted(result!);
     expect(result!.artwork.title).toBe('Sunflowers &#99999999; &#x110000; &#xD800; & été');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Control characters. Numeric references follow the HTML spec's numeric
+// character reference end state: &#0; becomes U+FFFD and &#x80;-&#x9F; are read
+// as windows-1252. Every other control character is removed from the whole
+// output, literal or decoded. A NUL in a title truncated the cache's `title`
+// column while `full_record` kept the whole string.
+// ---------------------------------------------------------------------------
+
+// The HTML spec's replacement table for numeric references 0x80-0x9F. The five
+// code points it leaves out (0x81, 0x8D, 0x8F, 0x90, 0x9D) stay C1 controls.
+const WINDOWS_1252: Record<number, number> = {
+  0x80: 0x20ac, 0x82: 0x201a, 0x83: 0x0192, 0x84: 0x201e, 0x85: 0x2026, 0x86: 0x2020,
+  0x87: 0x2021, 0x88: 0x02c6, 0x89: 0x2030, 0x8a: 0x0160, 0x8b: 0x2039, 0x8c: 0x0152,
+  0x8e: 0x017d, 0x91: 0x2018, 0x92: 0x2019, 0x93: 0x201c, 0x94: 0x201d, 0x95: 0x2022,
+  0x96: 0x2013, 0x97: 0x2014, 0x98: 0x02dc, 0x99: 0x2122, 0x9a: 0x0161, 0x9b: 0x203a,
+  0x9c: 0x0153, 0x9e: 0x017e, 0x9f: 0x0178,
+};
+
+describe('stripHtml: control characters', () => {
+  it('turns a reference to code point 0 into U+FFFD', () => {
+    expect(stripHtml('x&#0;y')).toBe('x\uFFFDy');
+    expect(stripHtml('x&#x0;y')).toBe('x\uFFFDy');
+    expect(stripHtml('x&#0000;y')).toBe('x\uFFFDy');
+  });
+
+  it('reads references 0x80-0x9F through the windows-1252 table', () => {
+    for (let cp = 0x80; cp <= 0x9f; cp++) {
+      const expected = WINDOWS_1252[cp] === undefined ? '' : String.fromCodePoint(WINDOWS_1252[cp]);
+      expect(stripHtml(`a&#${cp};b`), `&#${cp};`).toBe(`a${expected}b`);
+      expect(stripHtml(`a&#x${cp.toString(16)};b`), `&#x${cp.toString(16)};`).toBe(`a${expected}b`);
+    }
+    expect(stripHtml('&#x93;Irises&#x94; &#x96; 1889')).toBe('\u201CIrises\u201D \u2013 1889');
+  });
+
+  it('removes literal control characters, NUL included', () => {
+    expect(stripHtml('Sun\u0000flowers')).toBe('Sunflowers');
+    expect(stripHtml('a\u0001\u0008\u000E\u001F\u007F\u0080\u0085\u009Fb')).toBe('ab');
+  });
+
+  it('removes decoded control characters that are not whitespace', () => {
+    expect(stripHtml('a&#1;&#x1B;&#127;&#x81;&#x9D;b')).toBe('ab');
+  });
+
+  it('keeps whitespace controls as word separators, literal and decoded', () => {
+    expect(stripHtml('a\tb\nc\rd\fe\vf')).toBe('a b c d e f');
+    expect(stripHtml('a&#9;b&#10;c&#13;d&#x0C;e')).toBe('a b c d e');
+  });
+
+  it('collapses the whitespace around a removed control', () => {
+    expect(stripHtml('a \u0000 b')).toBe('a b');
+    expect(stripHtml('\u0000 a \u0001')).toBe('a');
+  });
+
+  it('leaves non-control characters alone, U+FFFD included', () => {
+    expect(stripHtml('caf\u00E9 \uFFFD \u200B \u{1F3A8}')).toBe('caf\u00E9 \uFFFD \u200B \u{1F3A8}');
+  });
+
+  it('met: the cached title column matches full_record.title when the source title holds a NUL', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'omm-ctrl-'));
+    try {
+      const path = join(dir, 'cache.db');
+      const result = metFetcher.normalize(metRaw({ title: 'Sun\u0000flowers &#0; &#x93;study&#x94;' }));
+      accepted(result);
+      expect(result.artwork.title).toBe('Sunflowers \uFFFD \u201Cstudy\u201D');
+      const cache = new Cache({ path });
+      cache.upsertObject(result.artwork);
+      const db = new DatabaseSync(path);
+      const row = db.prepare('SELECT title, full_record FROM objects WHERE id = ?').get(result.artwork.id) as {
+        title: string;
+        full_record: string;
+      };
+      db.close();
+      expect(row.title).toBe((JSON.parse(row.full_record) as Artwork).title);
+      expect(row.title).toBe('Sunflowers \uFFFD \u201Cstudy\u201D');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
