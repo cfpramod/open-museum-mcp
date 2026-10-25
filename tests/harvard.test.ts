@@ -58,37 +58,31 @@ describe('Harvard search query construction', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('sends the API key + hasimage filter and parses numeric ids', async () => {
-    const prev = process.env.HARVARD_API_KEY;
-    process.env.HARVARD_API_KEY = 'test-key';
+    vi.stubEnv('HARVARD_API_KEY', 'test-key');
     let capturedUrl = '';
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       capturedUrl = String(input);
       return new Response(JSON.stringify({ records: [{ id: 299918 }, { id: 303829 }] }), { status: 200 });
-    }) as unknown as typeof fetch;
+    }));
     const ids = await harvardFetcher.search('mughal', 5);
     expect(capturedUrl).toContain('apikey=test-key');
     expect(capturedUrl).toContain('hasimage=1');
     expect(ids).toEqual(['harvard:299918', 'harvard:303829']);
-    if (prev === undefined) delete process.env.HARVARD_API_KEY;
-    else process.env.HARVARD_API_KEY = prev;
   });
 
   // `q` ORs every term (stop words included) and ranks one verbose record first for
   // any common word; `keyword` requires all content terms. Pin which one is sent.
   it('searches with the AND-semantics `keyword` parameter, never the OR-matching `q`', async () => {
-    const prev = process.env.HARVARD_API_KEY;
-    process.env.HARVARD_API_KEY = 'test-key';
+    vi.stubEnv('HARVARD_API_KEY', 'test-key');
     let captured: URL | undefined;
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       captured = new URL(String(input));
       return new Response(JSON.stringify({ records: [] }), { status: 200 });
-    }) as unknown as typeof fetch;
+    }));
     await harvardFetcher.search('two cows in a landscape', 5);
     expect(captured?.searchParams.get('keyword')).toBe('two cows in a landscape');
     expect(captured?.searchParams.has('q')).toBe(false);
     expect(captured?.searchParams.get('sort')).toBe('rank');
-    if (prev === undefined) delete process.env.HARVARD_API_KEY;
-    else process.env.HARVARD_API_KEY = prev;
   });
 });
 

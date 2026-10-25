@@ -80,10 +80,10 @@ describe('Wellcome search query construction', () => {
 
   it('pushes workType=Pictures + cc0,pdm licence filters server-side', async () => {
     let capturedUrl = '';
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       capturedUrl = String(input);
       return new Response(JSON.stringify({ results: [{ id: 'abc12345' }, { id: 'def67890' }] }), { status: 200 });
-    }) as unknown as typeof fetch;
+    }));
     const ids = await wellcomeFetcher.search('anatomy', 5);
     const decoded = decodeURIComponent(capturedUrl);
     expect(decoded).toContain('workType=k');
