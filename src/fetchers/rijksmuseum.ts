@@ -52,9 +52,16 @@ function classifierIds(node: Record<string, unknown>): string[] {
     .filter(Boolean);
 }
 
-/** Pick the primary title (AAT 300404670), preferring the English-language Name. */
-function pickTitle(object: Record<string, unknown>): string {
-  const names = arr(object.identified_by).filter(isObj);
+function hasAat(node: Record<string, unknown>, aat: string): boolean {
+  return classifierIds(node).some((id) => id.endsWith(`/aat/${aat}`));
+}
+
+/**
+ * Pick the primary name (AAT 300404670), preferring the English-language Name:
+ * an object's title, or a person record's display name.
+ */
+function pickPrimaryName(entity: Record<string, unknown>): string {
+  const names = arr(entity.identified_by).filter(isObj);
   const primaries = names.filter((n) => classifierIds(n).some((id) => id.includes(AAT_PRIMARY_TITLE)));
   const pool = primaries.length ? primaries : names;
   const english = pool.find((n) =>
@@ -65,28 +72,151 @@ function pickTitle(object: Record<string, unknown>): string {
   return str((english ?? pool[0])?.content);
 }
 
-/** Collect creator display names from produced_by(.part[]).carried_out_by[]. */
-function pickCreators(object: Record<string, unknown>): string[] {
+/** An actor's inline display name, preferring the English notation. */
+function notationName(actor: Record<string, unknown>): string {
+  const notations = arr(actor.notation).filter(isObj);
+  const en = notations.find((n) => str(n['@language']) === 'en');
+  return str((en ?? notations[0])?.['@value']);
+}
+
+// Attribution qualifiers on an AttributeAssignment of `carried_out_by`, mapped to
+// the wording the museum puts before the name. Rijks also uses 300435722
+// ("possibly", a weaker attribution than "attributed to") and no qualifier at
+// all (shown as "mentioned on object": the name is inscribed on the object, which
+// does not make that person its maker). No attribution type says either without
+// claiming more than the museum does, so both stay out of the credit.
+const ATTRIBUTION_QUALIFIERS = new Map<string, string>([['300404269', 'attributed to']]);
+
+// The short credit text a production part carries when the museum credits it
+// (AAT 300435417, "abstract note": "attributed to Adriaen Matham"). Role parts
+// such as "after own design by" carry none and are not in the museum's credit line.
+const AAT_CREDIT_TEXT = '300435417';
+
+// Person records fetched per object. No record in a live sample of 376 needed
+// more than one; the cap bounds what an upstream record can make us fetch.
+const PERSON_FETCH_CAP = 6;
+const PERSON_TIMEOUT_MS = 10_000;
+
+/** A person reference we may dereference: only the museum's own numeric ids. */
+const PERSON_URI = /^https:\/\/id\.rijksmuseum\.nl\/\d+$/;
+
+type Maker = { direct: true; uri: string; name: string } | { direct: false; qualifier: string; uri: string; name: string };
+
+/**
+ * The makers of produced_by(.part[]), in the museum's order: actors who
+ * carried_out_by directly, and actors attributed by a mapped qualifier
+ * (produced_by.part[].assigned_by[], which names them by a bare reference) on a
+ * part the museum credits.
+ */
+function pickMakers(object: Record<string, unknown>): Maker[] {
   const produced = isObj(object.produced_by) ? object.produced_by : undefined;
   if (!produced) return [];
-  const actors: Record<string, unknown>[] = [];
+  const makers: Maker[] = [];
   for (const carrier of [produced, ...arr(produced.part).filter(isObj)]) {
-    for (const a of arr((carrier as Record<string, unknown>).carried_out_by).filter(isObj)) actors.push(a);
+    for (const actor of arr(carrier.carried_out_by).filter(isObj)) {
+      makers.push({ direct: true, uri: str(actor.id), name: notationName(actor) });
+    }
+    const credited = arr(carrier.referred_to_by).filter(isObj).some((r) => hasAat(r, AAT_CREDIT_TEXT));
+    if (!credited) continue;
+    for (const assignment of arr(carrier.assigned_by).filter(isObj)) {
+      if (str(assignment.assigned_property) !== 'carried_out_by') continue;
+      const qualifier = [...ATTRIBUTION_QUALIFIERS].find(([aat]) => hasAat(assignment, aat))?.[1];
+      if (!qualifier) continue;
+      for (const actor of arr(assignment.assigned).filter(isObj)) {
+        makers.push({ direct: false, qualifier, uri: str(actor.id), name: notationName(actor) });
+      }
+    }
   }
-  const names: string[] = [];
-  for (const actor of actors) {
-    const notations = arr(actor.notation).filter(isObj);
-    const en = notations.find((n) => str(n['@language']) === 'en');
-    const name = str((en ?? notations[0])?.['@value']);
-    if (name && !names.includes(name)) names.push(name);
+  return makers;
+}
+
+/** Attributed makers named only by reference, whose person record getRaw fetches. */
+function unnamedAttributedUris(object: Record<string, unknown>): string[] {
+  const makers = pickMakers(object);
+  const directUris = new Set(makers.filter((m) => m.direct).map((m) => m.uri));
+  const uris = makers.flatMap((m) => (!m.direct && !m.name && !directUris.has(m.uri) && PERSON_URI.test(m.uri) ? [m.uri] : []));
+  return [...new Set(uris)];
+}
+
+/**
+ * The name of a person record. Only a 404 or 410 (the museum no longer has the
+ * person) yields ''; a timeout, network error, other status, unreadable body or
+ * body that is not a person record throws, since a credit built without that
+ * maker must not be cached.
+ */
+async function fetchPersonName(uri: string): Promise<string> {
+  try {
+    const res = await httpGet(uri, {
+      headers: { Accept: 'application/ld+json' },
+      signal: AbortSignal.timeout(PERSON_TIMEOUT_MS),
+      redirect: 'error',
+    });
+    if (res.status === 404 || res.status === 410) return '';
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const person: unknown = await res.json();
+    if (!isObj(person) || Array.isArray(person)) throw new Error('body is not a person record');
+    return pickPrimaryName(person);
+  } catch (err) {
+    throw new Error(`Rijksmuseum person fetch failed for ${uri}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+type Credit = { name: string; attributed: boolean };
+
+/**
+ * Credit names in the museum's order, an attributed one carrying its qualifier.
+ * A person the museum also credits directly, in another role, is credited once
+ * by the bare name, as the museum's own page does.
+ */
+function pickCreators(object: Record<string, unknown>, personNames: ReadonlyMap<string, string>): Credit[] {
+  const makers = pickMakers(object);
+  const direct = makers.filter((m) => m.direct);
+  const directUris = new Set(direct.map((m) => m.uri).filter(Boolean));
+  const directNames = new Set(direct.map((m) => m.name).filter(Boolean));
+  const credits: Credit[] = [];
+  for (const maker of makers) {
+    let name = maker.name;
+    if (!maker.direct) {
+      const resolved = name || personNames.get(maker.uri) || '';
+      if (directUris.has(maker.uri) || directNames.has(resolved)) continue;
+      name = resolved ? `${maker.qualifier} ${resolved}` : '';
+    }
+    if (name && !credits.some((c) => c.name === name)) credits.push({ name, attributed: !maker.direct });
+  }
+  return credits;
+}
+
+/**
+ * The work's attribution type. Attributed only when every maker credited by
+ * name is attributed; beside a maker credited directly, the work is typed by
+ * that maker and each attributed name keeps its qualifier in the credit text.
+ */
+function creditType(credits: Credit[]): Artwork['artist']['attributionType'] {
+  const direct = credits.filter((c) => !c.attributed).map((c) => c.name);
+  const directType = detectAttributionType(direct.join(', '));
+  if (credits.some((c) => c.attributed) && directType === 'anonymous') return 'attributed';
+  return directType;
+}
+
+/** Person names getRaw resolved, as `[{ id, name }]` in the bundle. */
+function personNamesOf(raw: Record<string, unknown>): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const p of arr(raw.persons).filter(isObj)) {
+    const id = str(p.id);
+    const name = str(p.name);
+    if (PERSON_URI.test(id) && name) names.set(id, name);
   }
   return names;
 }
 
-/** Year bounds from produced_by.timespan ISO begin/end. */
+/**
+ * Year bounds from produced_by.timespan ISO begin/end. A record may carry several
+ * timespans (a later state or edition); the museum displays the first.
+ */
 function pickYears(object: Record<string, unknown>): { yearStart: number | null; yearEnd: number | null; display: string } {
   const produced = isObj(object.produced_by) ? object.produced_by : undefined;
-  const ts = produced && isObj(produced.timespan) ? produced.timespan : undefined;
+  const timespan = produced?.timespan;
+  const ts = Array.isArray(timespan) ? timespan.find(isObj) : isObj(timespan) ? timespan : undefined;
   const year = (iso: unknown): number | null => {
     const m = str(iso).match(/^(-?\d{1,4})-/);
     return m ? parseInt(m[1], 10) : null;
@@ -255,7 +385,16 @@ export const rijksmuseumFetcher: Fetcher = {
         /* place unavailable — region simply stays null */
       }
     }
-    return { id, object, visualItem, image, place };
+    // Dereference the attributed makers named only by reference, at most
+    // PERSON_FETCH_CAP of them, all at once, so normalize can credit them by name.
+    // A temporary failure (timeout, network error, other status, a body that is
+    // not a person record) fails this fetch, so it is never cached. Two cases
+    // leave a maker out of a credit that is cached: a person the museum no longer
+    // has (404 or 410), and makers past the cap.
+    const uris = isObj(object) ? unnamedAttributedUris(object).slice(0, PERSON_FETCH_CAP) : [];
+    const names = await Promise.all(uris.map(fetchPersonName));
+    const persons = uris.flatMap((uri, i) => (names[i] ? [{ id: uri, name: names[i] }] : []));
+    return { id, object, visualItem, image, place, persons };
   },
 
   normalize(raw: unknown): ValidationResult {
@@ -288,9 +427,13 @@ export const rijksmuseumFetcher: Fetcher = {
       );
     }
 
-    const title = (pickTitle(object) || '(Untitled)').slice(0, TITLE_MAX);
-    const creators = pickCreators(object);
+    const title = (pickPrimaryName(object) || '(Untitled)').slice(0, TITLE_MAX);
+    const credits = pickCreators(object, personNamesOf(raw));
+    const creators = credits.map((c) => c.name);
     const artistRaw = creators.join(', ').slice(0, ARTIST_NAME_MAX);
+    // A lone attributed maker reads as the bare name with attributionType
+    // 'attributed'; beside other makers, each qualifier stays with its own name.
+    const artistName = creators.length > 1 ? artistRaw : cleanArtistName(artistRaw);
     const { yearStart, yearEnd, display } = pickYears(object);
     const displayDate = display || parseAndFormat(yearStart, yearEnd);
 
@@ -299,10 +442,10 @@ export const rijksmuseumFetcher: Fetcher = {
       museum: { code: 'rijksmuseum', name: 'Rijksmuseum', url: 'https://www.rijksmuseum.nl' },
       title,
       artist: {
-        name: cleanArtistName(artistRaw) || 'Unknown',
+        name: artistName || 'Unknown',
         nationality: undefined,
         lifespan: undefined,
-        attributionType: detectAttributionType(artistRaw),
+        attributionType: creditType(credits),
       },
       displayDate,
       yearStart,
