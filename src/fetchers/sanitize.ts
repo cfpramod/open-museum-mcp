@@ -65,7 +65,7 @@ export function decodeEntities(s: string): string {
 // `<div>a</div><div>b</div>` read as two words, not one. Inline tags leave
 // nothing, so markup inside a word ("Mon<i>et</i>") keeps the word whole.
 // stripHtml's whitespace collapse folds the runs this leaves behind.
-const SEPARATING_TAGS = new Set([
+export const SEPARATING_TAGS = new Set([
   'br', 'hr', 'p', 'div', 'li', 'ul', 'ol', 'dl', 'dt', 'dd',
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption',
