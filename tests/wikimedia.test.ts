@@ -1454,7 +1454,7 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
   // the common ones; kept here rather than read from the fetcher, so a name
   // dropped from the fetcher's list fails this test instead of passing it.
   const ELEMENT_NAMES = new Set([
-    'a', 'b', 'i', 'p', 's', 'br', 'tr', 'rp', 'rt', 'abbr', 'script', 'img', 'image', 'param', 'div', 'span', 'iframe', 'style',
+    'a', 'b', 'i', 'p', 's', 'br', 'tr', 'rp', 'rt', 'abbr', 'script', 'img', 'image', 'param', 'div', 'span', 'iframe', 'style', 'selectedcontent',
   ]);
 
   // The guarantee: no `<name` or `</name`, for an HTML element name, followed
@@ -1495,6 +1495,13 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
       expect(a.description).toBe('Before after');
     });
   }
+
+  // The longest current element name, longer than any other in the list, so
+  // it checks that the name window is wide enough for every name.
+  it('removes an escaped selectedcontent tag and its closing tag', () => {
+    const a = accepted(withExtField('ImageDescription', escaped('Before <selectedcontent>x</selectedcontent> after')));
+    expect(a.description).toBe('Before x after');
+  });
 
   it('breaks a tag still standing after nesting deeper than the repeated pass reaches', () => {
     let nested = '<script>';

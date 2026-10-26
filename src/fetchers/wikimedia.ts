@@ -36,8 +36,8 @@ const HTML_ELEMENTS = new Set(
     'fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup hr html i ' +
     'iframe img input ins kbd label legend li link main map mark math menu meta meter nav ' +
     'noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp ' +
-    'script search section select slot small source span strong style sub summary sup svg ' +
-    'table tbody td template textarea tfoot th thead time title tr track u ul var video wbr ' +
+    'script search section select selectedcontent slot small source span strong style sub ' +
+    'summary sup svg table tbody td template textarea tfoot th thead time title tr track u ul var video wbr ' +
     'acronym applet basefont big center dir font frame frameset marquee nobr noframes strike tt ' +
     // Names the parser still builds an element for: `image` becomes `img`.
     'bgsound blink image isindex keygen listing menuitem multicol nextid noembed param plaintext rb rtc ' +
@@ -45,9 +45,10 @@ const HTML_ELEMENTS = new Set(
   ).split(' '),
 );
 
-// Longest name in HTML_ELEMENTS ("figcaption", "blockquote"), plus room for
-// the optional '/' and the character after the name.
-const TAG_HEAD_MAX = 12;
+// Longest name in HTML_ELEMENTS, plus room for the optional '/' and the
+// character after the name. Derived from the set, so a longer name added to it
+// is still seen whole.
+const TAG_HEAD_MAX = Math.max(...[...HTML_ELEMENTS].map((name) => name.length)) + 2;
 
 // The element name a `<` at `lt` opens, or null when it opens none.
 function elementAt(s: string, lt: number): string | null {
