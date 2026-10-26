@@ -135,6 +135,21 @@ describe('cite', () => {
       const a = qualified('named', 'de Hooghe, Romeyn');
       expect(cite(a, 'full').startsWith('de Hooghe, Romeyn, Local animals with a dodo.')).toBe(true);
       expect(cite(a, 'caption').startsWith('de Hooghe, Romeyn, Local animals with a dodo,')).toBe(true);
+      // Some cached names are lower case or an identifier URI; recasing either breaks it.
+      for (const name of ['davidgsteadman', 'http://www.wikidata.org/entity/Q2939637']) {
+        const n = qualified('named', name);
+        expect(cite(n, 'full').startsWith(`${name}, Local animals with a dodo.`), name).toBe(true);
+        expect(cite(n, 'caption').startsWith(`${name}, Local animals with a dodo,`), name).toBe(true);
+      }
+    });
+
+    it('adds its own qualifier when the name carries a different one', () => {
+      // NGA credits a print "attributed" to its engraver, after another artist's design.
+      const a = qualified('attributed', 'Zacharias Dolendo after Jacques de Gheyn II');
+      expect(cite(a, 'short')).toBe(
+        'Local animals with a dodo (attributed to Zacharias Dolendo after Jacques de Gheyn II, 1632 - 1634)',
+      );
+      expect(cite(a, 'full').startsWith('Attributed to Zacharias Dolendo after Jacques de Gheyn II, Local')).toBe(true);
     });
 
     it('leaves a named artist and an anonymous work as they were', () => {
