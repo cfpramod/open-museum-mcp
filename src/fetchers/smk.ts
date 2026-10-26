@@ -59,9 +59,12 @@ function pickTitle(titles: unknown): string {
 // used: in the 2026-10-26 census of the 39,517 public-domain image records it
 // disagreed with the values on 4,398 of 49,074 entries it could be checked on.
 // Parts are SMK's cataloguing terms: blad (sheet), plade (plate), billed
-// (image), montering (mount), netto (the work without its frame), brutto (with
-// it). A part with an unknown name, a measurement it cannot read, two values
-// for one measurement or two units is dropped whole, never written in part.
+// (image), montering (mount), netto (net: the work itself) and brutto (gross:
+// with whatever frame, base or mount it has). SMK does not say which of these a
+// gross size includes, and records casts and drawings with a gross size only,
+// so brutto is written "Overall" and netto "Object", never "Framed". A part
+// with an unknown name, a measurement it cannot read, two values for one
+// measurement or two units is dropped whole, never written in part.
 // A size with no part is written only when no other size in the record names
 // one.
 // Maps, not object literals: a plain object would read inherited keys such as
@@ -71,10 +74,10 @@ const SMK_DIMENSION_PARTS = new Map<string, string>([
   ['plademaal', 'Plate'],
   ['billedmaal', 'Image'],
   ['monteringsmaal', 'Mount'],
-  ['netto', 'Unframed'],
-  ['nettomaal', 'Unframed'],
-  ['brutto', 'Framed'],
-  ['bruttomaal', 'Framed'],
+  ['netto', 'Object'],
+  ['nettomaal', 'Object'],
+  ['brutto', 'Overall'],
+  ['bruttomaal', 'Overall'],
 ]);
 const SMK_DIMENSION_TYPES = new Map<string, 'height' | 'width' | 'depth' | 'diameter'>([
   ['højde', 'height'],
@@ -151,7 +154,7 @@ function composeSmkDimensions(dimensions: unknown): string | undefined {
   for (const [key, part] of parts) {
     if (!part.readable || part.measures.length === 0) continue;
     // Beside a named part, a size with no part could measure anything
-    // (KMS317 gives an unframed size and then one with no part), so it is not
+    // (KMS317 gives a net size and then one with no part), so it is not
     // written rather than guessed at.
     if (key === '' && namesPart) continue;
     const units = new Set(part.measures.map((x) => x.unit));

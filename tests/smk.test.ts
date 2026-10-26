@@ -155,10 +155,10 @@ describe('SMK dimensions composed from structured measurements', () => {
     expect(fields).toContain('dimensions');
   });
 
-  it('writes the unframed and framed size of a painting (the accepted fixture)', () => {
+  it('writes the net and gross size of a painting (the accepted fixture)', () => {
     const result = smkFetcher.normalize(fixture('smk-accepted.json'));
     if (result.status !== 'accepted') throw new Error('expected accepted');
-    expect(result.artwork.dimensions).toBe('Unframed: 91 x 73.5 cm; Framed: 94 x 76 x 4.2 cm');
+    expect(result.artwork.dimensions).toBe('Object: 91 x 73.5 cm; Overall: 94 x 76 x 4.2 cm');
   });
 
   it('writes a sheet size in millimetres', () => {
@@ -177,9 +177,20 @@ describe('SMK dimensions composed from structured measurements', () => {
     expect(dimsOf([
       m('netto', 'højde', 'centimeter', '10'), m('netto', 'bredde', 'centimeter', '8'),
       m('Bruttomål', 'højde', 'centimeter', '12'), m('Bruttomål', 'bredde', 'centimeter', '10'),
-    ])).toBe('Unframed: 10 x 8 cm; Framed: 12 x 10 cm');
+    ])).toBe('Object: 10 x 8 cm; Overall: 12 x 10 cm');
     expect(dimsOf([m('Nettomål', 'højde', 'centimeter', '10'), m('Nettomål', 'bredde', 'centimeter', '8')]))
-      .toBe('Unframed: 10 x 8 cm');
+      .toBe('Object: 10 x 8 cm');
+  });
+
+  it('labels net and gross sizes without claiming a frame', () => {
+    // KAS385 as published, a plaster statue group: a gross size only.
+    expect(dimsOf([
+      m('brutto', 'højde', 'centimeter', '242'), m('brutto', 'bredde', 'centimeter', '162.5'),
+      m('brutto', 'dybde', 'centimeter', '103'),
+    ])).toBe('Overall: 242 x 162.5 x 103 cm');
+    // KKS14024 as published, a drawing.
+    expect(dimsOf([m('brutto', 'højde', 'millimeter', '197'), m('brutto', 'bredde', 'millimeter', '136')]))
+      .toBe('Overall: 197 x 136 mm');
   });
 
   it('groups a part whose entries are not adjacent', () => {
@@ -196,38 +207,38 @@ describe('SMK dimensions composed from structured measurements', () => {
 
   it('labels each measurement when height and width are not both given', () => {
     expect(dimsOf([m(undefined, 'højde', 'centimeter', '39.5')])).toBe('height 39.5 cm');
-    expect(dimsOf([m('Netto', 'bredde', 'centimeter', '34')])).toBe('Unframed: width 34 cm');
+    expect(dimsOf([m('Netto', 'bredde', 'centimeter', '34')])).toBe('Object: width 34 cm');
     expect(dimsOf([m('bladmaal', 'diameter', 'millimeter', '265')])).toBe('Sheet: diameter 265 mm');
     expect(dimsOf([m('Netto', 'højde', 'centimeter', '30'), m('Netto', 'diameter', 'centimeter', '12')]))
-      .toBe('Unframed: height 30 cm, diameter 12 cm');
+      .toBe('Object: height 30 cm, diameter 12 cm');
     expect(dimsOf([m('Netto', 'højde', 'centimeter', '30'), m('Netto', 'dybde', 'centimeter', '5')]))
-      .toBe('Unframed: height 30 cm, depth 5 cm');
+      .toBe('Object: height 30 cm, depth 5 cm');
   });
 
   it('labels each measurement when a diameter comes with height and width', () => {
     expect(dimsOf([
       m('Netto', 'højde', 'centimeter', '30'), m('Netto', 'bredde', 'centimeter', '20'),
       m('Netto', 'diameter', 'centimeter', '12'),
-    ])).toBe('Unframed: height 30 cm, width 20 cm, diameter 12 cm');
+    ])).toBe('Object: height 30 cm, width 20 cm, diameter 12 cm');
   });
 
   it('reads the English names the API gives with lang=en, and the unit spellings in the data', () => {
     expect(dimsOf([m('Netto', 'height', 'cm', '239'), m('Netto', 'width', 'cm', '307'), m('Netto', 'depth', 'cm', '9')]))
-      .toBe('Unframed: 239 x 307 x 9 cm');
+      .toBe('Object: 239 x 307 x 9 cm');
     expect(dimsOf([m('bladmaal', 'højde', 'milimeter', '161'), m('bladmaal', 'bredde', 'mm', '120')]))
       .toBe('Sheet: 161 x 120 mm');
   });
 
   it('keeps the value as SMK writes it', () => {
     expect(dimsOf([m('Netto', 'højde', 'centimeter', '91.0'), m('Netto', 'bredde', 'centimeter', '73.50')]))
-      .toBe('Unframed: 91.0 x 73.50 cm');
+      .toBe('Object: 91.0 x 73.50 cm');
   });
 
   it('ignores a weight and keeps the size beside it', () => {
     expect(dimsOf([
       m('Netto', 'højde', 'centimeter', '91'), m('Netto', 'bredde', 'centimeter', '73.5'),
       m(undefined, 'vægt', 'kilo', '12'), m('Netto', 'weight', 'kg', '12'),
-    ])).toBe('Unframed: 91 x 73.5 cm');
+    ])).toBe('Object: 91 x 73.5 cm');
   });
 
   it('drops a part when any of its measurements lacks a unit, and writes the rest', () => {
@@ -236,7 +247,7 @@ describe('SMK dimensions composed from structured measurements', () => {
     expect(dimsOf([
       m('Netto', 'højde', undefined, '39.5'), m('Netto', 'bredde', 'centimeter', '34'),
       m('Brutto', 'højde', 'centimeter', '50'), m('Brutto', 'bredde', 'centimeter', '44'),
-    ])).toBe('Framed: 50 x 44 cm');
+    ])).toBe('Overall: 50 x 44 cm');
   });
 
   it('drops a part that gives two values for one measurement', () => {
@@ -274,7 +285,7 @@ describe('SMK dimensions composed from structured measurements', () => {
       expect(dimsOf([
         m(key, 'højde', 'centimeter', '10'), m(key, 'bredde', 'centimeter', '8'),
         m('Netto', 'højde', 'centimeter', '91'), m('Netto', 'bredde', 'centimeter', '73.5'),
-      ])).toBe('Unframed: 91 x 73.5 cm');
+      ])).toBe('Object: 91 x 73.5 cm');
       // As a measurement type.
       expect(dimsOf([m('Netto', key, 'centimeter', '10'), m('Netto', 'bredde', 'centimeter', '8')])).toBeUndefined();
       // As a unit.
@@ -283,14 +294,14 @@ describe('SMK dimensions composed from structured measurements', () => {
   });
 
   it('drops a size with no part when the record names a part elsewhere', () => {
-    // KMS317 as published: an unframed size, then a size with no part.
+    // KMS317 as published: a net size, then a size with no part.
     // What the second measures is not stated, so it is not written.
     expect(dimsOf([
       { notes: '650 x 960 mm', part: 'Netto', type: 'højde', unit: 'centimeter', value: '65' },
       { notes: '650 x 960 mm', part: 'Netto', type: 'bredde', unit: 'centimeter', value: '96' },
       { type: 'højde', unit: 'centimeter', value: '82' },
       { type: 'bredde', unit: 'centimeter', value: '114' },
-    ])).toBe('Unframed: 65 x 96 cm');
+    ])).toBe('Object: 65 x 96 cm');
     // Also when the named part is itself left out: the record still says the
     // sizes it gives belong to parts.
     expect(dimsOf([

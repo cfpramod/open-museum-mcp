@@ -202,10 +202,11 @@ export interface Artwork {
    * parse this and own that interpretation. The one exception is SMK, which
    * publishes structured measurements and no display string: its value is
    * composed from those entries in one fixed format, "Label: H x W [x D] unit"
-   * per part, parts joined by "; " (e.g. "Unframed: 91 x 73.5 cm; Framed:
-   * 94 x 76 x 4.2 cm" for SMK's KMS3352). A part SMK publishes incompletely
-   * is left out rather than written in part, as is a size naming no part
-   * beside one that names a part. ABSENT when the source publishes none.
+   * per part, parts joined by "; " (e.g. "Object: 91 x 73.5 cm; Overall:
+   * 94 x 76 x 4.2 cm" for SMK's KMS3352). A part is left out whole, never
+   * written in part, when it has a measurement it cannot read, two values for
+   * one measurement, two units or a name it does not know, as is a size
+   * naming no part beside one that names a part. ABSENT when the source publishes none.
    * Additive v0.21 field.
    */
   dimensions?: string;
