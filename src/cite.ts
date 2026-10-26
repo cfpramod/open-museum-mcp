@@ -6,8 +6,41 @@ function joinNonEmpty(parts: Array<string | undefined | null>, sep: string): str
   return parts.filter((p): p is string => Boolean(p && p.trim())).join(sep);
 }
 
+// Adapters store the bare name and carry the qualifier in attributionType, so
+// the citation puts the qualifier back: a bare name would claim the work outright.
+const QUALIFIERS: Partial<Record<Artwork['artist']['attributionType'], string>> = {
+  attributed: 'attributed to',
+  workshop: 'workshop of',
+  circle: 'circle of',
+  follower: 'follower of',
+  after: 'after',
+};
+
+/** The artist as credited, with its qualifier unless the name already carries it. */
+function creditedArtist(a: Artwork): string {
+  const qualifier = QUALIFIERS[a.artist.attributionType];
+  if (!qualifier) return a.artist.name;
+  if (new RegExp(`\\b${qualifier}\\b`, 'i').test(a.artist.name)) return a.artist.name;
+  return `${qualifier} ${a.artist.name}`;
+}
+
+/**
+ * The credited artist with a leading qualifier set in the given case: capital
+ * where it opens a sentence (full, caption), lower case inline (short). Only the
+ * qualifier is recased; a name is printed as the museum gives it.
+ */
+function casedArtist(a: Artwork, opensSentence: boolean): string {
+  const artist = creditedArtist(a);
+  const qualifier = QUALIFIERS[a.artist.attributionType];
+  if (!qualifier || artist.slice(0, qualifier.length).toLowerCase() !== qualifier) return artist;
+  const lead = opensSentence ? qualifier.charAt(0).toUpperCase() + qualifier.slice(1) : qualifier;
+  return lead + artist.slice(qualifier.length);
+}
+
+const leadingArtist = (a: Artwork): string => casedArtist(a, true);
+
 function metFull(a: Artwork): string {
-  const artist = a.artist.attributionType === 'anonymous' ? '' : a.artist.name;
+  const artist = a.artist.attributionType === 'anonymous' ? '' : leadingArtist(a);
   const head = joinNonEmpty([artist, a.title], ', ');
   const date = a.displayDate;
   const tail = `${a.museum.name}. ${a.license.type}. ${a.source.pageUrl}`;
@@ -16,7 +49,7 @@ function metFull(a: Artwork): string {
 }
 
 function metCaption(a: Artwork): string {
-  const artist = a.artist.attributionType === 'anonymous' ? 'Unknown artist' : a.artist.name;
+  const artist = a.artist.attributionType === 'anonymous' ? 'Unknown artist' : leadingArtist(a);
   const parts: string[] = [`${artist}, ${a.title}, ${a.displayDate}`];
   if (a.medium && a.medium.trim()) parts.push(a.medium.trim());
   parts.push(`${a.museum.name}, ${a.license.type}`);
@@ -30,7 +63,7 @@ function metCaption(a: Artwork): string {
 // "Title (Unknown, 1500)" over "Title (Unknown artist, 1500)". Captions are
 // standalone sentences where the longer form is conventional.
 function shortStyle(a: Artwork): string {
-  const artist = a.artist.attributionType === 'anonymous' ? 'Unknown' : a.artist.name;
+  const artist = a.artist.attributionType === 'anonymous' ? 'Unknown' : casedArtist(a, false);
   const date = a.displayDate || (a.yearStart != null ? String(a.yearStart) : '');
   return `${a.title} (${artist}, ${date})`;
 }
