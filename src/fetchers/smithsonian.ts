@@ -501,14 +501,14 @@ export const smithsonianFetcher: Fetcher = {
     // Museum: surface the contributing unit's full name (e.g. "Smithsonian
     // American Art Museum") for accurate citation, keeping the federation code
     // 'smithsonian'. data_source is the unit's display name.
-    const unitName = sanitizeArtistName(asString(dnr.data_source)) || 'Smithsonian Institution';
+    const unitName = sanitizeArtistName(asString(dnr.data_source));
     const recordLink = asString(dnr.record_link) || asString(dnr.guid);
 
     const artwork: Artwork = {
       id,
       museum: {
         code: 'smithsonian',
-        name: unitName,
+        name: unitName || 'Smithsonian Institution',
         url: SI_SITE,
       },
       title,
@@ -547,6 +547,9 @@ export const smithsonianFetcher: Fetcher = {
         pickByLabel(freetextEntries(content, 'physicalDescription'), new Set(['dimensions'])),
         (s) => sanitizeText(s, DIMENSIONS_MAX),
       ),
+      // The credit line names the unit that holds the object, so a record that
+      // names no unit has none: buildCreditLine leaves it absent for an empty
+      // holder rather than crediting the Institution as a whole.
       creditLine: buildCreditLine(
         unitName,
         pickByLabel(freetextEntries(content, 'creditLine'), new Set(['credit line'])),

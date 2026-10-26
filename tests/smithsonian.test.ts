@@ -479,4 +479,20 @@ describe('Smithsonian dimensions and credit line', () => {
     expect(result.artwork.dimensions).toBeUndefined();
     expect(result.artwork.creditLine).toBeUndefined();
   });
+
+  // The credit line names the unit that holds the object; with no unit named,
+  // it is absent rather than credited to the Institution as a whole.
+  for (const dataSource of ['', undefined]) {
+    it(`omits the credit line when the record names no unit (data_source ${JSON.stringify(dataSource)})`, () => {
+      const raw = clone('smithsonian-accepted.json');
+      const content = ((raw.response ?? raw) as { content: { descriptiveNonRepeating: Record<string, unknown> } }).content;
+      if (dataSource === undefined) delete content.descriptiveNonRepeating.data_source;
+      else content.descriptiveNonRepeating.data_source = dataSource;
+      const result = smithsonianFetcher.normalize(raw);
+      if (result.status !== 'accepted') throw new Error('expected accepted');
+      expect(result.artwork.museum.name).toBe('Smithsonian Institution');
+      expect(result.artwork.creditLine).toBeUndefined();
+      expect(result.artwork.dimensions).toBe('length: 15 in. (38.0 cm)');
+    });
+  }
 });
