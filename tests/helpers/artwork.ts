@@ -30,18 +30,26 @@ export function makeArtwork(over: Partial<Artwork> = {}): Artwork {
   };
 }
 
-// Every string path of a type, with `[]` for an array element.
-export type StringPaths<T, Prefix extends string = ''> = {
-  [K in keyof T & string]-?: NonNullable<T[K]> extends string
-    ? `${Prefix}${K}`
-    : NonNullable<T[K]> extends readonly (infer E)[]
-      ? NonNullable<E> extends string
-        ? `${Prefix}${K}[]`
-        : StringPaths<NonNullable<E>, `${Prefix}${K}[].`>
-      : NonNullable<T[K]> extends object
-        ? StringPaths<NonNullable<T[K]>, `${Prefix}${K}.`>
-        : never;
-}[keyof T & string];
+// Every string path of a type, with `[]` for an array element. A union is read
+// member by member: a value typed `string | number` or `string | { x: string }`
+// is a string path, and its object and array members are followed as well.
+export type StringPaths<T, Prefix extends string = ''> = Resolved<{
+  [K in keyof T & string]-?: ValuePaths<NonNullable<T[K]>, `${Prefix}${K}`>;
+}[keyof T & string]>;
+
+// Spells the union out as literals, so a compile error names each path.
+type Resolved<P> = P extends string ? P : never;
+
+type ValuePaths<V, Path extends string> =
+  | ([Extract<V, string>] extends [never] ? never : Path)
+  | NestedPaths<Exclude<V, string>, Path>;
+
+// Distributes over the union's non-string members.
+type NestedPaths<V, Path extends string> = V extends readonly (infer E)[]
+  ? ValuePaths<NonNullable<E>, `${Path}[]`>
+  : V extends object
+    ? StringPaths<V, `${Path}.`>
+    : never;
 
 // The string fields the final pass cleans: the ones textFields reads.
 export const CLEANED_PATHS = [
