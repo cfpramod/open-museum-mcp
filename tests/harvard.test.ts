@@ -109,3 +109,36 @@ describe('Harvard provenance mapping (v0.20.0, openclearance P-7 posture)', () =
     expect('provenance' in result.artwork).toBe(false);
   });
 });
+
+describe('Harvard dimensions and credit line', () => {
+  it('carries the dimensions string, credit line and object number verbatim', () => {
+    const result = harvardFetcher.normalize(fixture('harvard-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBe('actual: 36.7 x 25.1 cm (14 7/16 x 9 7/8 in.)');
+    expect(result.artwork.creditLine).toEqual({
+      holder: 'Harvard Art Museums',
+      fund: 'Harvard Art Museums/Arthur M. Sackler Museum, Gift of Eric Schroeder in honor of John Coolidge',
+      accession: '1968.47',
+    });
+  });
+
+  it('requests dimensions and objectnumber from the object endpoint', async () => {
+    const prevKey = process.env.HARVARD_API_KEY;
+    const prevFetch = globalThis.fetch;
+    process.env.HARVARD_API_KEY = 'test-key';
+    let capturedUrl = '';
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      capturedUrl = String(input);
+      return new Response(JSON.stringify({ id: 1 }), { status: 200 });
+    }) as unknown as typeof fetch;
+    try {
+      await harvardFetcher.getRaw('harvard:1');
+      const fields = new URL(capturedUrl).searchParams.get('fields')?.split(',') ?? [];
+      expect(fields).toEqual(expect.arrayContaining(['dimensions', 'creditline', 'objectnumber']));
+    } finally {
+      globalThis.fetch = prevFetch;
+      if (prevKey === undefined) delete process.env.HARVARD_API_KEY;
+      else process.env.HARVARD_API_KEY = prevKey;
+    }
+  });
+});

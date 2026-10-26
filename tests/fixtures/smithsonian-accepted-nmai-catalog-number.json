@@ -1,0 +1,196 @@
+{
+  "status": 200,
+  "responseCode": 1,
+  "response": {
+    "id": "ld1-1643403783737-1643403809338-0",
+    "title": "Dance outfit",
+    "unitCode": "NMAI",
+    "type": "edanmdm",
+    "url": "edanmdm:NMAI_203003",
+    "content": {
+      "freetext": {
+        "name": [
+          {
+            "label": "Culture/People",
+            "content": "Karajá (Caraja)"
+          },
+          {
+            "label": "Seller agent",
+            "content": "University of Pennsylvania Museum of Archaeology and Anthropology (The University Museum/Penn Museum)"
+          },
+          {
+            "label": "Seller",
+            "content": "Elizabeth K. Steen (Elizabeth Kilgore Steen), Non-Indian, 1886-1938"
+          },
+          {
+            "label": "Previous owner",
+            "content": "Elizabeth K. Steen (Elizabeth Kilgore Steen), Non-Indian, 1886-1938"
+          },
+          {
+            "label": "Collector",
+            "content": "Elizabeth K. Steen (Elizabeth Kilgore Steen), Non-Indian, 1886-1938"
+          }
+        ],
+        "notes": [
+          {
+            "label": "Collection History",
+            "content": "Collected between 1930 and 1931 by explorer and anthropologist Elizabeth K. Steen (1886-1938); deposited by Miss Steen at the University of Pennsylvania Museum of Archaeology and Anthropology (Philadelphia) in 1931 to allow the University Museum time to raise funds for the purchase of her collection; purchased by MAI from Elizabeth K. Steen in 1936."
+          },
+          {
+            "label": "Contact Us",
+            "content": "Have a concern, a correction, or something to add? Contact us: https://nmai.si.edu/collections-statement"
+          }
+        ],
+        "place": [
+          {
+            "label": "Place",
+            "content": "Ilha do Bananal, Rio Araguaia; Tocantins State, North Region; Brazil"
+          },
+          {
+            "label": "Island Name",
+            "content": "Ilha do Bananal"
+          }
+        ],
+        "setName": [
+          {
+            "label": "See related items",
+            "content": "Karajá (Caraja)"
+          },
+          {
+            "label": "See related items",
+            "content": "Ceremonial/Ritual items"
+          }
+        ],
+        "dataSource": [
+          {
+            "label": "Data Source",
+            "content": "National Museum of the American Indian"
+          }
+        ],
+        "identifier": [
+          {
+            "label": "Catalog Number",
+            "content": "18/9845"
+          },
+          {
+            "label": "Barcode",
+            "content": "189845.000"
+          }
+        ],
+        "objectType": [
+          {
+            "label": "Object Type",
+            "content": "Ceremonial/Ritual items"
+          }
+        ],
+        "physicalDescription": [
+          {
+            "label": "Object Name",
+            "content": "Dance outfit"
+          },
+          {
+            "label": "Media/Materials",
+            "content": "Palm frond/fronds, feather/feathers"
+          },
+          {
+            "label": "Techniques",
+            "content": "Wrapped, tied"
+          },
+          {
+            "label": "Dimensions",
+            "content": "150 x 74 cm"
+          }
+        ]
+      },
+      "indexedStructured": {
+        "date": [],
+        "name": [
+          "University of Pennsylvania Museum of Archaeology and Anthropology",
+          "Steen, Elizabeth K."
+        ],
+        "place": [
+          "Ilha do Bananal",
+          "Brazil",
+          "Tocantins State, North Region",
+          "Ilha do Bananal, Rio Araguaia"
+        ],
+        "topic": [
+          "Rituals (events)"
+        ],
+        "culture": [
+          "East Brazil (no sub-culture area)",
+          "Indians of South America",
+          "East Brazil",
+          "Native Americans",
+          "Caraja Indians"
+        ],
+        "usage_flag": [
+          "189845.000"
+        ],
+        "geoLocation": [
+          {
+            "L1": {
+              "type": "Continent",
+              "content": "South America"
+            },
+            "L2": {
+              "type": "Country",
+              "content": "Brazil"
+            },
+            "L3": {
+              "type": "State",
+              "content": "Tocantins State, North Region"
+            },
+            "Other": {
+              "type": "Island Name",
+              "content": "Ilha do Bananal"
+            }
+          }
+        ],
+        "object_type": [
+          "Ceremonial costume",
+          "Ceremonial objects",
+          "Outfits",
+          "Costume"
+        ],
+        "online_media_type": [
+          "Catalog cards",
+          "Images"
+        ],
+        "nmaiculture_archeol_1": [
+          "Karajá (Caraja)"
+        ],
+        "nmaiculture_continent": [
+          "South America"
+        ],
+        "nmaiculture_culture_area": [
+          "East Brazil"
+        ],
+        "nmaiculture_culture_subarea": [
+          "East Brazil (no sub-culture area)"
+        ]
+      },
+      "descriptiveNonRepeating": {
+        "guid": "http://n2t.net/ark:/65665/ws603f286de-6296-4862-b13b-7657c32b20db",
+        "title": {
+          "label": "Object Name",
+          "content": "Dance outfit"
+        },
+        "record_ID": "NMAI_203003",
+        "unit_code": "NMAI",
+        "title_sort": "Dance outfit",
+        "data_source": "National Museum of the American Indian",
+        "record_link": "http://n2t.net/ark:/65665/ws603f286de-6296-4862-b13b-7657c32b20db",
+        "record_type": "",
+        "metadata_usage": {
+          "access": "CC0"
+        }
+      }
+    },
+    "hash": "c9a820f0f2545e16e099f06a1b4801f95d31d92f",
+    "docSignature": "5029ec802aac6ba0b3c112533fa5221a",
+    "timestamp": "1663783746",
+    "lastTimeUpdated": "1728117698",
+    "version": ""
+  }
+}

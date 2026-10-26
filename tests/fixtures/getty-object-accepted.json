@@ -98,6 +98,439 @@
       ]
     }
   ],
+  "referred_to_by": [
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/rights/d5e16909-d00d-5891-a5af-1ec3d04387a1",
+      "type": "LinguisticObject",
+      "_label": "Source Credit Line",
+      "classified_as": [
+        {
+          "id": "http://vocab.getty.edu/aat/300435418",
+          "type": "Type",
+          "_label": "Credit Line"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300404764",
+          "type": "Type",
+          "_label": "Sources (General Concept)"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300418049",
+          "type": "Type",
+          "_label": "Brief Text"
+        }
+      ],
+      "content": "The J. Paul Getty Museum, Los Angeles"
+    },
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/element",
+      "type": "LinguisticObject",
+      "_label": "Dimensions Measurement (Element)",
+      "classified_as": [
+        {
+          "id": "https://data.getty.edu/local/thesaurus/dimensions-measurement-element",
+          "type": "Type",
+          "_label": "Dimensions Measurement (Element)"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300418049",
+          "type": "Type",
+          "_label": "Brief Text"
+        }
+      ],
+      "content": "Unframed",
+      "assigned_by": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/element/attribute/technique",
+          "type": "AttributeAssignment",
+          "technique": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/dimensions-measured-unframed",
+              "type": "Type",
+              "_label": "Dimensions Measured: Unframed"
+            }
+          ]
+        },
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/element/attribute/sequence",
+          "type": "AttributeAssignment",
+          "assigned_property": "dimension",
+          "assigned": [
+            {
+              "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/element/attribute/sequence/position",
+              "type": "Dimension",
+              "_label": "Dimensions Sequence",
+              "classified_as": [
+                {
+                  "id": "http://vocab.getty.edu/aat/300010269",
+                  "type": "Type",
+                  "_label": "Positional Attributes"
+                },
+                {
+                  "id": "http://vocab.getty.edu/aat/300192339",
+                  "type": "Type",
+                  "_label": "Sequences"
+                }
+              ],
+              "value": 1,
+              "unit": {
+                "id": "http://vocab.getty.edu/aat/300055665",
+                "type": "MeasurementUnit",
+                "_label": "Numbers"
+              }
+            }
+          ]
+        }
+      ],
+      "member_of": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/set",
+          "type": "Set",
+          "_label": "Dimensions Set: Unframed"
+        }
+      ]
+    },
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/statement",
+      "type": "LinguisticObject",
+      "_label": "Dimensions Statement",
+      "classified_as": [
+        {
+          "id": "http://vocab.getty.edu/aat/300435430",
+          "type": "Type",
+          "_label": "Dimensions Description"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300418049",
+          "type": "Type",
+          "_label": "Brief Text"
+        }
+      ],
+      "content": "Unframed: 74.3 × 94.3 cm (29 1/4 × 37 1/8 in.)",
+      "assigned_by": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/statement/attribute/technique",
+          "type": "AttributeAssignment",
+          "technique": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/dimensions-measured-unframed",
+              "type": "Type",
+              "_label": "Dimensions Measured: Unframed"
+            }
+          ]
+        },
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/statement/attribute/sequence",
+          "type": "AttributeAssignment",
+          "assigned_property": "dimension",
+          "assigned": [
+            {
+              "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/statement/attribute/sequence/position",
+              "type": "Dimension",
+              "_label": "Dimensions Sequence",
+              "classified_as": [
+                {
+                  "id": "http://vocab.getty.edu/aat/300010269",
+                  "type": "Type",
+                  "_label": "Positional Attributes"
+                },
+                {
+                  "id": "http://vocab.getty.edu/aat/300192339",
+                  "type": "Type",
+                  "_label": "Sequences"
+                }
+              ],
+              "value": 1,
+              "unit": {
+                "id": "http://vocab.getty.edu/aat/300055665",
+                "type": "MeasurementUnit",
+                "_label": "Numbers"
+              }
+            }
+          ]
+        }
+      ],
+      "member_of": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/set",
+          "type": "Set",
+          "_label": "Dimensions Set: Unframed"
+        }
+      ]
+    },
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/formatted",
+      "type": "LinguisticObject",
+      "_label": "Dimensions Measurement (Formatted)",
+      "classified_as": [
+        {
+          "id": "https://data.getty.edu/local/thesaurus/dimensions-measurement-formatted",
+          "type": "Type",
+          "_label": "Dimensions Measurement (Formatted)"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300418049",
+          "type": "Type",
+          "_label": "Brief Text"
+        }
+      ],
+      "content": "74.3 × 94.3 cm (29 1/4 × 37 1/8 in.)",
+      "assigned_by": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/formatted/attribute/technique",
+          "type": "AttributeAssignment",
+          "technique": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/dimensions-measured-unframed",
+              "type": "Type",
+              "_label": "Dimensions Measured: Unframed"
+            }
+          ]
+        },
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/formatted/attribute/sequence",
+          "type": "AttributeAssignment",
+          "assigned_property": "dimension",
+          "assigned": [
+            {
+              "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/formatted/attribute/sequence/position",
+              "type": "Dimension",
+              "_label": "Dimensions Sequence",
+              "classified_as": [
+                {
+                  "id": "http://vocab.getty.edu/aat/300010269",
+                  "type": "Type",
+                  "_label": "Positional Attributes"
+                },
+                {
+                  "id": "http://vocab.getty.edu/aat/300192339",
+                  "type": "Type",
+                  "_label": "Sequences"
+                }
+              ],
+              "value": 1,
+              "unit": {
+                "id": "http://vocab.getty.edu/aat/300055665",
+                "type": "MeasurementUnit",
+                "_label": "Numbers"
+              }
+            }
+          ]
+        }
+      ],
+      "member_of": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/67f76128-7b8a-55ac-a219-7b496a557c48/set",
+          "type": "Set",
+          "_label": "Dimensions Set: Unframed"
+        }
+      ]
+    },
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/element",
+      "type": "LinguisticObject",
+      "_label": "Dimensions Measurement (Element)",
+      "classified_as": [
+        {
+          "id": "https://data.getty.edu/local/thesaurus/dimensions-measurement-element",
+          "type": "Type",
+          "_label": "Dimensions Measurement (Element)"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300418049",
+          "type": "Type",
+          "_label": "Brief Text"
+        }
+      ],
+      "content": "Framed [outer dim]",
+      "assigned_by": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/element/attribute/technique",
+          "type": "AttributeAssignment",
+          "technique": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/dimensions-measured-framed-outer-dim",
+              "type": "Type",
+              "_label": "Dimensions Measured: Framed [outer dim]"
+            }
+          ]
+        },
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/element/attribute/sequence",
+          "type": "AttributeAssignment",
+          "assigned_property": "dimension",
+          "assigned": [
+            {
+              "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/element/attribute/sequence/position",
+              "type": "Dimension",
+              "_label": "Dimensions Sequence",
+              "classified_as": [
+                {
+                  "id": "http://vocab.getty.edu/aat/300010269",
+                  "type": "Type",
+                  "_label": "Positional Attributes"
+                },
+                {
+                  "id": "http://vocab.getty.edu/aat/300192339",
+                  "type": "Type",
+                  "_label": "Sequences"
+                }
+              ],
+              "value": 2,
+              "unit": {
+                "id": "http://vocab.getty.edu/aat/300055665",
+                "type": "MeasurementUnit",
+                "_label": "Numbers"
+              }
+            }
+          ]
+        }
+      ],
+      "member_of": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/set",
+          "type": "Set",
+          "_label": "Dimensions Set: Framed [Outer Dim]"
+        }
+      ]
+    },
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/statement",
+      "type": "LinguisticObject",
+      "_label": "Dimensions Statement",
+      "classified_as": [
+        {
+          "id": "http://vocab.getty.edu/aat/300435430",
+          "type": "Type",
+          "_label": "Dimensions Description"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300418049",
+          "type": "Type",
+          "_label": "Brief Text"
+        }
+      ],
+      "content": "Framed [Outer Dim]: 94.9 × 114.9 × 11.4 cm (37 3/8 × 45 1/4 × 4 1/2 in.)",
+      "assigned_by": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/statement/attribute/technique",
+          "type": "AttributeAssignment",
+          "technique": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/dimensions-measured-framed-outer-dim",
+              "type": "Type",
+              "_label": "Dimensions Measured: Framed [outer dim]"
+            }
+          ]
+        },
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/statement/attribute/sequence",
+          "type": "AttributeAssignment",
+          "assigned_property": "dimension",
+          "assigned": [
+            {
+              "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/statement/attribute/sequence/position",
+              "type": "Dimension",
+              "_label": "Dimensions Sequence",
+              "classified_as": [
+                {
+                  "id": "http://vocab.getty.edu/aat/300010269",
+                  "type": "Type",
+                  "_label": "Positional Attributes"
+                },
+                {
+                  "id": "http://vocab.getty.edu/aat/300192339",
+                  "type": "Type",
+                  "_label": "Sequences"
+                }
+              ],
+              "value": 2,
+              "unit": {
+                "id": "http://vocab.getty.edu/aat/300055665",
+                "type": "MeasurementUnit",
+                "_label": "Numbers"
+              }
+            }
+          ]
+        }
+      ],
+      "member_of": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/set",
+          "type": "Set",
+          "_label": "Dimensions Set: Framed [Outer Dim]"
+        }
+      ]
+    },
+    {
+      "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/formatted",
+      "type": "LinguisticObject",
+      "_label": "Dimensions Measurement (Formatted)",
+      "classified_as": [
+        {
+          "id": "https://data.getty.edu/local/thesaurus/dimensions-measurement-formatted",
+          "type": "Type",
+          "_label": "Dimensions Measurement (Formatted)"
+        },
+        {
+          "id": "http://vocab.getty.edu/aat/300418049",
+          "type": "Type",
+          "_label": "Brief Text"
+        }
+      ],
+      "content": "94.9 × 114.9 × 11.4 cm (37 3/8 × 45 1/4 × 4 1/2 in.)",
+      "assigned_by": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/formatted/attribute/technique",
+          "type": "AttributeAssignment",
+          "technique": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/dimensions-measured-framed-outer-dim",
+              "type": "Type",
+              "_label": "Dimensions Measured: Framed [outer dim]"
+            }
+          ]
+        },
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/formatted/attribute/sequence",
+          "type": "AttributeAssignment",
+          "assigned_property": "dimension",
+          "assigned": [
+            {
+              "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/formatted/attribute/sequence/position",
+              "type": "Dimension",
+              "_label": "Dimensions Sequence",
+              "classified_as": [
+                {
+                  "id": "http://vocab.getty.edu/aat/300010269",
+                  "type": "Type",
+                  "_label": "Positional Attributes"
+                },
+                {
+                  "id": "http://vocab.getty.edu/aat/300192339",
+                  "type": "Type",
+                  "_label": "Sequences"
+                }
+              ],
+              "value": 2,
+              "unit": {
+                "id": "http://vocab.getty.edu/aat/300055665",
+                "type": "MeasurementUnit",
+                "_label": "Numbers"
+              }
+            }
+          ]
+        }
+      ],
+      "member_of": [
+        {
+          "id": "https://data.getty.edu/museum/collection/object/c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb/dimensions/b61018ad-1210-5db6-9c1e-f03d299f325f/set",
+          "type": "Set",
+          "_label": "Dimensions Set: Framed [Outer Dim]"
+        }
+      ]
+    }
+  ],
   "made_of": [
     {
       "id": "http://vocab.getty.edu/aat/300015050",

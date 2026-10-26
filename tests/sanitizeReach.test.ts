@@ -16,7 +16,9 @@ import {
   sanitizeArtworkText,
   sanitizeText,
   stripHtml,
+  ACCESSION_MAX,
   ARTIST_NAME_MAX,
+  CREDIT_LINE_MAX,
   DESCRIPTION_MAX,
   DIMENSIONS_MAX,
   MEDIUM_MAX,
@@ -75,6 +77,9 @@ function textFields(a: Artwork): Record<string, string | undefined | null> {
     description: a.description,
     objectType: a.objectType,
     dimensions: a.dimensions,
+    'creditLine.holder': a.creditLine?.holder,
+    'creditLine.fund': a.creditLine?.fund,
+    'creditLine.accession': a.creditLine?.accession,
     ...Object.fromEntries((a.rawTags ?? []).map((t, i) => [`rawTags[${i}]`, t])),
   };
 }
@@ -98,6 +103,7 @@ function dirtyArtwork(): Artwork {
     description: dirty('Gift of a donor'),
     objectType: dirty('Painting'),
     dimensions: dirty('89.9 x 94.1 cm'),
+    creditLine: { holder: dirty('Test Museum'), fund: dirty('Rogers Fund, 1942'), accession: dirty('42.1') },
     rawTags: [dirty('Flowers'), dirty('Water')],
   });
 }
@@ -192,6 +198,31 @@ describe('sanitizeArtworkText', () => {
     expect(out.period).toBeNull();
     expect(out.objectType).toBeUndefined();
     expect(out.rawTags).toEqual(['Water']);
+  });
+
+  it('cleans each part of the credit line, caps it, and drops a line that cleans to nothing', () => {
+    const hidden = '‮\u0000';
+    const out = sanitizeArtworkText(
+      makeArtwork({
+        creditLine: { holder: `Test${hidden} Museum`, fund: `Rogers${hidden} Fund, 1942`, accession: `42${hidden}.1` },
+      }),
+    );
+    expect(out.creditLine).toEqual({ holder: 'Test Museum', fund: 'Rogers Fund, 1942', accession: '42.1' });
+
+    const long = sanitizeArtworkText(
+      makeArtwork({
+        creditLine: { holder: 'h'.repeat(TITLE_MAX + 50), fund: 'f'.repeat(CREDIT_LINE_MAX + 50), accession: 'a'.repeat(ACCESSION_MAX + 50) },
+      }),
+    );
+    expect(long.creditLine?.holder).toHaveLength(TITLE_MAX);
+    expect(long.creditLine?.fund).toHaveLength(CREDIT_LINE_MAX);
+    expect(long.creditLine?.accession).toHaveLength(ACCESSION_MAX);
+
+    const fundOnly = sanitizeArtworkText(makeArtwork({ creditLine: { holder: 'Test Museum', fund: 'Rogers Fund', accession: hidden } }));
+    expect(fundOnly.creditLine).toEqual({ holder: 'Test Museum', fund: 'Rogers Fund' });
+    expect(sanitizeArtworkText(makeArtwork({ creditLine: { holder: hidden, fund: 'Rogers Fund' } })).creditLine).toBeUndefined();
+    expect(sanitizeArtworkText(makeArtwork({ creditLine: { holder: 'Test Museum', fund: hidden, accession: PAYLOAD } })).creditLine).toBeUndefined();
+    expect(sanitizeArtworkText(makeArtwork()).creditLine).toBeUndefined();
   });
 
   it('keeps the characters scripts and emoji depend on', () => {

@@ -15,12 +15,14 @@
  *   title        ≤ 256 chars   — longest known real artwork title is ~200 chars
  *   description  ≤ 1024 chars  — prose summaries; museum object descriptions
  *   artistName   ≤ 200 chars   — full attribution strings incl. birth/death
+ *   creditLine   ≤ 512 chars   (fund and donor lines, which can name several donors)
+ *   accession    ≤ 64 chars    (object numbers, including part suffixes such as "a-c")
  *
  * The remaining text fields have caps of their own below, and
  * sanitizeArtworkText applies all of them to the finished record.
  */
 
-import type { Artwork } from '../types.js';
+import type { Artwork, CreditLine } from '../types.js';
 
 const HTML_ENTITIES: Record<string, string> = {
   amp: '&',
@@ -152,6 +154,9 @@ function cap(s: string, maxLen: number): string {
 export const TITLE_MAX = 256;
 export const DESCRIPTION_MAX = 1024;
 export const ARTIST_NAME_MAX = 200;
+export const CREDIT_LINE_MAX = 512;
+export const ACCESSION_MAX = 64;
+
 // Caps for the other upstream text fields, set well above the longest value
 // in about 14,700 cached records: medium 803, dimensions 302, display date 200,
 // object type, period, region and tags all under 60.
@@ -179,6 +184,20 @@ function cleanOptional(s: string | undefined, maxLen: number): string | undefine
 function cleanNullable(s: string | null, maxLen: number): string | null {
   if (s === null) return null;
   return cap(cleanText(s), maxLen) || null;
+}
+
+// A credit line that cleans to no holder, or to neither a fund nor an
+// accession number, becomes absent, as buildCreditLine would have made it.
+function cleanCreditLine(line: CreditLine | undefined): CreditLine | undefined {
+  if (line === undefined) return undefined;
+  const holder = cap(cleanText(line.holder), TITLE_MAX);
+  const fund = cleanOptional(line.fund, CREDIT_LINE_MAX);
+  const accession = cleanOptional(line.accession, ACCESSION_MAX);
+  if (holder === '' || (fund === undefined && accession === undefined)) return undefined;
+  const out: CreditLine = { holder };
+  if (fund !== undefined) out.fund = fund;
+  if (accession !== undefined) out.accession = accession;
+  return out;
 }
 
 /**
@@ -215,6 +234,7 @@ export function sanitizeArtworkText(artwork: Artwork): Artwork {
     description: cleanOptional(artwork.description, DESCRIPTION_MAX),
     objectType: cleanOptional(artwork.objectType, SHORT_TEXT_MAX),
     dimensions: cleanOptional(artwork.dimensions, DIMENSIONS_MAX),
+    creditLine: cleanCreditLine(artwork.creditLine),
     rawTags: artwork.rawTags
       ?.map((t) => cap(cleanText(t), SHORT_TEXT_MAX))
       .filter((t) => t !== ''),
@@ -231,4 +251,32 @@ export function sanitizeDescription(s: string): string {
 
 export function sanitizeArtistName(s: string): string {
   return cap(stripHtml(s), ARTIST_NAME_MAX);
+}
+
+/**
+ * Sanitise an optional upstream text field: `undefined` for a non-string, and
+ * for a string that is empty once markup and whitespace are removed, so an
+ * Artwork field stays absent instead of carrying `""`.
+ */
+export function optionalText(v: unknown, sanitize: (s: string) => string): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const out = sanitize(v);
+  return out.length > 0 ? out : undefined;
+}
+
+/**
+ * Build an Artwork's credit line from a museum's raw values. Absent unless the
+ * record publishes a credit line or an accession number, and absent when the
+ * holder is empty. Each part is kept verbatim after sanitising; a credit line
+ * that opens with the holder's own name keeps it.
+ */
+export function buildCreditLine(holder: string, fund: unknown, accession: unknown): CreditLine | undefined {
+  const h = sanitizeTitle(holder);
+  const f = optionalText(fund, (s) => cap(stripHtml(s), CREDIT_LINE_MAX));
+  const a = optionalText(accession, (s) => cap(stripHtml(s), ACCESSION_MAX));
+  if (h.length === 0 || (f === undefined && a === undefined)) return undefined;
+  const line: CreditLine = { holder: h };
+  if (f !== undefined) line.fund = f;
+  if (a !== undefined) line.accession = a;
+  return line;
 }

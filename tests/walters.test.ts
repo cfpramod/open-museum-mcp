@@ -178,3 +178,12 @@ describe('Walters bundle-loader seam (createWaltersFetcher)', () => {
     expect(typeof core.createWaltersFetcher).toBe('function');
   });
 });
+
+describe('Walters credit line', () => {
+  it('carries the object number; the bundle has no credit line or dimensions', () => {
+    const result = waltersFetcher.normalize(fixture('walters-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.creditLine).toEqual({ holder: 'Walters Art Museum', accession: 'W.561.2B' });
+    expect(result.artwork.dimensions).toBeUndefined();
+  });
+});

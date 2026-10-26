@@ -11,8 +11,10 @@ import {
   isValidPositiveInt,
   rejectFor,
 } from './helpers.js';
-import { ARTIST_NAME_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeDescription, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { ARTIST_NAME_MAX, DIMENSIONS_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, buildCreditLine, optionalText, sanitizeArtistName, sanitizeDescription, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
+
+const MET_HOLDER = 'The Metropolitan Museum of Art';
 
 const MET_API = 'https://collectionapi.metmuseum.org/public/collection/v1';
 // Search lives under v1.1 (Elastic-backed, paginated via `offset` + `limit`). The
@@ -132,7 +134,7 @@ export const metFetcher: Fetcher = {
       id,
       museum: {
         code: 'met',
-        name: 'The Metropolitan Museum of Art',
+        name: MET_HOLDER,
         url: 'https://www.metmuseum.org',
       },
       title: sanitizeTitle(asString(r.title)) || '(Untitled)',
@@ -161,6 +163,8 @@ export const metFetcher: Fetcher = {
         pageUrl: asString(r.objectURL) || `https://www.metmuseum.org/art/collection/search/${objectID}`,
       },
       description: asOptionalString(sanitizeDescription(asString(r.objectName))),
+      dimensions: optionalText(r.dimensions, (s) => sanitizeText(s, DIMENSIONS_MAX)),
+      creditLine: buildCreditLine(MET_HOLDER, r.creditLine, r.accessionNumber),
       rawTags: Array.isArray(r.tags)
         ? (r.tags as Array<unknown>)
             .map((t) => (t && typeof t === 'object' ? (t as { term?: unknown }).term : undefined))

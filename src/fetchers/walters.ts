@@ -4,7 +4,7 @@ import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mapp
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { accepted, asOptionalString, rejectFor } from './helpers.js';
-import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { MEDIUM_MAX, SHORT_TEXT_MAX, buildCreditLine, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // Walters Art Museum — the engine's FIRST ingest source. The Walters v1 REST API
@@ -242,6 +242,7 @@ export function createWaltersFetcher(
           pageUrl: `${PURL_BASE}/${r.n}`,
         },
         description: asOptionalString(sanitizeText(typeof r.l === 'string' ? r.l : '', SHORT_TEXT_MAX)),
+        creditLine: buildCreditLine('Walters Art Museum', undefined, r.n),
       };
 
       return accepted(artwork);

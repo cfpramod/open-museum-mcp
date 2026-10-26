@@ -4,7 +4,7 @@ import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mapp
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { accepted, asFiniteNumber, asOptionalString, asString, derivePeriodFromYears, httpGet, rejectFor } from './helpers.js';
-import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { DIMENSIONS_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, buildCreditLine, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // The Getty Museum publishes its ~250k-object collection as Linked.Art
@@ -91,6 +91,11 @@ function findHomepageUrl(subjectOf: unknown): string {
 
 const PRIMARY_TITLE = 'https://data.getty.edu/local/thesaurus/object-title-primary';
 const ACCESSION_NUMBER = 'http://vocab.getty.edu/aat/300312355';
+const CREDIT_LINE = 'http://vocab.getty.edu/aat/300435418';
+// The full statement ("Unframed: 74.3 × 94.3 cm …"). Getty also publishes the
+// element label and the bare measurement as separate entries under its own
+// local classifications; those are not read.
+const DIMENSIONS_DESCRIPTION = 'http://vocab.getty.edu/aat/300435430';
 const PRODUCER_NAME = 'https://data.getty.edu/local/thesaurus/producer-name';
 const PRODUCER_DESCRIPTION = 'https://data.getty.edu/local/thesaurus/producer-description';
 const PRODUCER_NATIONALITY_AND_DATES = 'https://data.getty.edu/local/thesaurus/nationality-and-dates';
@@ -330,6 +335,8 @@ SELECT DISTINCT ?obj WHERE {
         pageUrl: findHomepageUrl(r.subject_of),
       },
       description: accessionNumber ? asOptionalString(sanitizeText(accessionNumber, SHORT_TEXT_MAX)) : undefined,
+      dimensions: asOptionalString(sanitizeText(asString(findContentByClassification(r.referred_to_by, DIMENSIONS_DESCRIPTION)), DIMENSIONS_MAX)),
+      creditLine: buildCreditLine('J. Paul Getty Museum', findContentByClassification(r.referred_to_by, CREDIT_LINE), accessionNumber),
     };
 
     return accepted(artwork);

@@ -4,7 +4,7 @@ import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mapp
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { accepted, asFiniteNumber, asOptionalString, asString, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
-import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeDescription, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { DIMENSIONS_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, buildCreditLine, sanitizeArtistName, sanitizeDescription, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // Harvard Art Museums — keyless-to-you-but-keyed REST API (api.harvardartmuseums.org,
@@ -26,6 +26,8 @@ const HARVARD_FIELDS = [
   'period',
   'people',
   'creditline',
+  'dimensions',
+  'objectnumber',
   'imagepermissionlevel',
   'primaryimageurl',
   'images',
@@ -181,6 +183,8 @@ export const harvardFetcher: Fetcher = {
         pageUrl: asString(r.url) || `https://harvardartmuseums.org/collections/object/${objectId}`,
       },
       description: asOptionalString(sanitizeDescription(asString(r.creditline))),
+      dimensions: asOptionalString(sanitizeText(asString(r.dimensions), DIMENSIONS_MAX)),
+      creditLine: buildCreditLine('Harvard Art Museums', r.creditline, r.objectnumber),
       ...(provenance ? { provenance } : {}),
     };
 

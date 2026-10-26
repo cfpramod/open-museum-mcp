@@ -12,7 +12,7 @@ import {
   pickMaxResolution,
   rejectFor,
 } from './helpers.js';
-import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { DIMENSIONS_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, buildCreditLine, optionalText, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // Smithsonian Open Access (EDAN) API. ~3–4M CC0 objects across the
@@ -203,6 +203,20 @@ function pickByLabel(entries: FreetextEntry[], labels: Set<string>): string {
   for (const e of entries) {
     const label = typeof e.label === 'string' ? e.label.toLowerCase() : '';
     if (labels.has(label)) return asString(e.content);
+  }
+  return '';
+}
+
+// How units label the object's own number, in the order to prefer them. NMAH
+// records carry an "accession number" too, but there it numbers the lot the
+// object arrived in, so its "ID Number" comes first.
+const OBJECT_NUMBER_LABELS = ['object number', 'id number', 'accession number', 'inventory number', 'catalog number'];
+
+/** Content of the entry under the earliest label in `labels` that has one, else "". */
+function pickByLabelOrder(entries: FreetextEntry[], labels: readonly string[]): string {
+  for (const label of labels) {
+    const content = pickByLabel(entries, new Set([label]));
+    if (content) return content;
   }
   return '';
 }
@@ -501,14 +515,14 @@ export const smithsonianFetcher: Fetcher = {
     // Museum: surface the contributing unit's full name (e.g. "Smithsonian
     // American Art Museum") for accurate citation, keeping the federation code
     // 'smithsonian'. data_source is the unit's display name.
-    const unitName = sanitizeArtistName(asString(dnr.data_source)) || 'Smithsonian Institution';
+    const unitName = sanitizeArtistName(asString(dnr.data_source));
     const recordLink = asString(dnr.record_link) || asString(dnr.guid);
 
     const artwork: Artwork = {
       id,
       museum: {
         code: 'smithsonian',
-        name: unitName,
+        name: unitName || 'Smithsonian Institution',
         url: SI_SITE,
       },
       title,
@@ -542,6 +556,18 @@ export const smithsonianFetcher: Fetcher = {
       },
       description: asOptionalString(
         sanitizeTitle(pickByLabel(freetextEntries(content, 'objectType'), new Set(['type']))),
+      ),
+      dimensions: optionalText(
+        pickByLabel(freetextEntries(content, 'physicalDescription'), new Set(['dimensions'])),
+        (s) => sanitizeText(s, DIMENSIONS_MAX),
+      ),
+      // The credit line names the unit that holds the object, so a record that
+      // names no unit has none: buildCreditLine leaves it absent for an empty
+      // holder rather than crediting the Institution as a whole.
+      creditLine: buildCreditLine(
+        unitName,
+        pickByLabel(freetextEntries(content, 'creditLine'), new Set(['credit line'])),
+        pickByLabelOrder(freetextEntries(content, 'identifier'), OBJECT_NUMBER_LABELS),
       ),
     };
 

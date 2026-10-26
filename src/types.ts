@@ -129,6 +129,34 @@ export interface Model3D {
   format?: string[];
 }
 
+/**
+ * The object's credit line, split into its parts. Every value is the museum's
+ * own wording; nothing is reworded, abbreviated or inferred.
+ */
+export interface CreditLine {
+  /**
+   * The institution that holds the object. For a single museum this is that
+   * museum; for an aggregated source it is the contributing institution the
+   * record names, never the aggregator. The holder is not always the owner:
+   * for a loan, `fund` names the lender, as in a Rijksmuseum line that opens
+   * "On loan from".
+   */
+  holder: string;
+  /**
+   * The museum's credit line VERBATIM (e.g. "Rogers Fund, 1942" on Met 1077).
+   * Some museums open it with their own name and some do not; it is kept as
+   * published either way, so a consumer that also shows `holder` decides how
+   * to avoid repeating it. ABSENT when the record publishes no credit line.
+   */
+  fund?: string;
+  /**
+   * The museum's identifier for the object, verbatim, whatever the source
+   * calls it: object, accession, ID, inventory or catalog number. ABSENT when
+   * not published.
+   */
+  accession?: string;
+}
+
 export interface Artwork {
   id: string;
   museum: MuseumRef;
@@ -175,6 +203,13 @@ export interface Artwork {
    * none. Additive v0.21 field.
    */
   dimensions?: string;
+  /**
+   * Who holds the object and how it came to them, as the museum publishes it.
+   * ABSENT unless the record publishes a credit line or an accession number:
+   * the holder on its own is this project's knowledge, not the record's.
+   * Additive v0.22 field.
+   */
+  creditLine?: CreditLine;
   rawTags?: string[];
   /**
    * Dominant colour as a `#rrggbb` hex. Set by Node-side colour enrichment when
