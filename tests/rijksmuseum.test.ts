@@ -335,6 +335,10 @@ describe('Rijksmuseum makers named by attribution, and records with several time
       () => {
         throw new TypeError('fetch failed');
       },
+      // A 200 whose body parses but is not a person record is a failure, not a nameless person.
+      () => new Response('[]', { status: 200 }),
+      () => new Response('null', { status: 200 }),
+      () => new Response('"Adriaen Matham"', { status: 200 }),
     ]) {
       const responses = dodoResponses();
       globalThis.fetch = vi.fn(async (input: string | URL | Request) => {

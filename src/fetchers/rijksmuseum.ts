@@ -140,8 +140,9 @@ function unnamedAttributedUris(object: Record<string, unknown>): string[] {
 
 /**
  * The name of a person record. Only a 404 or 410 (the museum no longer has the
- * person) yields ''; a timeout, network error, other status or unreadable body
- * throws, since a credit built without that maker must not be cached.
+ * person) yields ''; a timeout, network error, other status, unreadable body or
+ * body that is not a person record throws, since a credit built without that
+ * maker must not be cached.
  */
 async function fetchPersonName(uri: string): Promise<string> {
   try {
@@ -153,7 +154,8 @@ async function fetchPersonName(uri: string): Promise<string> {
     if (res.status === 404 || res.status === 410) return '';
     if (!res.ok) throw new Error(`status ${res.status}`);
     const person: unknown = await res.json();
-    return isObj(person) ? pickPrimaryName(person) : '';
+    if (!isObj(person) || Array.isArray(person)) throw new Error('body is not a person record');
+    return pickPrimaryName(person);
   } catch (err) {
     throw new Error(`Rijksmuseum person fetch failed for ${uri}: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -385,8 +387,8 @@ export const rijksmuseumFetcher: Fetcher = {
     }
     // Dereference the attributed makers named only by reference, at most
     // PERSON_FETCH_CAP of them, all at once, so normalize can credit them by name.
-    // A person the museum no longer has leaves that maker out; any other failure
-    // fails this fetch, so a credit missing a maker is never cached.
+    // A person the museum no longer has leaves that maker out, as do any past the
+    // cap; any other failure fails this fetch, so a failed person fetch is never cached.
     const uris = isObj(object) ? unnamedAttributedUris(object).slice(0, PERSON_FETCH_CAP) : [];
     const names = await Promise.all(uris.map(fetchPersonName));
     const persons = uris.flatMap((uri, i) => (names[i] ? [{ id: uri, name: names[i] }] : []));
