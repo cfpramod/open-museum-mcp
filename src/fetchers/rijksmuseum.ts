@@ -387,8 +387,10 @@ export const rijksmuseumFetcher: Fetcher = {
     }
     // Dereference the attributed makers named only by reference, at most
     // PERSON_FETCH_CAP of them, all at once, so normalize can credit them by name.
-    // A person the museum no longer has leaves that maker out, as do any past the
-    // cap; any other failure fails this fetch, so a failed person fetch is never cached.
+    // A temporary failure (timeout, network error, other status, a body that is
+    // not a person record) fails this fetch, so it is never cached. Two cases
+    // leave a maker out of a credit that is cached: a person the museum no longer
+    // has (404 or 410), and makers past the cap.
     const uris = isObj(object) ? unnamedAttributedUris(object).slice(0, PERSON_FETCH_CAP) : [];
     const names = await Promise.all(uris.map(fetchPersonName));
     const persons = uris.flatMap((uri, i) => (names[i] ? [{ id: uri, name: names[i] }] : []));
