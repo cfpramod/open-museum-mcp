@@ -4,6 +4,7 @@ import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mapp
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ArtworkMaster, ValidationResult } from '../types.js';
 import {
+  accepted,
   asFiniteNumber,
   asOptionalString,
   asString,
@@ -11,7 +12,7 @@ import {
   pickMaxResolution,
   rejectFor,
 } from './helpers.js';
-import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // Smithsonian Open Access (EDAN) API. ~3–4M CC0 objects across the
@@ -475,13 +476,16 @@ export const smithsonianFetcher: Fetcher = {
     const parsedName = parseSmithsonianName(makerName);
     const cleanName = cleanArtistName(parsedName.name);
 
-    const displayDate = pickByLabel(
-      freetextEntries(content, 'date'),
-      new Set(['date']),
+    const displayDate = sanitizeText(
+      pickByLabel(freetextEntries(content, 'date'), new Set(['date'])),
+      SHORT_TEXT_MAX,
     );
     const dateRange = parseDisplayDate(displayDate);
 
-    const medium = pickByLabel(freetextEntries(content, 'physicalDescription'), new Set(['medium']));
+    const medium = sanitizeText(
+      pickByLabel(freetextEntries(content, 'physicalDescription'), new Set(['medium'])),
+      MEDIUM_MAX,
+    );
 
     // Region: prefer the indexed culture vocabulary, then place; both are
     // string arrays. Fall back to the freetext place display string.
@@ -541,6 +545,6 @@ export const smithsonianFetcher: Fetcher = {
       ),
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };

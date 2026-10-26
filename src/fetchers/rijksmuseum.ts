@@ -19,8 +19,14 @@ import { normalizeMedium } from '../medium.js';
 import { isRightsUri, validateCommercialRights } from '../rights/commercialRights.js';
 import { fetchInfoJson, meetsPrintResolution } from '../iiif/client.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { derivePeriodFromYears, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
-import { ARTIST_NAME_MAX, TITLE_MAX } from './sanitize.js';
+import {
+  accepted,
+  derivePeriodFromYears,
+  httpGet,
+  pickMaxResolution,
+  rejectFor,
+} from './helpers.js';
+import { SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const ID_RESOLVER = 'https://id.rijksmuseum.nl';
@@ -288,11 +294,11 @@ export const rijksmuseumFetcher: Fetcher = {
       );
     }
 
-    const title = (pickTitle(object) || '(Untitled)').slice(0, TITLE_MAX);
+    const title = sanitizeTitle(pickTitle(object)) || '(Untitled)';
     const creators = pickCreators(object);
-    const artistRaw = creators.join(', ').slice(0, ARTIST_NAME_MAX);
+    const artistRaw = sanitizeArtistName(creators.join(', '));
     const { yearStart, yearEnd, display } = pickYears(object);
-    const displayDate = display || parseAndFormat(yearStart, yearEnd);
+    const displayDate = sanitizeText(display, SHORT_TEXT_MAX) || parseAndFormat(yearStart, yearEnd);
 
     const artwork: Artwork = {
       id,
@@ -328,7 +334,7 @@ export const rijksmuseumFetcher: Fetcher = {
         pageUrl: `https://www.rijksmuseum.nl/en/collection/${objectNumber(object)}`,
       },
     };
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };
 

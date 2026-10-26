@@ -3,8 +3,8 @@ import { validateHarvardLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asOptionalString, asString, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
-import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import { accepted, asFiniteNumber, asOptionalString, asString, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
+import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeDescription, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // Harvard Art Museums — keyless-to-you-but-keyed REST API (api.harvardartmuseums.org,
@@ -124,7 +124,7 @@ export const harvardFetcher: Fetcher = {
       return reject(id, 'harvard: no primary image URL (reject)', raw);
     }
 
-    const displayDate = asString(r.dated);
+    const displayDate = sanitizeText(asString(r.dated), SHORT_TEXT_MAX);
     const dateStart = asFiniteNumber(r.datebegin);
     const dateEnd = asFiniteNumber(r.dateend);
     const dateRange =
@@ -161,10 +161,10 @@ export const harvardFetcher: Fetcher = {
       displayDate,
       yearStart: dateRange.yearStart,
       yearEnd: dateRange.yearEnd,
-      medium: asString(r.medium),
+      medium: sanitizeText(asString(r.medium), MEDIUM_MAX),
       mediumCategory: normalizeMedium(asString(r.medium) || asString(r.classification)),
       region: normalizeRegion(asString(r.culture)),
-      period: asOptionalString(r.period) ?? null,
+      period: asOptionalString(sanitizeText(asString(r.period), SHORT_TEXT_MAX)) ?? null,
       imageUrls: {
         full: imageUrl,
         thumbnail: undefined,
@@ -180,10 +180,10 @@ export const harvardFetcher: Fetcher = {
         apiUrl: `${HARVARD_API}/object/${objectId}`,
         pageUrl: asString(r.url) || `https://harvardartmuseums.org/collections/object/${objectId}`,
       },
-      description: asOptionalString(r.creditline),
+      description: asOptionalString(sanitizeDescription(asString(r.creditline))),
       ...(provenance ? { provenance } : {}),
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };

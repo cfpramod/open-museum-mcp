@@ -3,8 +3,8 @@ import { validateNgaLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asOptionalString, pickMaxResolution, rejectFor } from './helpers.js';
-import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import { accepted, asOptionalString, pickMaxResolution, rejectFor } from './helpers.js';
+import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // National Gallery of Art (Washington) — INGEST. NGA has no live query API; its
@@ -157,7 +157,7 @@ export function createNgaFetcher(loadBundle: NgaBundleLoader = defaultBundleLoad
         return reject(id, 'nga: missing objectid', raw);
       }
 
-      const displayDate = typeof r.d === 'string' ? r.d : '';
+      const displayDate = sanitizeText(typeof r.d === 'string' ? r.d : '', SHORT_TEXT_MAX);
       const dateRange =
         typeof r.a === 'number' && typeof r.b === 'number'
           ? { yearStart: r.a, yearEnd: r.b }
@@ -185,7 +185,7 @@ export function createNgaFetcher(loadBundle: NgaBundleLoader = defaultBundleLoad
         displayDate,
         yearStart: dateRange.yearStart,
         yearEnd: dateRange.yearEnd,
-        medium: typeof r.m === 'string' ? r.m : '',
+        medium: sanitizeText(typeof r.m === 'string' ? r.m : '', MEDIUM_MAX),
         mediumCategory: normalizeMedium(typeof r.m === 'string' ? r.m : ''),
         // NGA records no structured culture/place in the dump; region stays null
         // unless the attribution carries one (rare). Honest absence over a guess.
@@ -206,10 +206,10 @@ export function createNgaFetcher(loadBundle: NgaBundleLoader = defaultBundleLoad
           apiUrl: 'https://github.com/NationalGalleryOfArt/opendata',
           pageUrl: `${NGA_PAGE}.${objectId}.html`,
         },
-        description: asOptionalString(r.l),
+        description: asOptionalString(sanitizeText(typeof r.l === 'string' ? r.l : '', SHORT_TEXT_MAX)),
       };
 
-      return { status: 'accepted', artwork };
+      return accepted(artwork);
     },
   };
 }

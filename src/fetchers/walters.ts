@@ -3,8 +3,8 @@ import { validateWaltersLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asOptionalString, rejectFor } from './helpers.js';
-import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import { accepted, asOptionalString, rejectFor } from './helpers.js';
+import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // Walters Art Museum — the engine's FIRST ingest source. The Walters v1 REST API
@@ -190,7 +190,7 @@ export function createWaltersFetcher(
 
       // Dates: trust the bundled integer years; fall back to parsing the display
       // string (dynasty-aware) when a bound is absent.
-      const displayDate = typeof r.d === 'string' ? r.d : '';
+      const displayDate = sanitizeText(typeof r.d === 'string' ? r.d : '', SHORT_TEXT_MAX);
       const dateRange =
         typeof r.a === 'number' && typeof r.b === 'number'
           ? { yearStart: r.a, yearEnd: r.b }
@@ -226,10 +226,10 @@ export function createWaltersFetcher(
         displayDate,
         yearStart: dateRange.yearStart,
         yearEnd: dateRange.yearEnd,
-        medium: typeof r.m === 'string' ? r.m : '',
+        medium: sanitizeText(typeof r.m === 'string' ? r.m : '', MEDIUM_MAX),
         mediumCategory: normalizeMedium(typeof r.m === 'string' ? r.m : ''),
         region: normalizeRegion(typeof r.c === 'string' ? r.c : ''),
-        period: asOptionalString(r.p) ?? null,
+        period: asOptionalString(sanitizeText(typeof r.p === 'string' ? r.p : '', SHORT_TEXT_MAX)) ?? null,
         imageUrls: {
           full: `${IMAGE_BASE}/${image}`,
           thumbnail: undefined,
@@ -241,10 +241,10 @@ export function createWaltersFetcher(
           apiUrl: 'https://github.com/WaltersArtMuseum/api-thewalters-org',
           pageUrl: `${PURL_BASE}/${r.n}`,
         },
-        description: asOptionalString(r.l),
+        description: asOptionalString(sanitizeText(typeof r.l === 'string' ? r.l : '', SHORT_TEXT_MAX)),
       };
 
-      return { status: 'accepted', artwork };
+      return accepted(artwork);
     },
   };
 }

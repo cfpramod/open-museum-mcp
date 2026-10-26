@@ -3,8 +3,15 @@ import { validateMetLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asOptionalString, asString, httpGet, isValidPositiveInt, rejectFor } from './helpers.js';
-import { sanitizeArtistName, sanitizeDescription, sanitizeTitle } from './sanitize.js';
+import {
+  accepted,
+  asOptionalString,
+  asString,
+  httpGet,
+  isValidPositiveInt,
+  rejectFor,
+} from './helpers.js';
+import { ARTIST_NAME_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeDescription, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const MET_API = 'https://collectionapi.metmuseum.org/public/collection/v1';
@@ -100,7 +107,7 @@ export const metFetcher: Fetcher = {
       return rejectFor('met', id, 'met: missing or non-integer objectID', raw);
     }
 
-    const displayDate = asString(r.objectDate);
+    const displayDate = sanitizeText(asString(r.objectDate), SHORT_TEXT_MAX);
     const dateRange = parseDisplayDate(displayDate);
 
     const artistRaw = sanitizeArtistName(asString(r.artistDisplayName));
@@ -111,14 +118,14 @@ export const metFetcher: Fetcher = {
       asString(r.culture) || asString(r.country) || asString(r.classification);
     const region = normalizeRegion(cultureOrCountry);
 
-    const periodRaw = (asString(r.period) || asString(r.dynasty)).toLowerCase().trim();
+    const periodRaw = sanitizeText(asString(r.period) || asString(r.dynasty), SHORT_TEXT_MAX).toLowerCase();
     const period = periodRaw.replace(/\s*\([^)]*\)\s*$/, '').trim() || null;
 
     const fullImage = asString(r.primaryImage) || asString(r.primaryImageSmall);
     const thumbnail = asOptionalString(r.primaryImageSmall);
 
-    const beginDate = asString(r.artistBeginDate);
-    const endDate = asString(r.artistEndDate);
+    const beginDate = sanitizeText(asString(r.artistBeginDate), SHORT_TEXT_MAX);
+    const endDate = sanitizeText(asString(r.artistEndDate), SHORT_TEXT_MAX);
     const lifespan = beginDate || endDate ? `${beginDate}–${endDate}`.replace(/^–|–$/g, '') : undefined;
 
     const artwork: Artwork = {
@@ -131,14 +138,14 @@ export const metFetcher: Fetcher = {
       title: sanitizeTitle(asString(r.title)) || '(Untitled)',
       artist: {
         name: cleanName || 'Unknown',
-        nationality: asOptionalString(r.artistNationality),
+        nationality: asOptionalString(sanitizeText(asString(r.artistNationality), ARTIST_NAME_MAX)),
         lifespan,
         attributionType,
       },
       displayDate,
       yearStart: dateRange.yearStart,
       yearEnd: dateRange.yearEnd,
-      medium: asString(r.medium),
+      medium: sanitizeText(asString(r.medium), MEDIUM_MAX),
       mediumCategory: normalizeMedium(asString(r.medium)),
       region,
       period,
@@ -158,9 +165,11 @@ export const metFetcher: Fetcher = {
         ? (r.tags as Array<unknown>)
             .map((t) => (t && typeof t === 'object' ? (t as { term?: unknown }).term : undefined))
             .filter((s): s is string => typeof s === 'string')
+            .map((s) => sanitizeText(s, SHORT_TEXT_MAX))
+            .filter((s) => s !== '')
         : undefined,
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };

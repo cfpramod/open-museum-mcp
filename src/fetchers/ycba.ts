@@ -3,7 +3,15 @@ import { firstIiif2Canvas, validateYcbaLicense, YCBA_GROUP_ID, YCBA_MANIFEST_URL
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asOptionalString, asString, derivePeriodFromYears, httpGet, rejectFor } from './helpers.js';
+import {
+  accepted,
+  asFiniteNumber,
+  asOptionalString,
+  asString,
+  derivePeriodFromYears,
+  httpGet,
+  rejectFor,
+} from './helpers.js';
 import { sanitizeArtistName, sanitizeDescription, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
@@ -378,6 +386,6 @@ export const ycbaFetcher: Fetcher = {
       dimensions: dimensions ? sanitizeDescription(dimensions) : undefined,
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };

@@ -7,7 +7,18 @@
  * helpers express the most-common narrowings once.
  */
 
-import type { ValidationResult } from '../types.js';
+import type { Artwork, ValidationResult } from '../types.js';
+import { sanitizeArtworkText } from './sanitize.js';
+
+/**
+ * The only way an adapter's normalize() returns an accepted record. It runs
+ * the record through sanitizeArtworkText, so every text field is cleaned and
+ * capped however the adapter filled it. A test fails if an adapter builds an
+ * accepted result any other way.
+ */
+export function accepted(artwork: Artwork): ValidationResult {
+  return { status: 'accepted', artwork: sanitizeArtworkText(artwork) };
+}
 
 /**
  * Descriptive User-Agent for all outbound museum-API requests.

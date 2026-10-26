@@ -5,6 +5,7 @@ import { normalizeMedium } from '../medium.js';
 import type { Artwork, ArtworkMaster, ValidationResult } from '../types.js';
 import { isNonArtWikimedia } from './curation.js';
 import {
+  accepted,
   asFiniteNumber,
   asString,
   httpGet,
@@ -451,6 +452,6 @@ export const wikimediaFetcher: Fetcher = {
       description: description || undefined,
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };

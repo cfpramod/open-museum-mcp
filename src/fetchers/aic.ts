@@ -4,6 +4,7 @@ import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mapp
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import {
+  accepted,
   asFiniteNumber,
   asOptionalString,
   asString,
@@ -11,7 +12,7 @@ import {
   isValidPositiveInt,
   rejectFor,
 } from './helpers.js';
-import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import { DIMENSIONS_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const AIC_API = 'https://api.artic.edu/api/v1';
@@ -149,7 +150,7 @@ export const aicFetcher: Fetcher = {
       return reject(id, 'aic: missing or non-integer id', raw);
     }
 
-    const displayDate = asString(r.date_display);
+    const displayDate = sanitizeText(asString(r.date_display), SHORT_TEXT_MAX);
     const dateStart = asFiniteNumber(r.date_start);
     const dateEnd = asFiniteNumber(r.date_end);
     // AIC ships date_start/date_end as integers. Trust them when both are
@@ -212,7 +213,7 @@ export const aicFetcher: Fetcher = {
       displayDate,
       yearStart: dateRange.yearStart,
       yearEnd: dateRange.yearEnd,
-      medium: asString(r.medium_display),
+      medium: sanitizeText(asString(r.medium_display), MEDIUM_MAX),
       mediumCategory: normalizeMedium(asString(r.medium_display)),
       region,
       period: null,
@@ -235,11 +236,11 @@ export const aicFetcher: Fetcher = {
       // real text's absence invisible. The classification now has no home on the
       // record rather than a misleading one; `objectType` below carries the
       // museum's object-type term, which is what consumers of that field wanted.
-      objectType: asOptionalString(r.artwork_type_title),
-      dimensions: asOptionalString(r.dimensions),
+      objectType: asOptionalString(sanitizeText(asString(r.artwork_type_title), SHORT_TEXT_MAX)),
+      dimensions: asOptionalString(sanitizeText(asString(r.dimensions), DIMENSIONS_MAX)),
       ...(provenance ? { provenance } : {}),
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };
