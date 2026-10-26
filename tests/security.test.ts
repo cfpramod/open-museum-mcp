@@ -20,7 +20,7 @@ import { wikimediaFetcher } from '../src/fetchers/wikimedia.js';
 import { createColorExtractor, isSafeImageUrl } from '../src/color/extract.js';
 import { Cache } from '../src/db.js';
 import { parseDisplayDate } from '../src/dateParser.js';
-import { decodeEntities, sanitizeTitle, stripHtml, textView } from '../src/fetchers/sanitize.js';
+import { cleanText, decodeEntities, sanitizeTitle, stripHtml, textView } from '../src/fetchers/sanitize.js';
 import type { Artwork } from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -666,8 +666,8 @@ describe('decodeEntities: one pass, shared with the text view', () => {
   const CASES = markup(0x5eed, 3000);
 
   // Each check lists the inputs it fails on, so a failure names them all.
-  it('reads the same text in textView as in stripHtml, before its whitespace collapse', () => {
-    const differ = CASES.filter((html) => textView(html).text.replace(/\s+/g, ' ').trim() !== stripHtml(html));
+  it('reads the text stripHtml cleans: cleaning the textView text gives stripHtml', () => {
+    const differ = CASES.filter((html) => cleanText(textView(html).text) !== stripHtml(html));
     expect(differ).toEqual([]);
   });
 

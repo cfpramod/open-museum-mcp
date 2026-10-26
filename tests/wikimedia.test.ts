@@ -1442,26 +1442,31 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
     expect(a.description).toBe('Quoted after');
   });
 
-  it('keeps decoded angle brackets that do not form an HTML tag', () => {
-    for (const text of ['&lt;untitled&gt;', '5 &lt; 6 and 7 &gt; 3', 'a &lt;-&gt; b', '&lt;Hearn&gt;', '&lt;i.e.&gt;', '&lt;a-z&gt;']) {
+  it('keeps decoded angle brackets that a parser reads as text', () => {
+    for (const text of ['5 &lt; 6 and 7 &gt; 3', 'a &lt;-&gt; b', '&lt;3 x']) {
       const a = accepted(withExtField('ImageDescription', text));
-      expect(a.description).toBe(
-        text.replace(/&lt;/g, '<').replace(/&gt;/g, '>'),
-      );
+      expect(a.description).toBe(text.replace(/&lt;/g, '<').replace(/&gt;/g, '>'));
     }
   });
 
-  it('keeps an escaped tag that is never closed', () => {
-    const a = accepted(withExtField('ImageDescription', 'Before &lt;a href="https://example.org/x" after'));
-    expect(a.description).toBe('Before <a href="https://example.org/x" after');
+  // A parser builds an element for any name, so text in angle brackets goes
+  // whether or not the name is a known element.
+  it('removes decoded markup whatever its name', () => {
+    for (const text of ['&lt;untitled&gt;', '&lt;Hearn&gt;', '&lt;i.e.&gt;', '&lt;a-z&gt;']) {
+      expect(accepted(withExtField('ImageDescription', text)).description).toBeUndefined();
+    }
   });
 
-  // Escapes `<` and `>` so the text reaches the second pass, as Commons sends it.
+  it('removes the "<" of an escaped tag that is never closed', () => {
+    const a = accepted(withExtField('ImageDescription', 'Before &lt;a href="https://example.org/x" after'));
+    expect(a.description).toBe('Before a href="https://example.org/x" after');
+  });
+
+  // Escapes `<` and `>`, as Commons sends markup that wikitext does not allow.
   const escaped = (text: string): string => text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   // Element names that can be spelled from the property test's alphabet, plus
-  // the common ones; kept here rather than read from the fetcher, so a name
-  // dropped from the fetcher's list fails this test instead of passing it.
+  // the common ones and the ones a parser still builds from older markup.
   const ELEMENT_NAMES = new Set([
     'a', 'b', 'i', 'p', 's', 'br', 'tr', 'rp', 'rt', 'abbr', 'script', 'img', 'image', 'param', 'div', 'span', 'iframe', 'style', 'selectedcontent',
   ]);
@@ -1475,15 +1480,15 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
     return false;
   }
 
-  // Removing a tag joins the text on either side of it. A `<` kept as text
-  // can then meet the rest of an element name and form a tag that was not in
-  // the source: `<scr<script>ipt>` would become `<script>`.
+  // Removing a tag joins the text on either side of it, which could form a
+  // tag that was not in the source. A parser reads `<scr<script>` as one tag
+  // that ends at the first `>`, and so does the stripper, leaving `ipt>`.
   for (const [input, expected] of [
-    ['<scr<script>ipt>alert(1)</scr</script>ipt>', 'Before alert(1)'],
+    ['<scr<script>ipt>alert(1)</scr</script>ipt>', 'Before ipt>alert(1)ipt>'],
     ['<<a>a href="https://evil.example">x<</a>/a>', 'Before x'],
-    ['<im<b>g src=x onerror=alert(1)>', 'Before'],
+    ['<im<b>g src=x onerror=alert(1)>', 'Before g src=x onerror=alert(1)>'],
     ['<<b>i>bold<<b>/i>', 'Before bold'],
-    ['<a<br>>', 'Before'],
+    ['<a<br>>', 'Before >'],
   ]) {
     it(`does not join kept text into a new tag: ${input}`, () => {
       const a = accepted(withExtField('ImageDescription', escaped(`Before ${input}`)));
@@ -1492,8 +1497,8 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
     });
   }
 
-  // Names a browser still builds an element for, which the element list here
-  // lacked: the parser rewrites `<image>` to `<img>`, so an escaped
+  // Names a browser still builds an element for from older markup: the parser
+  // rewrites `<image>` to `<img>`, so an escaped
   // `<image src=x onerror=...>` is as live as an `<img>`.
   for (const tag of [
     '<image src=x onerror=alert(1)>', '<param name=x>', '<rb>', '<rtc>', '<plaintext>', '<xmp>', '<listing>',
@@ -1505,8 +1510,7 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
     });
   }
 
-  // The longest current element name, longer than any other in the list, so
-  // it checks that the name window is wide enough for every name.
+  // The longest current element name: a name is read whole, however long.
   it('removes an escaped selectedcontent tag and its closing tag', () => {
     const a = accepted(withExtField('ImageDescription', escaped('Before <selectedcontent>x</selectedcontent> after')));
     expect(a.description).toBe('Before x after');

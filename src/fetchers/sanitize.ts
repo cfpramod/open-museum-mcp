@@ -8,7 +8,9 @@
  * reverse (capping first could leave a trailing open tag). Control characters
  * are removed too, except the whitespace controls, which collapse to a space.
  * Unicode tag characters and bidirectional embeddings, overrides and isolates
- * are removed as well: they hide or reorder text without showing it.
+ * are removed as well: they hide or reorder text without showing it. No field
+ * keeps a `<` that an HTML parser would read as markup, whatever the element
+ * name, including markup that decoding a character reference formed.
  *
  * Field caps (chosen to be generous for legitimate data while bounding the
  * token surface area for any single field in LLM context):
@@ -153,8 +155,9 @@ function stripTags(s: string): string {
   return out;
 }
 
-// The text stripHtml reads, before its whitespace collapse, with the index in
-// `s` that each character came from. A caller that finds something in the text
+// The text stripHtml reads, before cleanText removes markup the decoding
+// formed and collapses whitespace, with the index in `s` that each character
+// came from. A caller that finds something in the text
 // can then act on the markup at the same place. Tags follow stripTags, and
 // each character reference is decoded once with decodeEntities' own per-match
 // function, after the tags are gone, as stripHtml does.
@@ -211,15 +214,86 @@ const CONTROL_CHARS = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F]/g;
 // variants depend on them.
 const HIDDEN_FORMAT_CHARS = /[\u202A-\u202E\u2066-\u2069\u{E0000}-\u{E007F}]/gu;
 
+// A `<` opens markup when an HTML parser reads it as the start of a tag, a
+// closing tag, a comment or a declaration: when a letter, `/`, `!` or `?`
+// follows it. Whatever the name, known element or not, since a parser builds
+// an element, with its attributes, for any name. Any other `<` is text to a
+// parser ("5 < 6", "<3") and stays.
+const MARKUP_OPENER = /[A-Za-z/!?]/;
+
+function opensMarkup(s: string, lt: number): boolean {
+  return lt + 1 < s.length && MARKUP_OPENER.test(s[lt + 1]);
+}
+
+// One linear pass. Markup closed by a `>` is removed up to the first `>`, as
+// a parser ends a tag there and as stripTags does, leaving a space where it
+// ends a line or a block. Markup that is never closed loses its `<` alone: a
+// parser drops it at the end of the text, but a consumer that puts the text
+// inside its own markup closes it with its next `>`, and the text after the
+// name becomes attributes.
+function removeMarkupOnce(s: string): string {
+  let out = '';
+  let i = 0;
+  let gtLeft = true; // false once no `>` follows the scan point
+  for (let lt = s.indexOf('<'); lt !== -1; lt = s.indexOf('<', i)) {
+    if (!opensMarkup(s, lt)) {
+      out += s.slice(i, lt + 1);
+      i = lt + 1;
+      continue;
+    }
+    out += s.slice(i, lt);
+    const gt = gtLeft ? s.indexOf('>', lt + 1) : -1;
+    if (gt === -1) {
+      gtLeft = false;
+      i = lt + 1;
+      continue;
+    }
+    if (SEPARATING_TAGS.has(tagNameAt(s, lt, gt))) out += ' ';
+    i = gt + 1;
+  }
+  return out + s.slice(i);
+}
+
+// Removing markup joins the text on either side of it, so a `<` kept as text
+// can meet a letter: `<<b>i>` becomes `<i>`. Each repeat peels one such layer;
+// source text nests no deeper than this.
+const MARKUP_PASSES = 4;
+
+// Remove markup of any name, then make sure none is left. After the repeats,
+// any `<` still followed by a letter, `/`, `!` or `?` is dropped. The sweep
+// runs from the end, so it judges each `<` by the text that will follow it:
+// dropping one `<` of `<<a` cannot leave the other in front of the `a`.
+// Every step is linear.
+function removeMarkup(s: string): string {
+  if (!s.includes('<')) return s;
+  let text = s;
+  for (let pass = 0; pass < MARKUP_PASSES; pass++) {
+    const next = removeMarkupOnce(text);
+    if (next === text) break;
+    text = next;
+  }
+  const kept: string[] = [];
+  let following = '';
+  for (let k = text.length - 1; k >= 0; k--) {
+    const c = text[k];
+    if (c === '<' && following !== '' && MARKUP_OPENER.test(following)) continue;
+    kept.push(c);
+    following = c;
+  }
+  return kept.reverse().join('');
+}
+
 // The character-level half of stripHtml: map C1, remove controls and hidden
-// format characters, collapse whitespace. It decodes nothing, so applying it
-// to its own output, or to stripHtml's, changes nothing. That is what lets
-// sanitizeArtworkText run over fields an adapter has already sanitized.
+// format characters, remove markup, collapse whitespace. Markup goes after the
+// characters, so one between `<` and a name cannot hide a tag that would form
+// once it is gone. It decodes nothing, so applying it to its own output, or to
+// stripHtml's, changes nothing. That is what lets sanitizeArtworkText run over
+// fields an adapter has already sanitized, and hold every field of every
+// record to the same markup rule.
 export function cleanText(s: string): string {
-  return s
-    .replace(C1_CHARS, mapWindows1252)
-    .replace(CONTROL_CHARS, '')
-    .replace(HIDDEN_FORMAT_CHARS, '')
+  return removeMarkup(
+    s.replace(C1_CHARS, mapWindows1252).replace(CONTROL_CHARS, '').replace(HIDDEN_FORMAT_CHARS, ''),
+  )
     .replace(/\s+/g, ' ')
     .trim();
 }
