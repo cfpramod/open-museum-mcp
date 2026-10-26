@@ -1483,8 +1483,8 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
     });
   }
 
-  // Names a browser still builds an element for, though no current element
-  // list carries them: the parser rewrites `<image>` to `<img>`, so an escaped
+  // Names a browser still builds an element for, which the element list here
+  // lacked: the parser rewrites `<image>` to `<img>`, so an escaped
   // `<image src=x onerror=...>` is as live as an `<img>`.
   for (const tag of [
     '<image src=x onerror=alert(1)>', '<param name=x>', '<rb>', '<rtc>', '<plaintext>', '<xmp>', '<listing>',
