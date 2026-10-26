@@ -480,6 +480,31 @@ describe('Smithsonian dimensions and credit line', () => {
     expect(result.artwork.creditLine).toBeUndefined();
   });
 
+  // Units label the object's own number differently. These records are
+  // unedited responses from the live API, one per label.
+  for (const [file, holder, fund, accession] of [
+    ['smithsonian-accepted-chndm-accession-number.json', 'Cooper Hewitt, Smithsonian Design Museum', 'Gift of Leverton Harris', '1913-13-19'],
+    ['smithsonian-accepted-nmah-id-number.json', 'National Museum of American History', undefined, '2009.0129.01'],
+    ['smithsonian-accepted-nasm-inventory-number.json', 'National Air and Space Museum', 'Gift of William J. Powell, III', 'A20100223000'],
+    ['smithsonian-accepted-nmai-catalog-number.json', 'National Museum of the American Indian', undefined, '18/9845'],
+  ]) {
+    it(`reads the object number under the unit's own label: ${file}`, () => {
+      const result = smithsonianFetcher.normalize(fixture(file!));
+      if (result.status !== 'accepted') throw new Error('expected accepted');
+      expect(result.artwork.creditLine).toEqual({ holder, ...(fund ? { fund } : {}), accession });
+    });
+  }
+
+  it('takes the ID number over the accession number, which names the lot the object came in', () => {
+    const raw = clone('smithsonian-accepted-nmah-id-number.json');
+    const content = ((raw.response ?? raw) as { content: { freetext: { identifier: Array<{ label: string; content: string }> } } }).content;
+    expect(content.freetext.identifier.map((e) => e.label)).toEqual(['ID Number', 'accession number', 'catalog number']);
+    content.freetext.identifier.reverse();
+    const result = smithsonianFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.creditLine?.accession).toBe('2009.0129.01');
+  });
+
   // The credit line names the unit that holds the object; with no unit named,
   // it is absent rather than credited to the Institution as a whole.
   for (const dataSource of ['', undefined]) {

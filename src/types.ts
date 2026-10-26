@@ -149,7 +149,11 @@ export interface CreditLine {
    * to avoid repeating it. ABSENT when the record publishes no credit line.
    */
   fund?: string;
-  /** The accession or object number, verbatim. ABSENT when not published. */
+  /**
+   * The museum's identifier for the object, verbatim, whatever the source
+   * calls it: object, accession, ID, inventory or catalog number. ABSENT when
+   * not published.
+   */
   accession?: string;
 }
 

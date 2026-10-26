@@ -207,6 +207,20 @@ function pickByLabel(entries: FreetextEntry[], labels: Set<string>): string {
   return '';
 }
 
+// How units label the object's own number, in the order to prefer them. NMAH
+// records carry an "accession number" too, but there it numbers the lot the
+// object arrived in, so its "ID Number" comes first.
+const OBJECT_NUMBER_LABELS = ['object number', 'id number', 'accession number', 'inventory number', 'catalog number'];
+
+/** Content of the entry under the earliest label in `labels` that has one, else "". */
+function pickByLabelOrder(entries: FreetextEntry[], labels: readonly string[]): string {
+  for (const label of labels) {
+    const content = pickByLabel(entries, new Set([label]));
+    if (content) return content;
+  }
+  return '';
+}
+
 /** First freetext entry's content regardless of label (used for single-purpose arrays). */
 function firstContent(entries: FreetextEntry[]): string {
   for (const e of entries) {
@@ -553,7 +567,7 @@ export const smithsonianFetcher: Fetcher = {
       creditLine: buildCreditLine(
         unitName,
         pickByLabel(freetextEntries(content, 'creditLine'), new Set(['credit line'])),
-        pickByLabel(freetextEntries(content, 'identifier'), new Set(['object number'])),
+        pickByLabelOrder(freetextEntries(content, 'identifier'), OBJECT_NUMBER_LABELS),
       ),
     };
 
