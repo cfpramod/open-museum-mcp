@@ -1,7 +1,7 @@
-// Compiled by tests/artworkFields.test.ts. Every string field of Artwork must
-// be either cleaned by the final pass or exempt with a reason. A field in
-// neither list, in both, or listed but gone makes the matching line fail to
-// compile, and the error names the path.
+// Compiled by the package typecheck script, through tests/types/tsconfig.json.
+// Every string field of Artwork must be either cleaned by the final pass or
+// exempt with a reason. A field in neither list, in both, or listed but gone
+// makes the matching line fail to compile, and the error names the path.
 
 import type { Artwork } from '../../src/types.js';
 import type { CLEANED_PATHS, EXEMPT_PATHS, StringPaths } from '../helpers/artwork.js';
