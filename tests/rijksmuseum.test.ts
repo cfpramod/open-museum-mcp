@@ -174,7 +174,7 @@ describe('Rijksmuseum makers named by attribution, and records with several time
     });
     const a = await normalizeDodo(responses);
     expect(a.artist.name).toBe('attributed to Adriaen Matham, Pieter van den Broecke');
-    expect(a.artist.attributionType).toBe('attributed');
+    expect(a.artist.attributionType).toBe('named');
   });
 
   it('credits a maker once, plainly, when the museum also credits them directly in another role', async () => {
@@ -202,7 +202,7 @@ describe('Rijksmuseum makers named by attribution, and records with several time
     expect(result.artwork.artist.name).toBe('Adriaen Matham');
   });
 
-  it('falls back to Unknown when the attributed person cannot be fetched', async () => {
+  it('falls back to Unknown when the museum no longer has the attributed person (404)', async () => {
     const responses = dodoResponses();
     delete responses[MATHAM];
     const a = await normalizeDodo(responses);
@@ -255,6 +255,106 @@ describe('Rijksmuseum makers named by attribution, and records with several time
     dodoPart(responses).assigned_by[0].assigned[0].id = 'constructor';
     const a = await normalizeDodo(responses);
     expect(a.artist.name).toBe('Unknown');
+  });
+
+  it('never fetches a person reference outside the museum\'s own numeric ids', async () => {
+    for (const uri of [
+      'https://evil.example/2108277',
+      'http://id.rijksmuseum.nl/2108277',
+      'https://id.rijksmuseum.nl.evil.example/2108277',
+      'https://id.rijksmuseum.nl/2108277?next=https://evil.example',
+      'https://id.rijksmuseum.nl/2108277/../../x',
+    ]) {
+      const responses = dodoResponses();
+      dodoPart(responses).assigned_by[0].assigned[0].id = uri;
+      const calls = stubFetch(responses);
+      const result = rijksmuseumFetcher.normalize(await rijksmuseumFetcher.getRaw(DODO_ID));
+      expect(calls, uri).not.toContain(uri);
+      expect(calls.filter((c) => !Object.hasOwn(dodoResponses(), c)), uri).toEqual([]);
+      if (result.status !== 'accepted') throw new Error('expected accepted');
+      expect(result.artwork.artist.name, uri).toBe('Unknown');
+    }
+  });
+
+  it('fetches at most six people for one record, all at once', async () => {
+    const responses = dodoResponses();
+    const object = responses['https://id.rijksmuseum.nl/200489255'] as any;
+    const credit = dodoPart(responses).referred_to_by;
+    for (let n = 1; n <= 10; n++) {
+      const uri = `https://id.rijksmuseum.nl/90000${n}`;
+      object.produced_by.part.push({
+        type: 'Production',
+        referred_to_by: credit,
+        assigned_by: [{ type: 'AttributeAssignment', assigned: [{ id: uri, type: 'Person' }], assigned_property: 'carried_out_by', classified_as: [{ id: AAT_ATTRIBUTED_TO, type: 'Type' }] }],
+      });
+      responses[uri] = { type: 'Person', identified_by: [{ type: 'Name', content: `Maker ${n}`, classified_as: [{ id: 'http://vocab.getty.edu/aat/300404670' }] }] };
+    }
+    let inFlight = 0;
+    let peak = 0;
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return new Response(JSON.stringify(responses[url]), { status: 200 });
+    }) as unknown as typeof fetch;
+    const result = rijksmuseumFetcher.normalize(await rijksmuseumFetcher.getRaw(DODO_ID));
+    const personCalls = calls.filter((c) => c === MATHAM || c.includes('/90000'));
+    expect(personCalls).toEqual([MATHAM, ...[1, 2, 3, 4, 5].map((n) => `https://id.rijksmuseum.nl/90000${n}`)]);
+    expect(peak).toBeGreaterThanOrEqual(6);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.artist.name).toBe(
+      ['attributed to Adriaen Matham', ...[1, 2, 3, 4, 5].map((n) => `attributed to Maker ${n}`)].join(', '),
+    );
+  });
+
+  it('bounds every person fetch with the 10s timeout and refuses redirects', async () => {
+    const responses = dodoResponses();
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    const seen = new Map<string, RequestInit | undefined>();
+    globalThis.fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      seen.set(String(input), init);
+      return new Response(JSON.stringify(responses[String(input)]), { status: 200 });
+    }) as unknown as typeof fetch;
+    await rijksmuseumFetcher.getRaw(DODO_ID);
+    expect(timeout).toHaveBeenCalledWith(10_000);
+    expect(seen.get(MATHAM)?.signal).toBe(timeout.mock.results[0]?.value);
+    expect(seen.get(MATHAM)?.redirect).toBe('error');
+  });
+
+  it('fails the fetch, so nothing is cached, when a person fetch fails transiently', async () => {
+    for (const fail of [
+      () => new Response('busy', { status: 503 }),
+      () => new Response('slow down', { status: 429 }),
+      () => {
+        throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+      },
+      () => {
+        throw new TypeError('fetch failed');
+      },
+    ]) {
+      const responses = dodoResponses();
+      globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+        if (String(input) === MATHAM) return fail();
+        return new Response(JSON.stringify(responses[String(input)]), { status: 200 });
+      }) as unknown as typeof fetch;
+      await expect(rijksmuseumFetcher.getRaw(DODO_ID)).rejects.toThrow(/Rijksmuseum person/);
+    }
+  });
+
+  it('types a work credited directly and by attribution as named, with the qualifier kept on its name', async () => {
+    const responses = dodoResponses();
+    const object = responses['https://id.rijksmuseum.nl/200489255'] as any;
+    object.produced_by.part.unshift({
+      type: 'Production',
+      carried_out_by: [{ id: 'https://id.rijksmuseum.nl/1', type: 'Person', notation: [{ '@language': 'en', '@value': 'Pieter van den Broecke' }] }],
+    });
+    const a = await normalizeDodo(responses);
+    expect(a.artist.name).toBe('Pieter van den Broecke, attributed to Adriaen Matham');
+    expect(a.artist.attributionType).toBe('named');
   });
 
   it('still dates a record whose timespan is a single object', () => {

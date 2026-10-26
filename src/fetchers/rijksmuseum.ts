@@ -81,15 +81,21 @@ function notationName(actor: Record<string, unknown>): string {
 
 // Attribution qualifiers on an AttributeAssignment of `carried_out_by`, mapped to
 // the wording the museum puts before the name. Rijks also uses 300435722
-// ("possibly") and no qualifier at all (shown as "mentioned on object", a name
-// inscribed on the object); neither is an attribution of authorship, so both
-// stay out of the credit until they have attribution types of their own.
+// ("possibly", a weaker attribution than "attributed to") and no qualifier at
+// all (shown as "mentioned on object": the name is inscribed on the object, which
+// does not make that person its maker). No attribution type says either without
+// claiming more than the museum does, so both stay out of the credit.
 const ATTRIBUTION_QUALIFIERS = new Map<string, string>([['300404269', 'attributed to']]);
 
 // The short credit text a production part carries when the museum credits it
 // (AAT 300435417, "abstract note": "attributed to Adriaen Matham"). Role parts
 // such as "after own design by" carry none and are not in the museum's credit line.
 const AAT_CREDIT_TEXT = '300435417';
+
+// Person records fetched per object. No record in a live sample of 376 needed
+// more than one; the cap bounds what an upstream record can make us fetch.
+const PERSON_FETCH_CAP = 6;
+const PERSON_TIMEOUT_MS = 10_000;
 
 /** A person reference we may dereference: only the museum's own numeric ids. */
 const PERSON_URI = /^https:\/\/id\.rijksmuseum\.nl\/\d+$/;
@@ -133,16 +139,39 @@ function unnamedAttributedUris(object: Record<string, unknown>): string[] {
 }
 
 /**
+ * The name of a person record. Only a 404 or 410 (the museum no longer has the
+ * person) yields ''; a timeout, network error, other status or unreadable body
+ * throws, since a credit built without that maker must not be cached.
+ */
+async function fetchPersonName(uri: string): Promise<string> {
+  try {
+    const res = await httpGet(uri, {
+      headers: { Accept: 'application/ld+json' },
+      signal: AbortSignal.timeout(PERSON_TIMEOUT_MS),
+      redirect: 'error',
+    });
+    if (res.status === 404 || res.status === 410) return '';
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const person: unknown = await res.json();
+    return isObj(person) ? pickPrimaryName(person) : '';
+  } catch (err) {
+    throw new Error(`Rijksmuseum person fetch failed for ${uri}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+type Credit = { name: string; attributed: boolean };
+
+/**
  * Credit names in the museum's order, an attributed one carrying its qualifier.
  * A person the museum also credits directly, in another role, is credited once
  * by the bare name, as the museum's own page does.
  */
-function pickCreators(object: Record<string, unknown>, personNames: ReadonlyMap<string, string>): string[] {
+function pickCreators(object: Record<string, unknown>, personNames: ReadonlyMap<string, string>): Credit[] {
   const makers = pickMakers(object);
   const direct = makers.filter((m) => m.direct);
   const directUris = new Set(direct.map((m) => m.uri).filter(Boolean));
   const directNames = new Set(direct.map((m) => m.name).filter(Boolean));
-  const names: string[] = [];
+  const credits: Credit[] = [];
   for (const maker of makers) {
     let name = maker.name;
     if (!maker.direct) {
@@ -150,9 +179,21 @@ function pickCreators(object: Record<string, unknown>, personNames: ReadonlyMap<
       if (directUris.has(maker.uri) || directNames.has(resolved)) continue;
       name = resolved ? `${maker.qualifier} ${resolved}` : '';
     }
-    if (name && !names.includes(name)) names.push(name);
+    if (name && !credits.some((c) => c.name === name)) credits.push({ name, attributed: !maker.direct });
   }
-  return names;
+  return credits;
+}
+
+/**
+ * The work's attribution type. Attributed only when every maker credited by
+ * name is attributed; beside a maker credited directly, the work is typed by
+ * that maker and each attributed name keeps its qualifier in the credit text.
+ */
+function creditType(credits: Credit[]): Artwork['artist']['attributionType'] {
+  const direct = credits.filter((c) => !c.attributed).map((c) => c.name);
+  const directType = detectAttributionType(direct.join(', '));
+  if (credits.some((c) => c.attributed) && directType === 'anonymous') return 'attributed';
+  return directType;
 }
 
 /** Person names getRaw resolved, as `[{ id, name }]` in the bundle. */
@@ -342,18 +383,13 @@ export const rijksmuseumFetcher: Fetcher = {
         /* place unavailable — region simply stays null */
       }
     }
-    // Dereference each attributed maker named only by reference, so normalize can
-    // credit them by name. Failures degrade to leaving that maker out.
-    const persons: Array<{ id: string; name: string }> = [];
-    for (const uri of isObj(object) ? unnamedAttributedUris(object) : []) {
-      try {
-        const person = await fetchLd(uri);
-        const name = isObj(person) ? pickPrimaryName(person) : '';
-        if (name) persons.push({ id: uri, name });
-      } catch {
-        /* person unavailable: the maker is left out of the credit */
-      }
-    }
+    // Dereference the attributed makers named only by reference, at most
+    // PERSON_FETCH_CAP of them, all at once, so normalize can credit them by name.
+    // A person the museum no longer has leaves that maker out; any other failure
+    // fails this fetch, so a credit missing a maker is never cached.
+    const uris = isObj(object) ? unnamedAttributedUris(object).slice(0, PERSON_FETCH_CAP) : [];
+    const names = await Promise.all(uris.map(fetchPersonName));
+    const persons = uris.flatMap((uri, i) => (names[i] ? [{ id: uri, name: names[i] }] : []));
     return { id, object, visualItem, image, place, persons };
   },
 
@@ -388,7 +424,8 @@ export const rijksmuseumFetcher: Fetcher = {
     }
 
     const title = (pickPrimaryName(object) || '(Untitled)').slice(0, TITLE_MAX);
-    const creators = pickCreators(object, personNamesOf(raw));
+    const credits = pickCreators(object, personNamesOf(raw));
+    const creators = credits.map((c) => c.name);
     const artistRaw = creators.join(', ').slice(0, ARTIST_NAME_MAX);
     // A lone attributed maker reads as the bare name with attributionType
     // 'attributed'; beside other makers, each qualifier stays with its own name.
@@ -404,7 +441,7 @@ export const rijksmuseumFetcher: Fetcher = {
         name: artistName || 'Unknown',
         nationality: undefined,
         lifespan: undefined,
-        attributionType: detectAttributionType(artistRaw),
+        attributionType: creditType(credits),
       },
       displayDate,
       yearStart,
