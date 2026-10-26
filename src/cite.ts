@@ -24,11 +24,20 @@ function creditedArtist(a: Artwork): string {
   return `${qualifier} ${a.artist.name}`;
 }
 
-/** The credited artist opening a sentence. */
-function leadingArtist(a: Artwork): string {
+/**
+ * The credited artist with a leading qualifier set in the given case: capital
+ * where it opens a sentence (full, caption), lower case inline (short). Only the
+ * qualifier is recased; a name is printed as the museum gives it.
+ */
+function casedArtist(a: Artwork, opensSentence: boolean): string {
   const artist = creditedArtist(a);
-  return artist.charAt(0).toUpperCase() + artist.slice(1);
+  const qualifier = QUALIFIERS[a.artist.attributionType];
+  if (!qualifier || artist.slice(0, qualifier.length).toLowerCase() !== qualifier) return artist;
+  const lead = opensSentence ? qualifier.charAt(0).toUpperCase() + qualifier.slice(1) : qualifier;
+  return lead + artist.slice(qualifier.length);
 }
+
+const leadingArtist = (a: Artwork): string => casedArtist(a, true);
 
 function metFull(a: Artwork): string {
   const artist = a.artist.attributionType === 'anonymous' ? '' : leadingArtist(a);
@@ -54,7 +63,7 @@ function metCaption(a: Artwork): string {
 // "Title (Unknown, 1500)" over "Title (Unknown artist, 1500)". Captions are
 // standalone sentences where the longer form is conventional.
 function shortStyle(a: Artwork): string {
-  const artist = a.artist.attributionType === 'anonymous' ? 'Unknown' : creditedArtist(a);
+  const artist = a.artist.attributionType === 'anonymous' ? 'Unknown' : casedArtist(a, false);
   const date = a.displayDate || (a.yearStart != null ? String(a.yearStart) : '');
   return `${a.title} (${artist}, ${date})`;
 }

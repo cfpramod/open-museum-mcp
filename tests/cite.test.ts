@@ -127,7 +127,14 @@ describe('cite', () => {
       expect(cite(a, 'short')).toBe('Local animals with a dodo (attributed to Jan Lanting, Albert Egges van Giffen, 1632 - 1634)');
       expect(cite(a, 'caption').startsWith('Attributed to Jan Lanting, Albert Egges van Giffen, Local')).toBe(true);
       const workshop = qualified('workshop', 'Workshop of Rogier van der Weyden');
-      expect(cite(workshop, 'short')).toBe('Local animals with a dodo (Workshop of Rogier van der Weyden, 1632 - 1634)');
+      expect(cite(workshop, 'short')).toBe('Local animals with a dodo (workshop of Rogier van der Weyden, 1632 - 1634)');
+      expect(cite(workshop, 'caption').startsWith('Workshop of Rogier van der Weyden, Local')).toBe(true);
+    });
+
+    it('leaves a named name exactly as the museum gives it, even opening a citation', () => {
+      const a = qualified('named', 'de Hooghe, Romeyn');
+      expect(cite(a, 'full').startsWith('de Hooghe, Romeyn, Local animals with a dodo.')).toBe(true);
+      expect(cite(a, 'caption').startsWith('de Hooghe, Romeyn, Local animals with a dodo,')).toBe(true);
     });
 
     it('leaves a named artist and an anonymous work as they were', () => {
