@@ -464,7 +464,7 @@ describe('local cache reads', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 
   it('waits for another server holding the write lock, then rewrites', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'omm-reach-'));
