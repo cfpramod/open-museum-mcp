@@ -95,6 +95,52 @@ describe('cite', () => {
     expect(out).not.toMatch(/^Unknown[, ]/);
   });
 
+  describe('a qualified attribution keeps its qualifier', () => {
+    // Adapters store the bare name and carry the qualifier in attributionType, so
+    // a citation that prints the name alone claims the work outright.
+    const qualified = (attributionType: Artwork['artist']['attributionType'], name = 'Adriaen Matham'): Artwork => ({
+      ...sample,
+      title: 'Local animals with a dodo',
+      displayDate: '1632 - 1634',
+      artist: { ...sample.artist, name, attributionType },
+    });
+
+    it('in every style, for every qualified type', () => {
+      for (const [type, phrase] of [
+        ['attributed', 'attributed to'],
+        ['workshop', 'workshop of'],
+        ['circle', 'circle of'],
+        ['follower', 'follower of'],
+        ['after', 'after'],
+      ] as const) {
+        const a = qualified(type);
+        const lead = `${phrase[0].toUpperCase()}${phrase.slice(1)} Adriaen Matham`;
+        expect(cite(a, 'full').startsWith(`${lead}, Local animals with a dodo. 1632 - 1634.`), type).toBe(true);
+        expect(cite(a, 'caption').startsWith(`${lead}, Local animals with a dodo, 1632 - 1634.`), type).toBe(true);
+        expect(cite(a, 'short'), type).toBe(`Local animals with a dodo (${phrase} Adriaen Matham, 1632 - 1634)`);
+      }
+    });
+
+    it('does not repeat a qualifier the name already carries', () => {
+      // A Rijksmuseum work with several makers keeps each qualifier with its name.
+      const a = qualified('attributed', 'attributed to Jan Lanting, Albert Egges van Giffen');
+      expect(cite(a, 'short')).toBe('Local animals with a dodo (attributed to Jan Lanting, Albert Egges van Giffen, 1632 - 1634)');
+      expect(cite(a, 'caption').startsWith('Attributed to Jan Lanting, Albert Egges van Giffen, Local')).toBe(true);
+      const workshop = qualified('workshop', 'Workshop of Rogier van der Weyden');
+      expect(cite(workshop, 'short')).toBe('Local animals with a dodo (Workshop of Rogier van der Weyden, 1632 - 1634)');
+    });
+
+    it('leaves a named artist and an anonymous work as they were', () => {
+      expect(cite(qualified('named'), 'short')).toBe('Local animals with a dodo (Adriaen Matham, 1632 - 1634)');
+      expect(cite(qualified('anonymous', 'Unknown'), 'short')).toBe('Local animals with a dodo (Unknown, 1632 - 1634)');
+    });
+
+    it('does not read "after" inside a name as the qualifier', () => {
+      const a = qualified('after', 'Jan Aftermann');
+      expect(cite(a, 'short')).toBe('Local animals with a dodo (after Jan Aftermann, 1632 - 1634)');
+    });
+  });
+
   it('falls back to Met formatters for unregistered museum codes', () => {
     const cleveland: Artwork = {
       ...sample,
