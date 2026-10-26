@@ -1453,7 +1453,9 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
   // Element names that can be spelled from the property test's alphabet, plus
   // the common ones; kept here rather than read from the fetcher, so a name
   // dropped from the fetcher's list fails this test instead of passing it.
-  const ELEMENT_NAMES = new Set(['a', 'b', 'i', 'p', 's', 'br', 'tr', 'rp', 'rt', 'abbr', 'script', 'img', 'div', 'span', 'iframe', 'style']);
+  const ELEMENT_NAMES = new Set([
+    'a', 'b', 'i', 'p', 's', 'br', 'tr', 'rp', 'rt', 'abbr', 'script', 'img', 'image', 'param', 'div', 'span', 'iframe', 'style',
+  ]);
 
   // The guarantee: no `<name` or `</name`, for an HTML element name, followed
   // by whitespace, `/` or `>` and with a `>` somewhere after it.
@@ -1481,6 +1483,19 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
     });
   }
 
+  // Names a browser still builds an element for, though no current element
+  // list carries them: the parser rewrites `<image>` to `<img>`, so an escaped
+  // `<image src=x onerror=...>` is as live as an `<img>`.
+  for (const tag of [
+    '<image src=x onerror=alert(1)>', '<param name=x>', '<rb>', '<rtc>', '<plaintext>', '<xmp>', '<listing>',
+    '<noembed>', '<keygen>', '<menuitem>', '<bgsound src=x>', '<isindex>', '<nextid>', '<spacer>', '<multicol>', '<blink>',
+  ]) {
+    it(`removes an escaped tag the parser still builds: ${tag}`, () => {
+      const a = accepted(withExtField('ImageDescription', escaped(`Before ${tag}after`)));
+      expect(a.description).toBe('Before after');
+    });
+  }
+
   it('breaks a tag still standing after nesting deeper than the repeated pass reaches', () => {
     let nested = '<script>';
     for (let k = 0; k < 12; k++) nested = `<scr${nested}ipt>`;
@@ -1490,27 +1505,58 @@ describe('Wikimedia mapper: entity-escaped markup is removed after decoding', ()
     expect(a.description).toContain('alert(1)');
   });
 
-  it('never leaves an element tag in title, artist or description, over random markup', () => {
-    // mulberry32: a fixed seed keeps a failure reproducible.
-    let seed = 0x5eed206;
-    const random = (): number => {
+  // mulberry32: a fixed seed keeps a failure reproducible.
+  function seeded(start: number): () => number {
+    let seed = start;
+    return () => {
       seed = (seed + 0x6d2b79f5) | 0;
       let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
       t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
+  }
+
+  const FIELDS = ['ObjectName', 'Artist', 'ImageDescription'];
+  function fieldText(field: string, text: string): string {
+    const a = accepted(withExtField(field, escaped(`Text ${text}`)));
+    return field === 'ObjectName' ? a.title : field === 'Artist' ? a.artist.name : (a.description ?? '');
+  }
+
+  it('never leaves an element tag in title, artist or description, over random markup', () => {
+    const random = seeded(0x5eed206);
     const alphabet = '<>/abiprsct ';
     for (let n = 0; n < 3000; n++) {
       let text = '';
       const length = 1 + Math.floor(random() * 24);
       for (let c = 0; c < length; c++) text += alphabet[Math.floor(random() * alphabet.length)];
-      for (const field of ['ObjectName', 'Artist', 'ImageDescription']) {
-        const a = accepted(withExtField(field, escaped(`Text ${text}`)));
-        const value = field === 'ObjectName' ? a.title : field === 'Artist' ? a.artist.name : (a.description ?? '');
+      for (const field of FIELDS) {
+        const value = fieldText(field, text);
         expect(formsElementTag(value), `${field}: ${JSON.stringify(text)} -> ${JSON.stringify(value)}`).toBe(false);
       }
     }
   }, 60_000);
+
+  // Uniform random strings rarely nest deeper than the repeats reach, so this
+  // builds the nesting directly: a tag split at a random point around another
+  // split tag, up to ten deep, with stray text between the layers.
+  it('never leaves an element tag over tags nested inside tags', () => {
+    const random = seeded(0x0c2206);
+    const pick = <T,>(items: readonly T[]): T => items[Math.floor(random() * items.length)];
+    const names = [...ELEMENT_NAMES];
+    const tag = (): string => `<${random() < 0.3 ? '/' : ''}${pick(names)}${pick(['', ' x=1', '/', ' '])}>`;
+    const nest = (depth: number): string => {
+      if (depth === 0) return random() < 0.5 ? tag() : pick(['', 'x', '<', '>', ' ']);
+      const outer = tag();
+      const cut = 1 + Math.floor(random() * (outer.length - 1));
+      return outer.slice(0, cut) + nest(depth - 1) + pick(['', '', 'x', '<', ' ']) + outer.slice(cut);
+    };
+    for (let n = 0; n < 8000; n++) {
+      const text = nest(Math.floor(random() * 11)) + (random() < 0.3 ? nest(Math.floor(random() * 6)) : '');
+      const field = pick(FIELDS);
+      const value = fieldText(field, text);
+      expect(formsElementTag(value), `${field}: ${JSON.stringify(text)} -> ${JSON.stringify(value)}`).toBe(false);
+    }
+  }, 120_000);
 
   // Each shape drives one branch of the pass once per repeat: an unclosed tag
   // (the early exit), a removed tag, a kept `<`, a removed separating tag, and

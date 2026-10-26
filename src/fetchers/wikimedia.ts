@@ -38,7 +38,10 @@ const HTML_ELEMENTS = new Set(
     'noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp ' +
     'script search section select slot small source span strong style sub summary sup svg ' +
     'table tbody td template textarea tfoot th thead time title tr track u ul var video wbr ' +
-    'acronym applet basefont big center dir font frame frameset marquee nobr noframes strike tt'
+    'acronym applet basefont big center dir font frame frameset marquee nobr noframes strike tt ' +
+    // Names the parser still builds an element for: `image` becomes `img`.
+    'bgsound blink image isindex keygen listing menuitem multicol nextid noembed param plaintext rb rtc ' +
+    'spacer xmp'
   ).split(' '),
 );
 
