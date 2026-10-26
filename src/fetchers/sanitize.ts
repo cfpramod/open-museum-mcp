@@ -212,6 +212,13 @@ const CONTROL_CHARS = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F]/g;
 // (U+200E, U+200F, U+061C), the zero-width joiners and variation selectors
 // stay: right-to-left titles, Persian and Indic scripts and ideographic
 // variants depend on them.
+//
+// The zero-width space (U+200B) and word joiner (U+2060) are not in this set
+// and pass through. The byte order mark (U+FEFF) is whitespace to `\s`, so the
+// whitespace collapse turns it into a space. A `<` followed by U+200B is text
+// to a parser, so `<​script>` stays in a field as text; a consumer that
+// removes zero-width characters itself would turn it into a tag. Removing them
+// here would have to happen before markup removal, like the controls.
 const HIDDEN_FORMAT_CHARS = /[\u202A-\u202E\u2066-\u2069\u{E0000}-\u{E007F}]/gu;
 
 // A `<` opens markup when an HTML parser reads it as the start of a tag, a
