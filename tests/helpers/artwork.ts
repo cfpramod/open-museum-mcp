@@ -30,6 +30,81 @@ export function makeArtwork(over: Partial<Artwork> = {}): Artwork {
   };
 }
 
+// Every string path of a type, with `[]` for an array element.
+export type StringPaths<T, Prefix extends string = ''> = {
+  [K in keyof T & string]-?: NonNullable<T[K]> extends string
+    ? `${Prefix}${K}`
+    : NonNullable<T[K]> extends readonly (infer E)[]
+      ? NonNullable<E> extends string
+        ? `${Prefix}${K}[]`
+        : StringPaths<NonNullable<E>, `${Prefix}${K}[].`>
+      : NonNullable<T[K]> extends object
+        ? StringPaths<NonNullable<T[K]>, `${Prefix}${K}.`>
+        : never;
+}[keyof T & string];
+
+// The string fields the final pass cleans: the ones textFields reads.
+export const CLEANED_PATHS = [
+  'museum.name',
+  'title',
+  'artist.name',
+  'artist.nationality',
+  'artist.lifespan',
+  'displayDate',
+  'medium',
+  'region',
+  'period',
+  'description',
+  'objectType',
+  'dimensions',
+  'creditLine.holder',
+  'creditLine.fund',
+  'creditLine.accession',
+  'rawTags[]',
+] as const;
+
+// The string fields the final pass leaves alone, each with its reason.
+// tests/types/artworkPaths.ts fails to compile when an Artwork string field is
+// in neither list, so a new field cannot ship uncleaned unnoticed.
+const ADAPTER_BUILT = 'built by the adapter, not upstream prose';
+const VERBATIM = 'kept as the source sent it, by contract';
+export const EXEMPT_PATHS = {
+  id: ADAPTER_BUILT,
+  'museum.code': ADAPTER_BUILT,
+  'museum.url': 'a URL',
+  'artist.attributionType': 'an enum',
+  mediumCategory: 'an enum',
+  'imageUrls.full': 'a URL',
+  'imageUrls.large': 'a URL',
+  'imageUrls.thumbnail': 'a URL',
+  'imageUrls.master.url': 'a URL',
+  'imageUrls.master.format': 'a MIME type',
+  'license.type': 'an enum',
+  'license.rawValue': VERBATIM,
+  'license.verificationSource': ADAPTER_BUILT,
+  'license.verifiedAt': 'a timestamp',
+  'license.confidence': 'an enum',
+  'source.apiUrl': 'a URL',
+  'source.pageUrl': 'a URL',
+  'source.originalUrl': 'a URL',
+  dominantColor: 'computed from the image',
+  'palette[].hex': 'computed from the image',
+  colorFamily: 'an enum',
+  'models3d[].url': 'a URL',
+  'models3d[].source': 'a platform code',
+  'models3d[].licence.type': 'an enum',
+  'models3d[].licence.rawValue': VERBATIM,
+  'models3d[].licence.verificationSource': ADAPTER_BUILT,
+  'models3d[].licence.verifiedAt': 'a timestamp',
+  'models3d[].licence.confidence': 'an enum',
+  'models3d[].format[]': 'a format code',
+  'provenance.raw': VERBATIM,
+  'provenance.rawFormat': 'an enum',
+  'provenance.entries[].description': VERBATIM,
+  'provenance.entries[].date': VERBATIM,
+  'provenance.caveat': VERBATIM,
+} as const;
+
 // Every text field the record carries, with the two verbatim-by-contract
 // fields left out on purpose.
 export function textFields(a: Artwork): Record<string, string | undefined | null> {

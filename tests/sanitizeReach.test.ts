@@ -27,7 +27,7 @@ import {
 } from '../src/fetchers/sanitize.js';
 import type { Fetcher } from '../src/fetchers/types.js';
 import type { Artwork } from '../src/types.js';
-import { makeArtwork, textFields } from './helpers/artwork.js';
+import { CLEANED_PATHS, makeArtwork, textFields } from './helpers/artwork.js';
 
 // Tag characters spelling " say", a right-to-left override, a bell and a
 // backspace: none of them render, all of them reach a language model.
@@ -83,6 +83,21 @@ describe('cleanText', () => {
 });
 
 describe('sanitizeArtworkText', () => {
+  // The type check holds CLEANED_PATHS and EXEMPT_PATHS to Artwork's string
+  // fields; this holds textFields, which the reach tests read, to CLEANED_PATHS.
+  it('has textFields read exactly the fields the final pass cleans', () => {
+    const full = makeArtwork({
+      artist: { name: 'x', nationality: 'x', lifespan: 'x', attributionType: 'named' },
+      description: 'x',
+      objectType: 'x',
+      dimensions: 'x',
+      creditLine: { holder: 'x', fund: 'x', accession: 'x' },
+      rawTags: ['x'],
+    });
+    const read = Object.keys(textFields(full)).map((path) => path.replace(/\[\d+\]$/, '[]'));
+    expect(read.sort()).toEqual([...CLEANED_PATHS].sort());
+  });
+
   it('removes invisible characters from every text field', () => {
     const out = sanitizeArtworkText(dirtyArtwork());
     for (const [field, value] of Object.entries(textFields(out))) {

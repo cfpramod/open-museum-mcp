@@ -217,6 +217,37 @@ describe('markup removal: every stripper', () => {
     expect(stripHtml(deep)).toBe('alert(1)');
   });
 
+  // Five `<` in a row outlast the four passes, so the last join meets the
+  // final sweep. The sweep drops a `<` before `/`, `!` and `?` as well as
+  // before a letter, or a closing tag, comment or declaration would be left.
+  for (const input of [
+    '<<<<</x',
+    '<<<<<!-- x',
+    '<<<<<?x',
+    '<<<<<b>b>b>b>/script>',
+    '<<<<<b>b>b>b>!-- x',
+    '<<<<<b>b>b>b>?php x',
+  ]) {
+    it(`breaks markup that the last join forms with "/", "!" or "?": ${input}`, () => {
+      check(input);
+      check(escaped(input));
+    });
+  }
+
+  // Every string over a small alphabet, so no shape is left to sampling.
+  it('never leaves markup over every short string of "<", ">", "/", "!", "?" and a letter', () => {
+    const alphabet = ['<', '>', '/', '!', '?', 'a'];
+    let layer = [''];
+    for (let length = 1; length <= 6; length++) {
+      layer = layer.flatMap((text) => alphabet.map((c) => text + c));
+      for (const text of layer) {
+        for (const value of [cleanText(text), stripHtml(escaped(text))]) {
+          if (opensMarkup(value)) expect(value, JSON.stringify(text)).toBe('no markup');
+        }
+      }
+    }
+  }, 120_000);
+
   it('is idempotent: cleaning a cleaned value changes nothing', () => {
     const random = seeded(0x1de7);
     for (let n = 0; n < 1500; n++) {
