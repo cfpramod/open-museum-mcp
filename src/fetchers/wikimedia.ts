@@ -14,8 +14,18 @@ import {
   rejectFor,
 } from './helpers.js';
 // Commons text fields are HTML-laden. The shared stripHtml strips tags in one
-// linear pass, decodes entities, and collapses whitespace.
-import { ARTIST_NAME_MAX, DESCRIPTION_MAX, TITLE_MAX, stripHtml } from './sanitize.js';
+// linear pass, decodes entities, removes any markup the decoding formed (Commons
+// escapes markup that wikitext does not allow, so an uploader's `<a href>`
+// arrives as `&lt;a href=...&gt;`), and collapses whitespace.
+import {
+  ARTIST_NAME_MAX,
+  DESCRIPTION_MAX,
+  TITLE_MAX,
+  decodeEntities,
+  stripHtml,
+  tagNameAt,
+  textView,
+} from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
@@ -77,6 +87,27 @@ function stripQsMetadata(s: string): string {
   return s.replace(QS_TRAILING_RE, '').trim();
 }
 
+// In ObjectName the markers sit in hidden label elements, and Commons renders
+// the alternative titles after them ("<br><b>Alternative title(s): </b>...").
+// Cut the raw HTML at the first marker, before hidden elements are dropped, so
+// the title still ends where the marker block begins. The hidden element the
+// cut leaves open is then dropped to the end of the field.
+//
+// The marker is found in the text the reader sees, the same text stripHtml
+// reads (tags gone, character references decoded), and the cut is made in the
+// HTML at the place that text came from. So whatever the text view counted as
+// a marker still counts: a tag or any whitespace reference between the keyword
+// and "QS:", a "<" that no ">" closes, which stays text. A marker inside a tag
+// (an attribute value) was never text, so the cut never leaves a tag open.
+// Building the view and searching it are both linear in the field length.
+const QS_MARKER_RE = /(?:title|label)\s*QS:/;
+
+function cutAtQsMarker(html: string): string {
+  const { text, offsets } = textView(html);
+  const at = text.search(QS_MARKER_RE);
+  return at === -1 ? html : html.slice(0, offsets[at]);
+}
+
 // Commons surfaces multilingual ObjectName as `<Language>: <native form>`,
 // often concatenated with an English transliteration:
 //   "German: Seerosen Water Lilies"
@@ -100,6 +131,153 @@ const FILE_NUMBER_SUFFIX_RE = /\s+0\d{1,2}$/;
 
 function stripFileNumberSuffix(s: string): string {
   return s.replace(FILE_NUMBER_SUFFIX_RE, '').trim();
+}
+
+// Commons templates hide text the reader never sees: {{Unknown}} renders its
+// label and then a `display: none` copy of it, so tag stripping alone gives
+// "Unknown authorUnknown author". Drop every element whose style attribute
+// hides it, with its content, before the HTML is stripped. One forward pass,
+// linear in the field length: each hidden element is skipped to its matching
+// close (counting nested elements of the same name), and an unclosed one runs
+// to the end of the field, which is where a browser would end it too.
+const VOID_ELEMENTS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr',
+]);
+
+function isSpace(c: string | undefined): boolean {
+  return c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f';
+}
+
+// A browser decodes character references in an attribute value before CSS
+// reads it, so "display&#58;none" hides. A no-break space is not CSS
+// whitespace, so `&nbsp;` is kept as U+00A0 here rather than read as the
+// plain space the text view gives it.
+function styleHides(value: string): boolean {
+  const css = decodeEntities(value.replace(/&nbsp;/gi, '\u00a0')).toLowerCase();
+  return css.split(/[ \t\n\r\f]+/).join('').includes('display:none');
+}
+
+// Walk the tag's attributes in order, stepping over each value whole, so
+// "style=" inside another attribute's quoted value is never read as the style
+// attribute. The first style attribute decides, as in a browser.
+function isHiddenByStyle(tag: string): boolean {
+  const lower = tag.toLowerCase();
+  let i = 1;
+  while (i < lower.length && !isSpace(lower[i]) && lower[i] !== '>' && lower[i] !== '/') i++;
+  for (;;) {
+    while (isSpace(lower[i]) || lower[i] === '/') i++;
+    if (i >= lower.length || lower[i] === '>') return false;
+    const nameStart = i;
+    while (i < lower.length && !isSpace(lower[i]) && lower[i] !== '=' && lower[i] !== '>' && lower[i] !== '/') i++;
+    const name = lower.slice(nameStart, i);
+    while (isSpace(lower[i])) i++;
+    if (lower[i] !== '=') continue;
+    i++;
+    while (isSpace(lower[i])) i++;
+    let value: string;
+    const quote = lower[i];
+    if (quote === '"' || quote === "'") {
+      const end = lower.indexOf(quote, i + 1);
+      value = lower.slice(i + 1, end === -1 ? lower.length - 1 : end);
+      i = end === -1 ? lower.length : end + 1;
+    } else {
+      const start = i;
+      while (i < lower.length && !isSpace(lower[i]) && lower[i] !== '>') i++;
+      value = lower.slice(start, i);
+    }
+    if (name === 'style') return styleHides(value);
+  }
+}
+
+// Index just past the close of the element named `name` whose opening tag ends
+// before `from`, or the field length when it never closes.
+function endOfElement(html: string, from: number, name: string): number {
+  let depth = 1;
+  let pos = from;
+  for (;;) {
+    const lt = html.indexOf('<', pos);
+    if (lt === -1) return html.length;
+    const gt = html.indexOf('>', lt + 1);
+    if (gt === -1) return html.length;
+    if (tagNameAt(html, lt, gt) === name) {
+      if (html[lt + 1] === '/') {
+        depth--;
+        if (depth === 0) return gt + 1;
+      } else if (html[gt - 1] !== '/') {
+        depth++;
+      }
+    }
+    pos = gt + 1;
+  }
+}
+
+function dropHiddenElements(html: string): string {
+  let out = '';
+  let i = 0;
+  for (;;) {
+    const lt = html.indexOf('<', i);
+    if (lt === -1) break;
+    const gt = html.indexOf('>', lt + 1);
+    if (gt === -1) break;
+    if (html[lt + 1] === '/' || !isHiddenByStyle(html.slice(lt, gt + 1))) {
+      out += html.slice(i, gt + 1);
+      i = gt + 1;
+      continue;
+    }
+    out += html.slice(i, lt);
+    const name = tagNameAt(html, lt, gt);
+    i = html[gt - 1] === '/' || VOID_ELEMENTS.has(name) ? gt + 1 : endOfElement(html, gt + 1, name);
+  }
+  return out + html.slice(i);
+}
+
+// The {{title}} template renders the title in its original language, a line
+// break, then the English translation in italics:
+//   <div>De triomf van de Doods</div><br><i><a ...>The Triumph of Death</a></i>
+// Split there, so the title can read "De triomf van de Doods (The Triumph of
+// Death)". Titles drawn from Wikidata wrap the English line in layout
+// elements first:
+//   <div>Italian: <div lang="it"><i>...</i></div></div><br><div><div lang="en"><i>Lady with an Ermine</i>
+// Only a `<br>` followed by an `<i>`, directly or inside opening `<div>` and
+// `<span>` tags, counts; any other line break is ordinary layout, left to
+// stripHtml, and the scan moves on to the next one.
+function splitTitleTranslation(html: string): { original: string; translation: string } | undefined {
+  let pos = 0;
+  for (;;) {
+    const lt = html.indexOf('<', pos);
+    if (lt === -1) return undefined;
+    const gt = html.indexOf('>', lt + 1);
+    if (gt === -1) return undefined;
+    if (html[lt + 1] !== '/' && tagNameAt(html, lt, gt) === 'br') {
+      let next = gt + 1;
+      for (;;) {
+        while (html[next] === ' ' || html[next] === '\t' || html[next] === '\n' || html[next] === '\r') next++;
+        const nextGt = html[next] === '<' && html[next + 1] !== '/' ? html.indexOf('>', next + 1) : -1;
+        if (nextGt === -1) break;
+        const name = tagNameAt(html, next, nextGt);
+        if (name === 'i') return { original: html.slice(0, lt), translation: html.slice(gt + 1) };
+        if (name !== 'div' && name !== 'span') break;
+        next = nextGt + 1;
+      }
+    }
+    pos = gt + 1;
+  }
+}
+
+// One title line as the reader sees it: tags removed, then the multilingual
+// prefix and file-numbering suffix. Wikidata markers are cut before this, in
+// cutAtQsMarker.
+function titleText(html: string): string {
+  return stripFileNumberSuffix(stripLanguagePrefix(stripHtml(html)));
+}
+
+function commonsTitle(objectNameHtml: string): string {
+  const split = splitTitleTranslation(objectNameHtml);
+  if (!split) return titleText(objectNameHtml);
+  const original = titleText(split.original);
+  const translation = titleText(split.translation);
+  if (!translation || translation === original) return original;
+  return original ? `${original} (${translation})` : translation;
 }
 
 // Commons `Credit` extmetadata is the upstream-source field. It is often a
@@ -295,14 +473,13 @@ export const wikimediaFetcher: Fetcher = {
         ? (info.extmetadata as Record<string, unknown>)
         : undefined;
 
-    const objectName = stripQsMetadata(stripHtml(getExtField(ext, 'ObjectName')));
     const fileTitle = asString(page.title)
       .replace(/^File:/, '')
       .replace(/\.[^.]+$/, '');
     // Polish: drop multilingual `<Lang>:` prefix and Commons file-numbering
     // suffix (" 02"). Apply to both ObjectName and fileTitle paths since
     // either can carry the conventions in the wild.
-    const cleanObjectName = stripFileNumberSuffix(stripLanguagePrefix(objectName));
+    const cleanObjectName = commonsTitle(dropHiddenElements(cutAtQsMarker(getExtField(ext, 'ObjectName'))));
     const cleanFileTitle = stripFileNumberSuffix(fileTitle);
     const rawTitle = (cleanObjectName || cleanFileTitle).trim();
     const title = (rawTitle || '(Untitled)').slice(0, TITLE_MAX);
@@ -317,11 +494,14 @@ export const wikimediaFetcher: Fetcher = {
       return reject(id, `wikimedia: ${nonArt} (curation reject)`, raw);
     }
 
-    const artistRaw = stripHtml(getExtField(ext, 'Artist')).slice(0, ARTIST_NAME_MAX);
+    const artistRaw = stripHtml(dropHiddenElements(getExtField(ext, 'Artist'))).slice(0, ARTIST_NAME_MAX);
     const attributionType = detectAttributionType(artistRaw);
     const cleanName = cleanArtistName(artistRaw);
 
-    const description = stripQsMetadata(stripHtml(getExtField(ext, 'ImageDescription'))).slice(0, DESCRIPTION_MAX);
+    const description = stripQsMetadata(stripHtml(dropHiddenElements(getExtField(ext, 'ImageDescription')))).slice(
+      0,
+      DESCRIPTION_MAX,
+    );
     // Commons has no structured creation-date field. DateTime extmetadata is
     // upload time, not artwork time. Source order, most-trustworthy first:
     //   1. ImageDescription prose ("c. 1560s." → {1560, 1569})

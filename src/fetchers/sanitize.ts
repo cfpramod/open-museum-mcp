@@ -8,7 +8,9 @@
  * reverse (capping first could leave a trailing open tag). Control characters
  * are removed too, except the whitespace controls, which collapse to a space.
  * Unicode tag characters and bidirectional embeddings, overrides and isolates
- * are removed as well: they hide or reorder text without showing it.
+ * are removed as well: they hide or reorder text without showing it. No field
+ * keeps a `<` that an HTML parser would read as markup, whatever the element
+ * name, including markup that decoding a character reference formed.
  *
  * Field caps (chosen to be generous for legitimate data while bounding the
  * token surface area for any single field in LLM context):
@@ -66,11 +68,22 @@ function mapWindows1252(c: string): string {
   return mapped === undefined ? c : String.fromCodePoint(mapped);
 }
 
-function decodeEntities(s: string): string {
-  return s
-    .replace(/&([a-z]+);/gi, (m, name: string) => HTML_ENTITIES[name.toLowerCase()] ?? m)
-    .replace(/&#(\d+);/g, (m, code: string) => decodeCodePoint(m, parseInt(code, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (m, hex: string) => decodeCodePoint(m, parseInt(hex, 16)));
+// A named, decimal or hexadecimal character reference.
+const ENTITY_RE = /&(?:([a-z]+)|#(\d+)|#x([0-9a-f]+));/gi;
+
+// The text one ENTITY_RE match stands for, or the reference itself when it is
+// left verbatim (an unknown name, or a number that is not a scalar value).
+function decodeReference(ref: string, name?: string, dec?: string, hex?: string): string {
+  if (name !== undefined) return HTML_ENTITIES[name.toLowerCase()] ?? ref;
+  return decodeCodePoint(ref, dec !== undefined ? parseInt(dec, 10) : parseInt(hex ?? '', 16));
+}
+
+// One pass, as HTML decodes: the text a reference produces is never read
+// again, so "&amp;#32;" is the literal text "&#32;", not a space.
+export function decodeEntities(s: string): string {
+  return s.replace(ENTITY_RE, (ref: string, name?: string, dec?: string, hex?: string) =>
+    decodeReference(ref, name, dec, hex),
+  );
 }
 
 // Remove HTML tags with a single linear pass instead of a `/<[^>]*>/g` global
@@ -82,25 +95,104 @@ function decodeEntities(s: string): string {
 // preserves the regex's exact semantics: it strips each `<` up to the FIRST
 // following `>`, and leaves an unclosed trailing `<…` (no `>`) verbatim, exactly
 // as `/<[^>]*>/` would (it can't match without a closing `>`).
-function stripTags(s: string): string {
-  let out = '';
+//
+// A removed tag leaves a space when it ends a line or a block (opening or
+// closing), because a browser puts what follows on a new line: `a<br>b` and
+// `<div>a</div><div>b</div>` read as two words, not one. Inline tags leave
+// nothing, so markup inside a word ("Mon<i>et</i>") keeps the word whole.
+// stripHtml's whitespace collapse folds the runs this leaves behind.
+export const SEPARATING_TAGS = new Set([
+  'br', 'hr', 'p', 'div', 'li', 'ul', 'ol', 'dl', 'dt', 'dd',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption',
+  'blockquote', 'pre', 'section', 'article', 'header', 'footer', 'aside', 'nav', 'main',
+  'figure', 'figcaption', 'address',
+]);
+
+// The element name of the tag `s.slice(lt, gt + 1)`, lower-cased: the run of
+// characters after `<` (and an optional `/`) up to whitespace, `/` or `>`.
+export function tagNameAt(s: string, lt: number, gt: number): string {
+  let i = lt + 1;
+  if (s[i] === '/') i++;
+  const start = i;
+  while (i < gt && s[i] !== '/' && s[i] !== ' ' && s[i] !== '\t' && s[i] !== '\n' && s[i] !== '\r' && s[i] !== '\f') i++;
+  return s.slice(start, i).toLowerCase();
+}
+
+// Walk `s` as the tag stripper reads it, reporting each run of text that stays
+// and the position of each tag that leaves a separating space.
+function walkTags(s: string, text: (from: number, to: number) => void, separator: (at: number) => void): void {
   let i = 0;
   while (i < s.length) {
     const lt = s.indexOf('<', i);
     if (lt === -1) {
-      out += s.slice(i);
+      text(i, s.length);
       break;
     }
-    out += s.slice(i, lt);
+    text(i, lt);
     const gt = s.indexOf('>', lt + 1);
     if (gt === -1) {
       // No closing '>': the unclosed '<…' tail is not a tag — keep it verbatim.
-      out += s.slice(lt);
+      text(lt, s.length);
       break;
     }
+    if (SEPARATING_TAGS.has(tagNameAt(s, lt, gt))) separator(lt);
     i = gt + 1; // skip the '<…>' tag
   }
+}
+
+function stripTags(s: string): string {
+  let out = '';
+  walkTags(
+    s,
+    (from, to) => {
+      out += s.slice(from, to);
+    },
+    () => {
+      out += ' ';
+    },
+  );
   return out;
+}
+
+// The text stripHtml reads, before cleanText removes markup the decoding
+// formed and collapses whitespace, with the index in `s` that each character
+// came from. A caller that finds something in the text
+// can then act on the markup at the same place. Tags follow stripTags, and
+// each character reference is decoded once with decodeEntities' own per-match
+// function, after the tags are gone, as stripHtml does.
+export function textView(s: string): { text: string; offsets: number[] } {
+  let stripped = '';
+  const strippedFrom: number[] = [];
+  walkTags(
+    s,
+    (from, to) => {
+      stripped += s.slice(from, to);
+      for (let k = from; k < to; k++) strippedFrom.push(k);
+    },
+    (at) => {
+      stripped += ' ';
+      strippedFrom.push(at);
+    },
+  );
+  let text = '';
+  const offsets: number[] = [];
+  let i = 0;
+  const keep = (from: number, to: number): void => {
+    text += stripped.slice(from, to);
+    for (let k = from; k < to; k++) offsets.push(strippedFrom[k]);
+  };
+  for (const m of stripped.matchAll(ENTITY_RE)) {
+    const [ref, name, dec, hex] = m;
+    const decoded = decodeReference(ref, name, dec, hex);
+    if (decoded === ref) continue; // left verbatim, kept with the text around it
+    keep(i, m.index);
+    text += decoded;
+    for (let k = 0; k < decoded.length; k++) offsets.push(strippedFrom[m.index]);
+    i = m.index + ref.length;
+  }
+  keep(i, stripped.length);
+  return { text, offsets };
 }
 
 // C0 controls other than the whitespace controls \t \n \v \f \r, DEL, and the
@@ -120,17 +212,97 @@ const CONTROL_CHARS = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F]/g;
 // (U+200E, U+200F, U+061C), the zero-width joiners and variation selectors
 // stay: right-to-left titles, Persian and Indic scripts and ideographic
 // variants depend on them.
+//
+// The zero-width space (U+200B) and word joiner (U+2060) are not in this set
+// and pass through. The byte order mark (U+FEFF) is whitespace to `\s`, so the
+// whitespace collapse turns it into a space. A `<` followed by U+200B is text
+// to a parser, and the markup rule leaves it in place, so `<`, U+200B,
+// `script>` can reach a field as text, for example when it arrives escaped.
+// (Given literally, `stripTags` removes it whole first.) A consumer that
+// removes zero-width characters itself would turn it into a tag. Removing them
+// here would have to happen before markup removal, like the controls.
 const HIDDEN_FORMAT_CHARS = /[\u202A-\u202E\u2066-\u2069\u{E0000}-\u{E007F}]/gu;
 
+// A `<` opens markup when an HTML parser reads it as the start of a tag, a
+// closing tag, a comment or a declaration: when a letter, `/`, `!` or `?`
+// follows it. Whatever the name, known element or not, since a parser builds
+// an element, with its attributes, for any name. Any other `<` is text to a
+// parser ("5 < 6", "<3") and stays.
+const MARKUP_OPENER = /[A-Za-z/!?]/;
+
+function opensMarkup(s: string, lt: number): boolean {
+  return lt + 1 < s.length && MARKUP_OPENER.test(s[lt + 1]);
+}
+
+// One linear pass. Markup closed by a `>` is removed up to the first `>`, as
+// a parser ends a tag there and as stripTags does, leaving a space where it
+// ends a line or a block. Markup that is never closed loses its `<` alone: a
+// parser drops it at the end of the text, but a consumer that puts the text
+// inside its own markup closes it with its next `>`, and the text after the
+// name becomes attributes.
+function removeMarkupOnce(s: string): string {
+  let out = '';
+  let i = 0;
+  let gtLeft = true; // false once no `>` follows the scan point
+  for (let lt = s.indexOf('<'); lt !== -1; lt = s.indexOf('<', i)) {
+    if (!opensMarkup(s, lt)) {
+      out += s.slice(i, lt + 1);
+      i = lt + 1;
+      continue;
+    }
+    out += s.slice(i, lt);
+    const gt = gtLeft ? s.indexOf('>', lt + 1) : -1;
+    if (gt === -1) {
+      gtLeft = false;
+      i = lt + 1;
+      continue;
+    }
+    if (SEPARATING_TAGS.has(tagNameAt(s, lt, gt))) out += ' ';
+    i = gt + 1;
+  }
+  return out + s.slice(i);
+}
+
+// Removing markup joins the text on either side of it, so a `<` kept as text
+// can meet a letter: `<<b>i>` becomes `<i>`. Each repeat peels one such layer;
+// source text nests no deeper than this.
+const MARKUP_PASSES = 4;
+
+// Remove markup of any name, then make sure none is left. After the repeats,
+// any `<` still followed by a letter, `/`, `!` or `?` is dropped. The sweep
+// runs from the end, so it judges each `<` by the text that will follow it:
+// dropping one `<` of `<<a` cannot leave the other in front of the `a`.
+// Every step is linear.
+function removeMarkup(s: string): string {
+  if (!s.includes('<')) return s;
+  let text = s;
+  for (let pass = 0; pass < MARKUP_PASSES; pass++) {
+    const next = removeMarkupOnce(text);
+    if (next === text) break;
+    text = next;
+  }
+  const kept: string[] = [];
+  let following = '';
+  for (let k = text.length - 1; k >= 0; k--) {
+    const c = text[k];
+    if (c === '<' && following !== '' && MARKUP_OPENER.test(following)) continue;
+    kept.push(c);
+    following = c;
+  }
+  return kept.reverse().join('');
+}
+
 // The character-level half of stripHtml: map C1, remove controls and hidden
-// format characters, collapse whitespace. It decodes nothing, so applying it
-// to its own output, or to stripHtml's, changes nothing. That is what lets
-// sanitizeArtworkText run over fields an adapter has already sanitized.
+// format characters, remove markup, collapse whitespace. Markup goes after the
+// characters, so one between `<` and a name cannot hide a tag that would form
+// once it is gone. It decodes nothing, so applying it to its own output, or to
+// stripHtml's, changes nothing. That is what lets sanitizeArtworkText run over
+// fields an adapter has already sanitized, and hold every field of every
+// record to the same markup rule.
 export function cleanText(s: string): string {
-  return s
-    .replace(C1_CHARS, mapWindows1252)
-    .replace(CONTROL_CHARS, '')
-    .replace(HIDDEN_FORMAT_CHARS, '')
+  return removeMarkup(
+    s.replace(C1_CHARS, mapWindows1252).replace(CONTROL_CHARS, '').replace(HIDDEN_FORMAT_CHARS, ''),
+  )
     .replace(/\s+/g, ' ')
     .trim();
 }
