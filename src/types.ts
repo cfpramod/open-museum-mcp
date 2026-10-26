@@ -199,8 +199,13 @@ export interface Artwork {
    * and mixed units in one string, and at least one source's own structured
    * numeric field is integer-truncated, so a parsed number would be less
    * accurate than the string it came from. A consumer needing numerics should
-   * parse this and own that interpretation. ABSENT when the source publishes
-   * none. Additive v0.21 field.
+   * parse this and own that interpretation. The one exception is SMK, which
+   * publishes structured measurements and no display string: its value is
+   * composed from those entries in one fixed format, "Label: H x W [x D] unit"
+   * per part, parts joined by "; " (e.g. "Unframed: 91 x 73.5 cm; Framed:
+   * 94 x 76 x 4.2 cm" for SMK's KMS3352), and a part SMK publishes incompletely is left out
+   * rather than written in part. ABSENT when the source publishes none.
+   * Additive v0.21 field.
    */
   dimensions?: string;
   /**
