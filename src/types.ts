@@ -137,11 +137,13 @@ export interface CreditLine {
   /**
    * The institution that holds the object. For a single museum this is that
    * museum; for an aggregated source it is the contributing institution the
-   * record names, never the aggregator.
+   * record names, never the aggregator. The holder is not always the owner:
+   * for a loan, `fund` names the lender, as in a Rijksmuseum line that opens
+   * "On loan from".
    */
   holder: string;
   /**
-   * The museum's credit line VERBATIM (e.g. "Purchase, Rogers Fund, 1936").
+   * The museum's credit line VERBATIM (e.g. "Rogers Fund, 1942" on Met 1077).
    * Some museums open it with their own name and some do not; it is kept as
    * published either way, so a consumer that also shows `holder` decides how
    * to avoid repeating it. ABSENT when the record publishes no credit line.
