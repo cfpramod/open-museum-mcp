@@ -216,7 +216,9 @@ const CONTROL_CHARS = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F]/g;
 // The zero-width space (U+200B) and word joiner (U+2060) are not in this set
 // and pass through. The byte order mark (U+FEFF) is whitespace to `\s`, so the
 // whitespace collapse turns it into a space. A `<` followed by U+200B is text
-// to a parser, so `<​script>` stays in a field as text; a consumer that
+// to a parser, and the markup rule leaves it in place, so `<`, U+200B,
+// `script>` can reach a field as text, for example when it arrives escaped.
+// (Given literally, `stripTags` removes it whole first.) A consumer that
 // removes zero-width characters itself would turn it into a tag. Removing them
 // here would have to happen before markup removal, like the controls.
 const HIDDEN_FORMAT_CHARS = /[\u202A-\u202E\u2066-\u2069\u{E0000}-\u{E007F}]/gu;
