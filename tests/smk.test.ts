@@ -268,6 +268,42 @@ describe('SMK dimensions composed from structured measurements', () => {
     expect(dimsOf([{ part: 7, type: 'højde', unit: 'centimeter', value: '91' }])).toBeUndefined();
   });
 
+  it('does not read built-in object keys as SMK terms', () => {
+    for (const key of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf']) {
+      // As a part name, beside a readable part.
+      expect(dimsOf([
+        m(key, 'højde', 'centimeter', '10'), m(key, 'bredde', 'centimeter', '8'),
+        m('Netto', 'højde', 'centimeter', '91'), m('Netto', 'bredde', 'centimeter', '73.5'),
+      ])).toBe('Unframed: 91 x 73.5 cm');
+      // As a measurement type.
+      expect(dimsOf([m('Netto', key, 'centimeter', '10'), m('Netto', 'bredde', 'centimeter', '8')])).toBeUndefined();
+      // As a unit.
+      expect(dimsOf([m('Netto', 'højde', key, '10'), m('Netto', 'bredde', key, '8')])).toBeUndefined();
+    }
+  });
+
+  it('drops a size with no part when the record names a part elsewhere', () => {
+    // KMS317 as published: an unframed size, then a size with no part.
+    // What the second measures is not stated, so it is not written.
+    expect(dimsOf([
+      { notes: '650 x 960 mm', part: 'Netto', type: 'højde', unit: 'centimeter', value: '65' },
+      { notes: '650 x 960 mm', part: 'Netto', type: 'bredde', unit: 'centimeter', value: '96' },
+      { type: 'højde', unit: 'centimeter', value: '82' },
+      { type: 'bredde', unit: 'centimeter', value: '114' },
+    ])).toBe('Unframed: 65 x 96 cm');
+    // Also when the named part is itself left out: the record still says the
+    // sizes it gives belong to parts.
+    expect(dimsOf([
+      m('Netto', 'højde', undefined, '65'), m('Netto', 'bredde', 'centimeter', '96'),
+      m(undefined, 'højde', 'centimeter', '82'), m(undefined, 'bredde', 'centimeter', '114'),
+    ])).toBeUndefined();
+    // A weight that names a part does not count as naming one for a size.
+    expect(dimsOf([
+      m(undefined, 'højde', 'centimeter', '82'), m(undefined, 'bredde', 'centimeter', '114'),
+      m('Netto', 'vægt', 'kilo', '12'),
+    ])).toBe('82 x 114 cm');
+  });
+
   it('is absent when the record has no usable measurements', () => {
     expect(dimsOf(undefined)).toBeUndefined();
     expect(dimsOf([])).toBeUndefined();

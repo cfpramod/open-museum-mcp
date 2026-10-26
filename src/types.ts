@@ -203,8 +203,9 @@ export interface Artwork {
    * publishes structured measurements and no display string: its value is
    * composed from those entries in one fixed format, "Label: H x W [x D] unit"
    * per part, parts joined by "; " (e.g. "Unframed: 91 x 73.5 cm; Framed:
-   * 94 x 76 x 4.2 cm" for SMK's KMS3352), and a part SMK publishes incompletely is left out
-   * rather than written in part. ABSENT when the source publishes none.
+   * 94 x 76 x 4.2 cm" for SMK's KMS3352). A part SMK publishes incompletely
+   * is left out rather than written in part, as is a size naming no part
+   * beside one that names a part. ABSENT when the source publishes none.
    * Additive v0.21 field.
    */
   dimensions?: string;

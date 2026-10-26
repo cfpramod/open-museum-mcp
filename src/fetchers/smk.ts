@@ -62,34 +62,38 @@ function pickTitle(titles: unknown): string {
 // (image), montering (mount), netto (the work without its frame), brutto (with
 // it). A part with an unknown name, a measurement it cannot read, two values
 // for one measurement or two units is dropped whole, never written in part.
-const SMK_DIMENSION_PARTS: Record<string, string> = {
-  bladmaal: 'Sheet',
-  plademaal: 'Plate',
-  billedmaal: 'Image',
-  monteringsmaal: 'Mount',
-  netto: 'Unframed',
-  nettomaal: 'Unframed',
-  brutto: 'Framed',
-  bruttomaal: 'Framed',
-};
-const SMK_DIMENSION_TYPES: Record<string, 'height' | 'width' | 'depth' | 'diameter'> = {
-  højde: 'height',
-  height: 'height',
-  bredde: 'width',
-  width: 'width',
-  dybde: 'depth',
-  depth: 'depth',
-  diameter: 'diameter',
-};
+// A size with no part is written only when no other size in the record names
+// one.
+// Maps, not object literals: a plain object would read inherited keys such as
+// "constructor" or "__proto__" as SMK terms.
+const SMK_DIMENSION_PARTS = new Map<string, string>([
+  ['bladmaal', 'Sheet'],
+  ['plademaal', 'Plate'],
+  ['billedmaal', 'Image'],
+  ['monteringsmaal', 'Mount'],
+  ['netto', 'Unframed'],
+  ['nettomaal', 'Unframed'],
+  ['brutto', 'Framed'],
+  ['bruttomaal', 'Framed'],
+]);
+const SMK_DIMENSION_TYPES = new Map<string, 'height' | 'width' | 'depth' | 'diameter'>([
+  ['højde', 'height'],
+  ['height', 'height'],
+  ['bredde', 'width'],
+  ['width', 'width'],
+  ['dybde', 'depth'],
+  ['depth', 'depth'],
+  ['diameter', 'diameter'],
+]);
 // A weight is not a size: skipped without affecting the rest of its part.
 const SMK_IGNORED_TYPES = new Set(['vægt', 'weight']);
-const SMK_DIMENSION_UNITS: Record<string, 'mm' | 'cm'> = {
-  millimeter: 'mm',
-  milimeter: 'mm',
-  mm: 'mm',
-  centimeter: 'cm',
-  cm: 'cm',
-};
+const SMK_DIMENSION_UNITS = new Map<string, 'mm' | 'cm'>([
+  ['millimeter', 'mm'],
+  ['milimeter', 'mm'],
+  ['mm', 'mm'],
+  ['centimeter', 'cm'],
+  ['cm', 'cm'],
+]);
 const SMK_DIMENSION_VALUE = /^\d{1,6}(\.\d{1,4})?$/;
 const SMK_DIMENSION_ORDER = ['height', 'width', 'depth', 'diameter'] as const;
 
@@ -109,6 +113,7 @@ interface SmkDimensionPart {
 function composeSmkDimensions(dimensions: unknown): string | undefined {
   if (!Array.isArray(dimensions)) return undefined;
   const parts = new Map<string, SmkDimensionPart>();
+  let namesPart = false;
   for (const entry of dimensions) {
     if (!entry || typeof entry !== 'object') continue;
     const d = entry as Record<string, unknown>;
@@ -118,7 +123,7 @@ function composeSmkDimensions(dimensions: unknown): string | undefined {
       key = '';
     } else {
       label = typeof d.part === 'string'
-        ? SMK_DIMENSION_PARTS[d.part.toLowerCase().replace(/å/g, 'aa')]
+        ? SMK_DIMENSION_PARTS.get(d.part.toLowerCase().replace(/å/g, 'aa'))
         : undefined;
       key = label ?? `?${String(d.part)}`;
     }
@@ -129,8 +134,9 @@ function composeSmkDimensions(dimensions: unknown): string | undefined {
     }
     const typeName = typeof d.type === 'string' ? d.type.toLowerCase() : '';
     if (SMK_IGNORED_TYPES.has(typeName)) continue;
-    const type = SMK_DIMENSION_TYPES[typeName];
-    const unit = typeof d.unit === 'string' ? SMK_DIMENSION_UNITS[d.unit.toLowerCase()] : undefined;
+    if (key !== '') namesPart = true;
+    const type = SMK_DIMENSION_TYPES.get(typeName);
+    const unit = typeof d.unit === 'string' ? SMK_DIMENSION_UNITS.get(d.unit.toLowerCase()) : undefined;
     const value = typeof d.value === 'string' && SMK_DIMENSION_VALUE.test(d.value) && Number(d.value) > 0
       ? d.value
       : undefined;
@@ -142,8 +148,12 @@ function composeSmkDimensions(dimensions: unknown): string | undefined {
   }
 
   const written: string[] = [];
-  for (const part of parts.values()) {
+  for (const [key, part] of parts) {
     if (!part.readable || part.measures.length === 0) continue;
+    // Beside a named part, a size with no part could measure anything
+    // (KMS317 gives an unframed size and then one with no part), so it is not
+    // written rather than guessed at.
+    if (key === '' && namesPart) continue;
     const units = new Set(part.measures.map((x) => x.unit));
     const byType = new Map(part.measures.map((x) => [x.type, x.value]));
     if (units.size !== 1 || byType.size !== part.measures.length) continue;
