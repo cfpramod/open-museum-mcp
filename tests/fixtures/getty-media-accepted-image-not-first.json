@@ -1,0 +1,190 @@
+{
+  "@context": "https://linked.art/ns/v1/linked-art.json",
+  "id": "https://data.getty.edu/media/image/a8f22509-9a55-5328-a2dc-dda0b250a4e0",
+  "type": "VisualItem",
+  "_label": "Media for Bestiary",
+  "shown_by": [
+    {
+      "id": "https://data.getty.edu/museum/collection/object/11271ba2-af4a-4062-aba3-35bc24c5428e",
+      "type": "HumanMadeObject",
+      "_label": "A Peacock"
+    }
+  ],
+  "identified_by": [
+    {
+      "id": "https://data.getty.edu/media/image/a8f22509-9a55-5328-a2dc-dda0b250a4e0/name",
+      "type": "Name",
+      "_label": "Title",
+      "classified_as": [
+        {
+          "id": "http://vocab.getty.edu/aat/300417193",
+          "type": "Type",
+          "_label": "Titles (General, Names)"
+        }
+      ],
+      "content": "Media for Bestiary"
+    }
+  ],
+  "digitally_shown_by": [
+    {
+      "id": "https://data.getty.edu/media/image/a8f22509-9a55-5328-a2dc-dda0b250a4e0/digital_object/7bb68aec-b5aa-6c05-593b-59e41dd92056",
+      "type": "DigitalObject",
+      "_label": "Object Overall - fol. 41v for Media for Bestiary",
+      "classified_by": [
+        {
+          "id": "http://vocab.getty.edu/aat/300215302",
+          "type": "Type",
+          "_label": "digital images"
+        }
+      ],
+      "format": "image/tiff",
+      "dimension": [
+        {
+          "id": "https://data.getty.edu/media/image/a8f22509-9a55-5328-a2dc-dda0b250a4e0/digital_object/7bb68aec-b5aa-6c05-593b-59e41dd92056/height",
+          "type": "Dimension",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300055644",
+              "type": "Type",
+              "_label": "Height"
+            }
+          ],
+          "value": 5959,
+          "unit": {
+            "id": "http://vocab.getty.edu/aat/300266190",
+            "type": "MeasurementUnit",
+            "_label": "pixels"
+          }
+        },
+        {
+          "id": "https://data.getty.edu/media/image/a8f22509-9a55-5328-a2dc-dda0b250a4e0/digital_object/7bb68aec-b5aa-6c05-593b-59e41dd92056/width",
+          "type": "Dimension",
+          "classified_as": [
+            {
+              "id": "http://vocab.getty.edu/aat/300055647",
+              "type": "Type",
+              "_label": "Width"
+            }
+          ],
+          "value": 4495,
+          "unit": {
+            "id": "http://vocab.getty.edu/aat/300266190",
+            "type": "MeasurementUnit",
+            "_label": "pixels"
+          }
+        }
+      ],
+      "access_point": [
+        {
+          "id": "https://media.getty.edu/iiif/image/0fca3f28-a7db-46f7-a648-bc6f7a1153ca",
+          "type": "DigitalObject",
+          "_label": "IIIF Image API for the image",
+          "conforms_to": "http://iiif.io/api/image",
+          "format": "application/json",
+          "classified_as": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/iiif-image",
+              "type": "Type",
+              "_label": "IIIF image service"
+            }
+          ]
+        },
+        {
+          "id": "https://media.getty.edu/iiif/image/0fca3f28-a7db-46f7-a648-bc6f7a1153ca/full/!600,600/0/default.jpg",
+          "type": "DigitalObject",
+          "_label": "Thumbnail for the image",
+          "format": "image/jpeg",
+          "classified_as": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/thumbnail",
+              "type": "Type",
+              "_label": "thumbnail image"
+            }
+          ]
+        },
+        {
+          "id": "https://media.getty.edu/iiif/image/0fca3f28-a7db-46f7-a648-bc6f7a1153ca/full/max/0/default.jpg",
+          "type": "DigitalObject",
+          "_label": "Full-resolution version of the image",
+          "format": "image/jpeg",
+          "classified_as": [
+            {
+              "id": "https://data.getty.edu/local/thesaurus/full-resolution",
+              "type": "Type",
+              "_label": "full resolution image"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "subject_to": [
+    {
+      "id": "https://data.getty.edu/media/image/a8f22509-9a55-5328-a2dc-dda0b250a4e0/rights",
+      "type": "Right",
+      "_label": "Rights for Media for Bestiary",
+      "classified_as": [
+        {
+          "type": "Type",
+          "_label": "Creative Commons Public Domain Dedication",
+          "id": "http://creativecommons.org/publicdomain/zero/1.0/",
+          "classified_as": [
+            {
+              "type": "Type",
+              "_label": "Rights Statement",
+              "id": "https://data.getty.edu/local/thesaurus/rights-statement"
+            },
+            {
+              "_deprecated": {
+                "reason": "Consolidation of local thesaurus terms.",
+                "replacement": "Filter on `Rights Statement` (https://data.getty.edu/local/thesaurus/rights-statement) instead.",
+                "since": "2023-08-13"
+              },
+              "type": "Type",
+              "_label": "RightsStatement.org Statement",
+              "id": "https://data.getty.edu/local/thesaurus/rightsstatement-org-statement"
+            }
+          ]
+        },
+        {
+          "type": "Type",
+          "_label": "download",
+          "id": "https://data.getty.edu/local/thesaurus/clearance/download",
+          "classified_as": [
+            {
+              "type": "Type",
+              "_label": "local clearance level",
+              "id": "https://data.getty.edu/local/thesaurus/clearance-level"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "subject_of": [
+    {
+      "id": "https://data.getty.edu/media/image/a8f22509-9a55-5328-a2dc-dda0b250a4e0/description",
+      "type": "LinguisticObject",
+      "value": "fol. 41v",
+      "classified_as": [
+        {
+          "type": "Type",
+          "_label": "descriptive note",
+          "id": "http://vocab.getty.edu/aat/300435416"
+        }
+      ]
+    },
+    {
+      "id": "https://data.getty.edu/media/image/a8f22509-9a55-5328-a2dc-dda0b250a4e0/texts/alt_text",
+      "type": "LinguisticObject",
+      "value": "Object Overall",
+      "classified_as": [
+        {
+          "type": "Type",
+          "_label": "Alternative text",
+          "id": "https://data.getty.edu/local/thesaurus/alt-text"
+        }
+      ]
+    }
+  ]
+}
