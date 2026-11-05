@@ -12,7 +12,7 @@ import {
   httpGet,
   rejectFor,
 } from './helpers.js';
-import { sanitizeArtistName, sanitizeDescription, sanitizeTitle } from './sanitize.js';
+import { buildCreditLine, sanitizeArtistName, sanitizeDescription, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // The Yale Center for British Art is federated through LUX, Yale's Linked Art
@@ -141,6 +141,7 @@ const AAT_PRIMARY_NAME = 'http://vocab.getty.edu/aat/300404670';
 const AAT_ACCESSION_NUMBER = 'http://vocab.getty.edu/aat/300312355';
 const AAT_MATERIAL_STATEMENT = 'http://vocab.getty.edu/aat/300435429';
 const AAT_DIMENSION_STATEMENT = 'http://vocab.getty.edu/aat/300435430';
+const AAT_CREDIT_LINE = 'http://vocab.getty.edu/aat/300435418';
 const AAT_WEB_PAGE = 'http://vocab.getty.edu/aat/300264578';
 const AAT_TYPE_OF_WORK = 'http://vocab.getty.edu/aat/300435443';
 
@@ -384,6 +385,7 @@ export const ycbaFetcher: Fetcher = {
       description: accessionNumber ? sanitizeTitle(accessionNumber) : undefined,
       objectType: objectType ? sanitizeTitle(objectType) : undefined,
       dimensions: dimensions ? sanitizeDescription(dimensions) : undefined,
+      creditLine: buildCreditLine(MUSEUM.name, findContentByAat(r.referred_to_by, AAT_CREDIT_LINE), accessionNumber),
     };
 
     return accepted(artwork);

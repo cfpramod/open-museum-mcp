@@ -1,0 +1,86 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 59145303,
+        "ns": 6,
+        "title": "File:Out Of The East.djvu",
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 64553362,
+            "width": 1061,
+            "height": 1500,
+            "pagecount": 294,
+            "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e2/Out_Of_The_East.djvu/page1-960px-Out_Of_The_East.djvu.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+            "thumbwidth": 2048,
+            "thumbheight": 2895,
+            "thumbattribs": {
+              "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e2/Out_Of_The_East.djvu/page1-960px-Out_Of_The_East.djvu.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+              "decoding": "async",
+              "loading": "lazy",
+              "width": 2048,
+              "height": 2895
+            },
+            "url": "https://upload.wikimedia.org/wikipedia/commons/e/e2/Out_Of_The_East.djvu?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Out_Of_The_East.djvu",
+            "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=59145303",
+            "extmetadata": {
+              "DateTime": {
+                "value": "2017-05-21 13:50:35",
+                "source": "mediawiki-metadata",
+                "hidden": ""
+              },
+              "ObjectName": {
+                "value": "<div class=\"fn\">\nOUT OF THE EAST</div>",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Lafcadio_Hearn\" class=\"extiw\" title=\"w:en:Lafcadio Hearn\"><span title=\"Greek-Irish writer, translator, and teacher who introduced the culture and literature of Japan to the West (1850–1904)\">Lafcadio Hearn</span></a></bdi>",
+                "source": "commons-desc-page"
+              },
+              "ImageDescription": {
+                "value": "<div class=\"description\">\n<p><b>Book Source:</b> &lt;a href=\"<a rel=\"nofollow\" class=\"external free\" href=\"http://www.new.dli.ernet.in/handle/2015/45846\">http://www.new.dli.ernet.in/handle/2015/45846</a>\" rel=\"nofollow\"&gt;Digital Library of India Item 2015.45846&lt;/a&gt;</p><p>dc.contributor.author: Hearn, Lafcadio<br>dc.date.accessioned: 2015-06-26T09:22:55Z<br>dc.date.available: 2015-06-26T09:22:55Z<br>dc.date.digitalpublicationdate: 2005-07-19<br>dc.date.citation: 1910<br>dc.identifier.barcode: 4990010206902<br>dc.identifier.origpath: /data3/upload/0061/054<br>dc.identifier.copyno: 1<br>dc.identifier.uri: <a rel=\"nofollow\" class=\"external free\" href=\"http://www.new.dli.ernet.in/handle/2015/45846\">http://www.new.dli.ernet.in/handle/2015/45846</a><br>dc.description.scanningcentre: C-DAK, Kolkata<br>dc.description.main: 1<br>dc.description.tagged: 0<br>dc.description.totalpages: 294<br>dc.format.mimetype: application/pdf<br>dc.language.iso: English<br>dc.publisher.digitalrepublisher: Digital Library Of India<br>dc.publisher: Bernhard Tauchnifz, Leipzig<br>dc.rights: In Public Domain<br>dc.source.library: Central Library, Visva-bharati<br>dc.subject.classification: Geography<br>dc.subject.classification: Geography. Exploration<br>dc.subject.classification: Travel<br>dc.subject.keywords: Japan-travel And Descriptions<br>dc.subject.keywords: Travel Literature<br>dc.title: Out Of The East<br></p></div>",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "<a href=\"//archive.org/details/in.ernet.dli.2015.45846\" class=\"extiw\" title=\"iarchive:in.ernet.dli.2015.45846\"><bdi class=\"description en\" lang=\"en\" dir=\"ltr\">Internet Archive identifier</bdi>: in.ernet.dli.2015.45846</a>",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "Public domain",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Public domain",
+                "source": "commons-desc-page"
+              },
+              "License": {
+                "value": "pd",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            },
+            "mime": "image/vnd.djvu"
+          }
+        ],
+        "categories": [
+          {
+            "ns": 14,
+            "title": "Category:1910 books"
+          },
+          {
+            "ns": 14,
+            "title": "Category:DjVu files in English"
+          },
+          {
+            "ns": 14,
+            "title": "Category:Literary works by Koizumi Yakumo"
+          }
+        ]
+      }
+    ]
+  }
+}

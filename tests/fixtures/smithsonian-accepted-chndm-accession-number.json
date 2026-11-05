@@ -1,0 +1,179 @@
+{
+  "status": 200,
+  "responseCode": 1,
+  "response": {
+    "id": "ld1-1643399887910-1643399893149-1",
+    "title": "Flavian Julia Helena",
+    "unitCode": "CHNDM",
+    "type": "edanmdm",
+    "url": "edanmdm:chndm_1913-13-19",
+    "content": {
+      "freetext": {
+        "date": [
+          {
+            "label": "Date",
+            "content": "1767–1780"
+          }
+        ],
+        "name": [
+          {
+            "label": "Manufacturer",
+            "content": "Wedgwood, English, established 1759"
+          }
+        ],
+        "notes": [
+          {
+            "label": "Catalogue Status",
+            "content": "Research in Progress"
+          },
+          {
+            "label": "Description",
+            "content": "Oval, with molded border. Head in profile to right, of Flavian Julia Helena, wife of Julian of Apostate, Roman Emperor (ca. 331–363 A.D.)."
+          }
+        ],
+        "place": [
+          {
+            "label": "made in",
+            "content": "England"
+          }
+        ],
+        "setName": [
+          {
+            "label": "See more items in",
+            "content": "Cooper Hewitt, Smithsonian Design Museum Collection"
+          },
+          {
+            "label": "See more items in",
+            "content": "Product Design and Decorative Arts Department"
+          }
+        ],
+        "creditLine": [
+          {
+            "label": "Credit Line",
+            "content": "Gift of Leverton Harris"
+          }
+        ],
+        "dataSource": [
+          {
+            "label": "Data Source",
+            "content": "Cooper Hewitt, Smithsonian Design Museum"
+          }
+        ],
+        "identifier": [
+          {
+            "label": "Accession Number",
+            "content": "1913-13-19"
+          }
+        ],
+        "objectType": [
+          {
+            "label": "Type",
+            "content": "ceramics"
+          },
+          {
+            "label": "Type",
+            "content": "Decorative Arts"
+          },
+          {
+            "label": "Object Name",
+            "content": "Portrait medallion"
+          },
+          {
+            "label": "Type",
+            "content": "Portrait medallion"
+          }
+        ],
+        "objectRights": [
+          {
+            "label": "Restrictions & Rights",
+            "content": "CC0"
+          }
+        ],
+        "physicalDescription": [
+          {
+            "label": "Medium",
+            "content": "Unglazed stoneware (\"black basalt\")"
+          },
+          {
+            "label": "Dimensions",
+            "content": "H x W x D: 5.2 x 4.5 x 0.5 cm (2 1/16 x 1 3/4 x 3/16 in.)"
+          }
+        ]
+      },
+      "indexedStructured": {
+        "date": [
+          "1780s",
+          "1760s"
+        ],
+        "name": [
+          "Wedgwood"
+        ],
+        "place": [
+          "England"
+        ],
+        "geoLocation": [
+          {
+            "L2": {
+              "type": "Country",
+              "content": "England"
+            }
+          }
+        ],
+        "object_type": [
+          "Ceramics (objects)",
+          "Portrait medallion",
+          "Decorative arts"
+        ],
+        "online_media_type": [
+          "Images"
+        ]
+      },
+      "descriptiveNonRepeating": {
+        "guid": "http://n2t.net/ark:/65665/kq469c1185b-c050-4b0a-99c2-48a536f68107",
+        "title": {
+          "label": "Title",
+          "content": "Flavian Julia Helena"
+        },
+        "record_ID": "chndm_1913-13-19",
+        "unit_code": "CHNDM",
+        "title_sort": "FLAVIAN JULIA HELENA",
+        "data_source": "Cooper Hewitt, Smithsonian Design Museum",
+        "record_link": "https://collection.cooperhewitt.org/view/objects/asitem/id/19460",
+        "online_media": {
+          "media": [
+            {
+              "id": "media:CHSDM-6D155339C29D2-000001",
+              "guid": "http://n2t.net/ark:/65665/vc903d948a3-e007-4ddf-b412-b0d4b1b16160",
+              "type": "Images",
+              "idsId": "CHSDM-6D155339C29D2-000001",
+              "usage": {
+                "access": "CC0"
+              },
+              "content": "https://ids.si.edu/ids/deliveryService?id=CHSDM-6D155339C29D2-000001",
+              "thumbnail": "https://ids.si.edu/ids/deliveryService?id=CHSDM-6D155339C29D2-000001",
+              "resources": [
+                {
+                  "label": "Screen Image",
+                  "url": "https://ids.si.edu/ids/download?id=CHSDM-6D155339C29D2-000001_screen"
+                },
+                {
+                  "label": "Thumbnail Image",
+                  "url": "https://ids.si.edu/ids/download?id=CHSDM-6D155339C29D2-000001_thumb"
+                }
+              ]
+            }
+          ],
+          "mediaCount": 1
+        },
+        "metadata_usage": {
+          "access": "CC0"
+        }
+      }
+    },
+    "hash": "063df194ef212e9235d163b5fdf5b681fec106f9",
+    "docSignature": "6b0e3ef70f0dc0d10dcc6637f4e911f3",
+    "timestamp": "1663784056",
+    "lastTimeUpdated": "1731758681",
+    "version": ""
+  }
+}

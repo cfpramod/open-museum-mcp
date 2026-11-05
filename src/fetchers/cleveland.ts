@@ -14,7 +14,7 @@ import {
   pickMaxResolution,
   rejectFor,
 } from './helpers.js';
-import { MEDIUM_MAX, SHORT_TEXT_MAX, sanitizeArtistName, sanitizeDescription, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { DIMENSIONS_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, buildCreditLine, sanitizeArtistName, sanitizeDescription, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const CLEVELAND_API = 'https://openaccess-api.clevelandart.org/api';
@@ -250,6 +250,10 @@ export const clevelandFetcher: Fetcher = {
         pageUrl: asString(r.url),
       },
       description: asOptionalString(sanitizeDescription(asString(r.accession_number))),
+      // `measurements` is Cleveland's display string; its `dimensions` key is a
+      // structured object in metres, which is not the field documented here.
+      dimensions: asOptionalString(sanitizeText(asString(r.measurements), DIMENSIONS_MAX)),
+      creditLine: buildCreditLine('Cleveland Museum of Art', r.creditline, r.accession_number),
       ...(models3d ? { models3d } : {}),
       ...(provenance ? { provenance } : {}),
     };

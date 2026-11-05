@@ -5,7 +5,7 @@ import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { accepted, asString, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
-import { SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { SHORT_TEXT_MAX, buildCreditLine, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // Wellcome Collection — keyless Catalogue API (api.wellcomecollection.org) over a
@@ -211,6 +211,9 @@ export const wellcomeFetcher: Fetcher = {
         pageUrl: `${WELLCOME_SITE}/${workId}`,
       },
       description: undefined,
+      // The item-level `credit` credits the image, not the acquisition, so the
+      // credit line carries only the reference number.
+      creditLine: buildCreditLine('Wellcome Collection', undefined, work.referenceNumber),
     };
 
     return accepted(artwork);

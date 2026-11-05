@@ -12,7 +12,7 @@ import {
   pickMaxResolution,
   rejectFor,
 } from './helpers.js';
-import { SHORT_TEXT_MAX, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
+import { SHORT_TEXT_MAX, buildCreditLine, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // SMK — Statens Museum for Kunst (National Gallery of Denmark). Keyless REST API
@@ -178,6 +178,10 @@ export const smkFetcher: Fetcher = {
         pageUrl: asString(r.frontend_url) || asString(r.object_url),
       },
       description: asOptionalString(firstObjectName),
+      // SMK publishes no credit line. Its `dimensions` are structured
+      // {type, part, unit, value} entries with no display string, so
+      // `dimensions` stays absent rather than being composed here.
+      creditLine: buildCreditLine('Statens Museum for Kunst (National Gallery of Denmark)', undefined, objectNumber),
     };
 
     return accepted(artwork);
