@@ -1,0 +1,329 @@
+{
+  "status": 200,
+  "responseCode": 1,
+  "response": {
+    "id": "ld1-1643398912743-1643398920406-0",
+    "title": "Album of WWI Photographs by Harry A. Spencer",
+    "unitCode": "NMAH",
+    "type": "edanmdm",
+    "url": "edanmdm:nmah_1363333",
+    "content": {
+      "freetext": {
+        "date": [
+          {
+            "label": "date made",
+            "content": "1918-1919"
+          }
+        ],
+        "notes": [
+          {
+            "label": "Description",
+            "content": "Album of photographs taken by Harry A. Spencer during his tour of service in the United States Army during World War I. The album has a black leather cover stamped with the word \"Photographs\" that has separated from the spine. A gelatin silver photograph of a piece of artillery is attached to the front below the title. The album is composed of fifty black paper pages on which silver gelatin photographs have been mounted with hand-written captions beneath. The pages are tied together near the spine with a black woven shoelace. The album details Spencer's life while he served in the military during the war, including his time at Camp Greene in North Carolina, and travels through Memphis, Tennessee, New York City, England, France, Belgium, Germany, and Colorado. See accession file for reference reproduction of Spencer's album created by the donor, Spencer's grand-daughter Kathi Wong."
+          },
+          {
+            "label": "Location",
+            "content": "Currently not on view"
+          }
+        ],
+        "place": [
+          {
+            "label": "place made",
+            "content": "United States: Colorado"
+          },
+          {
+            "label": "depicted",
+            "content": "United States: North Carolina"
+          },
+          {
+            "label": "depicted",
+            "content": "United States: Tennessee, Memphis"
+          },
+          {
+            "label": "depicted",
+            "content": "Germany"
+          },
+          {
+            "label": "depicted",
+            "content": "France"
+          },
+          {
+            "label": "depicted",
+            "content": "Belgium"
+          }
+        ],
+        "topic": [
+          {
+            "label": "Subject",
+            "content": "European History"
+          },
+          {
+            "label": "Subject",
+            "content": "United States Army"
+          },
+          {
+            "label": "Subject",
+            "content": "Soldiers"
+          },
+          {
+            "label": "Subject",
+            "content": "World War I"
+          },
+          {
+            "label": "related event",
+            "content": "World War I"
+          }
+        ],
+        "setName": [
+          {
+            "label": "See more items in",
+            "content": "Work and Industry: Photographic History"
+          },
+          {
+            "label": "See more items in",
+            "content": "Military"
+          },
+          {
+            "label": "See more items in",
+            "content": "Photography"
+          }
+        ],
+        "dataSource": [
+          {
+            "label": "Data Source",
+            "content": "National Museum of American History"
+          }
+        ],
+        "identifier": [
+          {
+            "label": "ID Number",
+            "content": "2009.0129.01"
+          },
+          {
+            "label": "accession number",
+            "content": "2009.0129"
+          },
+          {
+            "label": "catalog number",
+            "content": "2009.0129.01"
+          }
+        ],
+        "objectType": [
+          {
+            "label": "Object Name",
+            "content": "photo album"
+          },
+          {
+            "label": "Object Name",
+            "content": "album"
+          }
+        ],
+        "physicalDescription": [
+          {
+            "label": "Physical Description",
+            "content": "paper (overall material)"
+          },
+          {
+            "label": "Physical Description",
+            "content": "leather (overall material)"
+          },
+          {
+            "label": "Measurements",
+            "content": "overall: 10 in x 13 in x 1 1/2 in; 25.4 cm x 33.02 cm x 3.81 cm"
+          }
+        ]
+      },
+      "indexedStructured": {
+        "date": [
+          "1910s",
+          "1914-1918"
+        ],
+        "name": [
+          "United States. Army"
+        ],
+        "place": [
+          "North Carolina",
+          "Belgium",
+          "United States",
+          "Colorado",
+          "Tennessee",
+          "Europe",
+          "Memphis",
+          "France",
+          "Germany"
+        ],
+        "topic": [
+          "Photography",
+          "WW I",
+          "Soldiers",
+          "World War, 1914-1918",
+          "History",
+          "Military"
+        ],
+        "culture": [
+          "Europeans"
+        ],
+        "geoLocation": [
+          {
+            "Other": {
+              "type": "Place",
+              "content": "United States"
+            }
+          },
+          {
+            "Other": {
+              "type": "Place",
+              "content": "Colorado"
+            }
+          },
+          {
+            "Other": {
+              "type": "Place",
+              "content": "North Carolina"
+            }
+          },
+          {
+            "Other": {
+              "type": "Place",
+              "content": "Tennessee"
+            }
+          },
+          {
+            "Other": {
+              "type": "Place",
+              "content": "Memphis"
+            }
+          },
+          {
+            "Other": {
+              "type": "Place",
+              "content": "Germany"
+            }
+          },
+          {
+            "Other": {
+              "type": "Place",
+              "content": "France"
+            }
+          },
+          {
+            "Other": {
+              "type": "Place",
+              "content": "Belgium"
+            }
+          },
+          {
+            "points": {
+              "point": {
+                "latitude": {
+                  "type": "decimal",
+                  "content": "39"
+                },
+                "longitude": {
+                  "type": "decimal",
+                  "content": "-105"
+                }
+              }
+            }
+          },
+          {
+            "points": {
+              "point": {
+                "latitude": {
+                  "type": "decimal",
+                  "content": "35.5"
+                },
+                "longitude": {
+                  "type": "decimal",
+                  "content": "-80"
+                }
+              }
+            }
+          },
+          {
+            "points": {
+              "point": {
+                "latitude": {
+                  "type": "decimal",
+                  "content": "35.1333"
+                },
+                "longitude": {
+                  "type": "decimal",
+                  "content": "-90.0333"
+                }
+              }
+            }
+          },
+          {
+            "points": {
+              "point": {
+                "latitude": {
+                  "type": "decimal",
+                  "content": "51.5"
+                },
+                "longitude": {
+                  "type": "decimal",
+                  "content": "10.5"
+                }
+              }
+            }
+          },
+          {
+            "points": {
+              "point": {
+                "latitude": {
+                  "type": "decimal",
+                  "content": "46"
+                },
+                "longitude": {
+                  "type": "decimal",
+                  "content": "2"
+                }
+              }
+            }
+          },
+          {
+            "points": {
+              "point": {
+                "latitude": {
+                  "type": "decimal",
+                  "content": "50.8333"
+                },
+                "longitude": {
+                  "type": "decimal",
+                  "content": "4"
+                }
+              }
+            }
+          }
+        ],
+        "object_type": [
+          "Photographs",
+          "Photograph albums",
+          "Albums"
+        ],
+        "online_media_type": [
+          "Images"
+        ]
+      },
+      "descriptiveNonRepeating": {
+        "guid": "https://n2t.net/ark:/65665/ng49ca746ac-f5e1-704b-e053-15f76fa0b4fa",
+        "title": {
+          "label": "Title",
+          "content": "Album of WWI Photographs by Harry A. Spencer"
+        },
+        "record_ID": "nmah_1363333",
+        "unit_code": "NMAH",
+        "title_sort": "ALBUM OF WWI PHOTOGRAPHS BY HARRY A. SPENCER",
+        "data_source": "National Museum of American History",
+        "metadata_usage": {
+          "access": "CC0"
+        }
+      }
+    },
+    "hash": "831fc3e56bdc9a6625ed62c9435917846b1de653",
+    "docSignature": "82320c7f219be38bfcd2b2b993bf29b4",
+    "timestamp": "1663783025",
+    "lastTimeUpdated": "1769608384",
+    "version": ""
+  }
+}

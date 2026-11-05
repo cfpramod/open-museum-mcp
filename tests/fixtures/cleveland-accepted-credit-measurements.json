@@ -1,0 +1,279 @@
+{
+  "data": {
+    "id": 148382,
+    "accession_number": "1975.93",
+    "share_license_status": "CC0",
+    "tombstone": "Plums, Bamboo, and Orchid, 1834. Yamamoto Baiitsu (Japanese, 1783–1856). Hanging scroll; ink on silk; painting only: 172.4 x 79 cm (67 7/8 x 31 1/8 in.); including mounting: 252.7 x 105.4 cm (99 1/2 x 41 1/2 in.). The Cleveland Museum of Art, Mr. and Mrs. William H. Marlatt Fund, 1975.93",
+    "current_location": null,
+    "title": "Plums, Bamboo, and Orchid",
+    "creation_date": "1834",
+    "creation_date_earliest": 1834,
+    "creation_date_latest": 1834,
+    "artists_tags": [
+      "male"
+    ],
+    "culture": [
+      "Japan, Edo period (1615–1868)"
+    ],
+    "technique": "hanging scroll; ink on silk",
+    "support_materials": [],
+    "department": "Japanese Art",
+    "collection": "ASIAN - Hanging scroll",
+    "type": "Painting",
+    "measurements": "Painting only: 172.4 x 79 cm (67 7/8 x 31 1/8 in.); Including mounting: 252.7 x 105.4 cm (99 1/2 x 41 1/2 in.)",
+    "dimensions": {
+      "painting only": {
+        "height": 1.724,
+        "height_inch": 67,
+        "height_inch_fraction": 0.875,
+        "width": 0.79,
+        "width_inch": 31,
+        "width_inch_fraction": 0.125
+      },
+      "including mounting": {
+        "height": 2.527,
+        "height_inch": 99,
+        "height_inch_fraction": 0.5,
+        "width": 1.054,
+        "width_inch": 41,
+        "width_inch_fraction": 0.5
+      }
+    },
+    "state_of_the_work": null,
+    "edition_of_the_work": null,
+    "copyright": null,
+    "inscriptions": [
+      {
+        "inscription": "Artist's signature, seal, and date at lower left.",
+        "inscription_translation": null,
+        "inscription_remark": null,
+        "sortorder": 1
+      }
+    ],
+    "exhibitions": {
+      "current": [
+        {
+          "id": 302170,
+          "title": "Year in Review: 1975",
+          "description": "<i>Year in Review: 1975</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (February 3-March 7, 1976).",
+          "opening_date": "1976-02-03T05:00:00"
+        },
+        {
+          "id": 309912,
+          "title": "Suibokuga: Japanese Ink Painting",
+          "description": "<i>Suibokuga: Japanese Ink Painting</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (October 1, 1985-February 24, 1986).",
+          "opening_date": "1985-10-01T04:00:00"
+        },
+        {
+          "id": 310268,
+          "title": "Scholar's Studio",
+          "description": "<i>Scholar's Studio</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (September 19-December 17, 1989).",
+          "opening_date": "1989-09-19T04:00:00"
+        },
+        {
+          "id": 197104,
+          "title": "The Lure of Painted Poetry: Japanese and Korean Art",
+          "description": "<i>The Lure of Painted Poetry: Japanese and Korean Art</i>. The Cleveland Museum of Art, Cleveland, OH (organizer) (April 15-August 21, 2011).",
+          "opening_date": "2011-03-27T00:00:00"
+        },
+        {
+          "id": 291838,
+          "title": "Japanese Gallery 235 Rotation - January-July 2017",
+          "description": "<i>Japanese Gallery 235 Rotation - January-July 2017</i>. The Cleveland Museum of Art (January 9-July 10, 2017).",
+          "opening_date": "2017-01-09T05:00:00"
+        }
+      ],
+      "legacy": [
+        {
+          "description": "<em>Later Japanese Art Rotation (Gallery 113)</em>. The Cleveland Museum of Art, Cleveland, OH (December 4, 2003-March 18, 2004).",
+          "opening_date": "2003-12-04T05:00:00Z"
+        }
+      ]
+    },
+    "provenance": [
+      {
+        "description": "(Shogoro Yabumoto, Amagasaki, Hyōgo Prefecture, Japan, sold to the Cleveland Museum of Art)",
+        "citations": [],
+        "footnotes": null,
+        "date": "?–1975",
+        "sortorder": 1
+      },
+      {
+        "description": "The Cleveland Museum of Art, Cleveland, OH",
+        "citations": [],
+        "footnotes": null,
+        "date": "1975–",
+        "sortorder": 2
+      }
+    ],
+    "find_spot": null,
+    "related_works": [],
+    "former_accession_numbers": [],
+    "did_you_know": null,
+    "early_education_description": null,
+    "artlens_description": null,
+    "description": "This painting represents three of the plants known as the Four Gentlemen of Chinese painting; it lacks only autumn’s chrysanthemum. The plants’ characteristics are symbols of Confucian virtues, such as open-mindedness (bamboo), strength in the face of adversity (plum), and humility (orchid).",
+    "external_resources": {
+      "wikidata": [
+        "https://www.wikidata.org/wiki/Q60472959"
+      ],
+      "internet_archive": [
+        "https://archive.org/details/clevelandart-1975.93-plums-bamboo-and-orc"
+      ]
+    },
+    "citations": [
+      {
+        "citation": "Lee, Sherman E. “The Year in Review for 1975.” <em>The Bulletin of the Cleveland Museum of Art</em> 63, no. 2 (February 1976): 31–71. <br>Published as: <em>White Prunus</em>",
+        "page_number": "Reproduced: p. 63; Mentioned: p. 70, no. 153",
+        "url": "http://www.jstor.org/stable/25152624"
+      },
+      {
+        "citation": "The Cleveland Museum of Art. <em>Handbook of the Cleveland Museum of Art/1978</em>. Cleveland, OH: The Cleveland Museum of Art, 1978.",
+        "page_number": "Reproduced: p. 386",
+        "url": "https://archive.org/details/CMAHandbook1978/page/n406"
+      },
+      {
+        "citation": "Graham, Patricia J. \"Lifestyles of Scholar-Painters in Edo Japan.\" <em>The Bulletin of the Cleveland Museum of Art</em> 77, no. 7 (September 1990): 262–283.",
+        "page_number": "Reproduced and Mentioned: p. 277",
+        "url": "https://www.jstor.org/stable/25161293"
+      },
+      {
+        "citation": "Sŏn, Sŭng-hye. <em>The Lure of Painted Poetry: Japanese and Korean Art</em>. Cleveland, OH: Cleveland Museum of Art, 2011.",
+        "page_number": "Mentioned and Reproduced: pp. 79–80, no. 76",
+        "url": ""
+      }
+    ],
+    "url": "https://clevelandart.org/art/1975.93",
+    "images": {
+      "annotation": null,
+      "web": {
+        "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_web.jpg",
+        "width": "432",
+        "height": "893",
+        "filesize": "356594",
+        "filename": "1975.93_web.jpg"
+      },
+      "print": {
+        "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_print.jpg",
+        "width": "1644",
+        "height": "3400",
+        "filesize": "5179250",
+        "filename": "1975.93_print.jpg"
+      },
+      "full": {
+        "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_full.tif",
+        "width": "3157",
+        "height": "6527",
+        "filesize": "61845600",
+        "filename": "1975.93_full.tif"
+      }
+    },
+    "alternate_images": [
+      {
+        "web": {
+          "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_alt0_web.jpg",
+          "width": "375",
+          "height": "893",
+          "filesize": "271639"
+        },
+        "print": {
+          "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_alt0_print.jpg",
+          "width": "1426",
+          "height": "3400",
+          "filesize": "3986979"
+        },
+        "full": {
+          "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_alt0_full.tif",
+          "width": "2711",
+          "height": "6462",
+          "filesize": "52583004"
+        },
+        "date_created": "2010-10-12T14:58:07",
+        "annotation": ""
+      },
+      {
+        "web": {
+          "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_alt1_web.jpg",
+          "width": "490",
+          "height": "893",
+          "filesize": "127980"
+        },
+        "print": {
+          "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_alt1_print.jpg",
+          "width": "1124",
+          "height": "2048",
+          "filesize": "784758"
+        },
+        "full": {
+          "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_alt1_full.tif",
+          "width": "1124",
+          "height": "2048",
+          "filesize": "791463"
+        },
+        "annotation": ""
+      },
+      {
+        "web": {
+          "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_alt2_web.jpg",
+          "width": "490",
+          "height": "893",
+          "filesize": "429001"
+        },
+        "print": {
+          "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_alt2_print.jpg",
+          "width": "1124",
+          "height": "2048",
+          "filesize": "2262615"
+        },
+        "full": {
+          "url": "https://openaccess-cdn.clevelandart.org/1975.93/1975.93_alt2_full.tif",
+          "width": "1124",
+          "height": "2048",
+          "filesize": "6908380"
+        },
+        "annotation": ""
+      }
+    ],
+    "creditline": "Mr. and Mrs. William H. Marlatt Fund",
+    "image_credit": null,
+    "sketchfab_id": null,
+    "sketchfab_url": null,
+    "gallery_donor_text": null,
+    "athena_id": 148382,
+    "creators": [
+      {
+        "id": 11282,
+        "description": "Yamamoto Baiitsu (Japanese, 1783–1856)",
+        "extent": null,
+        "qualifier": null,
+        "role": "artist",
+        "biography": null,
+        "name_in_original_language": "山本 梅逸",
+        "birth_year": "1783",
+        "death_year": "1856",
+        "use_in_caption": true,
+        "include_extent": false,
+        "weight": 1
+      }
+    ],
+    "legal_status": "accessioned",
+    "accession_date": "1975-11-29T00:00:00",
+    "sortable_date": 1834,
+    "date_added_to_oa": null,
+    "date_text": "1834",
+    "collapse_artists": false,
+    "on_loan": false,
+    "recently_acquired": false,
+    "record_type": "object",
+    "conservation_statement": null,
+    "has_conservation_images": false,
+    "cover_accession_number": null,
+    "is_nazi_era_provenance": false,
+    "impression": null,
+    "alternate_titles": [
+      "White Prunus"
+    ],
+    "is_highlight": false,
+    "updated_at": "2026-07-18 11:14:35.648000"
+  }
+}

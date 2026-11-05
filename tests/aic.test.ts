@@ -312,3 +312,28 @@ describe('AIC provenance mapping (v0.20.0, openclearance P-7 posture)', () => {
     expect(prov!.entries![0].description).toBe(prov!.raw); // interpretation IS the text, unaltered
   });
 });
+
+describe('AIC credit line', () => {
+  it('carries the credit line and main reference number verbatim', () => {
+    const result = aicFetcher.normalize(fixture('aic-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.creditLine).toEqual({
+      holder: 'Art Institute of Chicago',
+      fund: 'Mr. and Mrs. Martin A. Ryerson Collection',
+      accession: '1933.1157',
+    });
+  });
+
+  it('requests both fields, which AIC publishes under CC0', () => {
+    expect(AIC_FIELDS.split(',')).toEqual(expect.arrayContaining(['credit_line', 'main_reference_number']));
+  });
+
+  it('omits the credit line when AIC publishes neither field', () => {
+    const raw = structuredClone(fixture('aic-accepted.json')) as { data: Record<string, unknown> };
+    delete raw.data.credit_line;
+    delete raw.data.main_reference_number;
+    const result = aicFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.creditLine).toBeUndefined();
+  });
+});

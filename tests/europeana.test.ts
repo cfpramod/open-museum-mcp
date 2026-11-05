@@ -243,3 +243,12 @@ describe('Europeana adapter mediumCategory', () => {
     expect(result.artwork.mediumCategory).toBe('other');
   });
 });
+
+describe('europeana dimensions and credit line', () => {
+  it('omits both: the search records this adapter reads carry no dimensions, credit line or accession number', () => {
+    const result = europeanaFetcher.normalize(fixture('europeana-accepted-pdm.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBeUndefined();
+    expect(result.artwork.creditLine).toBeUndefined();
+  });
+});

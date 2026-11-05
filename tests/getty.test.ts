@@ -245,3 +245,30 @@ describe('Getty search: the SPARQL endpoint now requires an access token', () =>
     expect(calls.some((u) => u.includes('/sparql'))).toBe(false);
   });
 });
+
+describe('Getty dimensions and credit line', () => {
+  const accepted = () => ({ object: fixture('getty-object-accepted.json'), media: fixture('getty-media-accepted.json') });
+
+  it('takes the first Dimensions Description and the Credit Line, verbatim', () => {
+    const result = gettyFetcher.normalize(accepted());
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    // The element label ("Unframed") and the bare formatted measurement are
+    // separate entries under Getty-local classifications; only the AAT
+    // Dimensions Description carries both, so that is the one read.
+    expect(result.artwork.dimensions).toBe('Unframed: 74.3 × 94.3 cm (29 1/4 × 37 1/8 in.)');
+    expect(result.artwork.creditLine).toEqual({
+      holder: 'J. Paul Getty Museum',
+      fund: 'The J. Paul Getty Museum, Los Angeles',
+      accession: '90.PA.20',
+    });
+  });
+
+  it('omits dimensions and keeps the accession number when no statements are published', () => {
+    const raw = accepted();
+    delete (raw.object as Record<string, unknown>).referred_to_by;
+    const result = gettyFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBeUndefined();
+    expect(result.artwork.creditLine).toEqual({ holder: 'J. Paul Getty Museum', accession: '90.PA.20' });
+  });
+});

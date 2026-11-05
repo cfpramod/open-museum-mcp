@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { cite as citeArtwork, type CiteStyle } from '../cite.js';
 import { dedupeWikimediaUploads } from '../dedupe.js';
+import { sanitizeArtworkText } from '../fetchers/sanitize.js';
 import type { Fetcher } from '../fetchers/types.js';
 import { MEDIUM_CATEGORIES } from '../medium.js';
 import {
@@ -409,8 +410,12 @@ export function createFederation(opts: FederationOptions): Federation {
     // time. (The query-cache holds only object IDs, not the copyrighted records.)
     // A cached record whose fetcher is no longer registered is still served.
     if (!fetcher?.noCache) {
-      const cached = await cache.getObject(id);
-      if (cached) {
+      const stored = await cache.getObject(id);
+      if (stored) {
+        // A record cached before every text field went through the sanitiser
+        // keeps its old text for up to the 90-day TTL. The pass is idempotent,
+        // so on a record that is already clean it changes nothing.
+        const cached = sanitizeArtworkText(stored);
         // Backfill colour onto a record cached before it had any — a pre-v0.8b row
         // still within the 90-day TTL, or one written by a sharp-less/Workers
         // process. Without this, such rows would stay colourless until natural

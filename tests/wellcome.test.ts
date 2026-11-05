@@ -92,3 +92,21 @@ describe('Wellcome search query construction', () => {
     expect(ids).toEqual(['wellcome:abc12345', 'wellcome:def67890']);
   });
 });
+
+describe('Wellcome credit line', () => {
+  it('carries the reference number as the accession number', () => {
+    const result = wellcomeFetcher.normalize(fixture('wellcome-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    // The item-level `credit` ("Wellcome Collection") credits the image, not
+    // the acquisition, so it is not read as the credit line.
+    expect(result.artwork.creditLine).toEqual({ holder: 'Wellcome Collection', accession: '3488i' });
+  });
+
+  it('omits the credit line when the work has no reference number', () => {
+    const raw = structuredClone(fixture('wellcome-accepted.json')) as { work: Record<string, unknown> };
+    delete raw.work.referenceNumber;
+    const result = wellcomeFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.creditLine).toBeUndefined();
+  });
+});

@@ -1,6 +1,7 @@
 import { chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { cleanText, sanitizeArtworkText } from './fetchers/sanitize.js';
 import type { Artwork, Tradition } from './types.js';
 
 const OBJECT_TTL_DAYS = 90;
@@ -17,7 +18,19 @@ function titleCase(s: string): string {
 
 export interface CacheConfig {
   path: string;
+  // How long to wait for another process's write lock before giving up.
+  busyTimeoutMs?: number;
 }
+
+// Several servers can share one cache file (one per MCP client session). A
+// writer holds the lock for at most one short transaction, so waiting this
+// long is enough under normal use without hanging a server on a stuck one.
+const DEFAULT_BUSY_TIMEOUT_MS = 5000;
+
+// user_version once every stored row's text has been through the sanitiser.
+const TEXT_SANITIZED_VERSION = 1;
+// Rows rewritten per transaction, so the write lock is never held for long.
+const RESANITIZE_BATCH = 500;
 
 /**
  * Constraints for {@link Cache.getRandomObject}. All fields are AND-combined.
@@ -31,6 +44,22 @@ export interface DiscoverFilter {
   period?: string;
   notArtist?: string[];
   museumCode?: string;
+}
+
+/**
+ * Every stored record is read back through here. A malformed row (manual DB
+ * tinkering, OS-level corruption, schema drift from a prior version) is a
+ * cache miss; the next write overwrites it. A record cached before every text
+ * field was sanitised is cleaned on the way out, so it does not serve its old
+ * text for the rest of its lifetime. The pass is idempotent, so a record that
+ * is already clean comes back unchanged.
+ */
+function parseRecord(json: string): Artwork | null {
+  try {
+    return sanitizeArtworkText(JSON.parse(json) as Artwork);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -51,6 +80,7 @@ export interface DiscoverFilter {
  */
 export class Cache {
   private db: DatabaseSync;
+  private busyTimeoutMs: number;
 
   constructor(config: CacheConfig) {
     if (!existsSync(dirname(config.path))) {
@@ -58,6 +88,10 @@ export class Cache {
     }
     const fileExisted = existsSync(config.path);
     this.db = new DatabaseSync(config.path);
+    // Set before anything else touches the file, so every statement below
+    // waits for another server's transaction instead of failing at once.
+    this.busyTimeoutMs = Math.max(0, Math.floor(config.busyTimeoutMs ?? DEFAULT_BUSY_TIMEOUT_MS));
+    this.setBusyTimeout(this.busyTimeoutMs);
     if (!fileExisted) {
       // Tighten file mode immediately on creation so the cache (which can
       // include rights metadata, snapshots of museum responses, etc.) isn't
@@ -70,7 +104,109 @@ export class Cache {
     }
     this.db.exec('PRAGMA journal_mode = WAL');
     this.init();
-    this.pruneExpired();
+    // Housekeeping at open is best-effort: if another server keeps the write
+    // lock past the busy timeout, or the file is read-only, the cache still
+    // opens. Reads treat expired rows as misses either way.
+    //
+    // Every step that takes the write lock shares one busy timeout, so an open
+    // waits for another server at most once in total, not once per step.
+    const deadline = performance.now() + this.busyTimeoutMs;
+    try {
+      this.pruneAtOpen(deadline);
+      this.resanitizeStoredText(deadline);
+    } finally {
+      this.setBusyTimeout(this.busyTimeoutMs);
+    }
+  }
+
+  private setBusyTimeout(ms: number): void {
+    this.db.exec(`PRAGMA busy_timeout = ${ms}`);
+  }
+
+  // Takes the write lock, waiting no later than deadline. False if it could not.
+  private beginBefore(deadline: number): boolean {
+    this.setBusyTimeout(Math.max(0, Math.ceil(deadline - performance.now())));
+    try {
+      this.db.exec('BEGIN IMMEDIATE');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private rollback(): void {
+    try {
+      this.db.exec('ROLLBACK');
+    } catch {
+      // SQLite has already ended the transaction (on an I/O or full-disk error).
+    }
+  }
+
+  // Both deletes in one transaction, so the prune takes the lock once.
+  private pruneAtOpen(deadline: number): void {
+    if (!this.beginBefore(deadline)) return;
+    try {
+      this.pruneExpired();
+      this.db.exec('COMMIT');
+    } catch {
+      this.rollback();
+    }
+  }
+
+  // Rows written before every text field was sanitised hold characters the
+  // sanitiser now removes, in full_record and in the columns that
+  // getRandomObject filters on and listTraditions counts. Rewrite them once,
+  // so a tag listed by list_traditions is one discover_random can find.
+  //
+  // The pass runs in batches of RESANITIZE_BATCH rows, each its own
+  // transaction, so another server on the same file waits for one batch at
+  // most. user_version is set in the transaction that finishes the last
+  // batch. If a batch cannot take the write lock before deadline (whatever is
+  // left of the open's one busy timeout), or the file is read-only, or a batch
+  // fails, that batch changes nothing, the batches before it stay (each is
+  // complete on its own), and the pass starts again at the next open.
+  // parseRecord cleans every read meanwhile.
+  //
+  // Not covered: a row written into the same file by an older version of this
+  // server, after the pass has gone past it or finished. Its full_record is
+  // still cleaned on read, but its filter columns keep the old text until the
+  // row is next fetched or expires.
+  private resanitizeStoredText(deadline: number): void {
+    const version = () => (this.db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
+    if (version() >= TEXT_SANITIZED_VERSION) return;
+    const select = this.db.prepare('SELECT id, full_record FROM objects WHERE id > ? ORDER BY id LIMIT ?');
+    const update = this.db.prepare(
+      `UPDATE objects SET title = ?, artist_name = ?, display_date = ?, medium = ?, region = ?, period = ?,
+         full_record = ? WHERE id = ?`,
+    );
+    let after = '';
+    for (;;) {
+      if (!this.beginBefore(deadline)) return;
+      try {
+        // Another server may have finished the pass while this one waited.
+        if (version() >= TEXT_SANITIZED_VERSION) {
+          this.db.exec('COMMIT');
+          return;
+        }
+        const rows = select.all(after, RESANITIZE_BATCH) as Array<{ id: string; full_record: string }>;
+        for (const row of rows) {
+          const art = parseRecord(row.full_record);
+          if (!art) continue;
+          const json = JSON.stringify(art);
+          if (json === row.full_record) continue;
+          update.run(art.title, art.artist.name, art.displayDate, art.medium, art.region, art.period, json, row.id);
+        }
+        const last = rows.length < RESANITIZE_BATCH;
+        // PRAGMA takes no bound parameters; the literal matches TEXT_SANITIZED_VERSION.
+        if (last) this.db.exec('PRAGMA user_version = 1');
+        else after = rows[rows.length - 1].id;
+        this.db.exec('COMMIT');
+        if (last) return;
+      } catch {
+        this.rollback();
+        return;
+      }
+    }
   }
 
   private init(): void {
@@ -203,11 +339,7 @@ export class Cache {
     const sql = `SELECT full_record FROM objects ${where} ORDER BY RANDOM() LIMIT 1`;
     const row = this.db.prepare(sql).get(...params) as { full_record: string } | undefined;
     if (!row) return null;
-    try {
-      return JSON.parse(row.full_record) as Artwork;
-    } catch {
-      return null;
-    }
+    return parseRecord(row.full_record);
   }
 
   getObject(id: string): Artwork | null {
@@ -216,14 +348,7 @@ export class Cache {
       | undefined;
     if (!row) return null;
     if (this.isExpired(row.cached_at, OBJECT_TTL_DAYS)) return null;
-    try {
-      return JSON.parse(row.full_record) as Artwork;
-    } catch {
-      // A malformed row (manual DB tinkering, OS-level corruption, schema
-      // drift from a prior version) shouldn't poison the request — treat it
-      // as a cache miss; the next write will overwrite the row.
-      return null;
-    }
+    return parseRecord(row.full_record);
   }
 
   putQuery(cacheKey: string, ids: string[]): void {
@@ -300,12 +425,17 @@ export class Cache {
 
     const byTag = new Map<string, Record<string, number>>();
     for (const row of rows) {
+      // A row cached before region and period were sanitised can hold
+      // characters the sanitiser now removes, so clean the tag here too.
+      // Two raw tags that clean to the same text merge their counts.
+      const tag = cleanText(row.tag);
+      if (tag === '') continue;
       // Object.create(null) prevents prototype pollution if a future
       // museum_code value ever collides with a built-in property name
       // (`__proto__`, `constructor`, `toString`).
-      const existing = byTag.get(row.tag) ?? Object.create(null);
-      existing[row.museum_code] = row.cnt;
-      byTag.set(row.tag, existing);
+      const existing = byTag.get(tag) ?? Object.create(null);
+      existing[row.museum_code] = (existing[row.museum_code] ?? 0) + row.cnt;
+      byTag.set(tag, existing);
     }
 
     return Array.from(byTag.entries())

@@ -1,0 +1,93 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 152447317,
+        "ns": 6,
+        "title": "File:Les Ateliers Soupireau situés jadis au 11 rue Fontaine Bleue, Alger, Algérie en 1912.jpg",
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 1084230,
+            "width": 928,
+            "height": 1476,
+            "thumburl": "https://upload.wikimedia.org/wikipedia/commons/1/15/Les_Ateliers_Soupireau_situ%C3%A9s_jadis_au_11_rue_Fontaine_Bleue%2C_Alger%2C_Alg%C3%A9rie_en_1912.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+            "thumbwidth": 2048,
+            "thumbheight": 3257,
+            "thumbattribs": {
+              "src": "https://upload.wikimedia.org/wikipedia/commons/1/15/Les_Ateliers_Soupireau_situ%C3%A9s_jadis_au_11_rue_Fontaine_Bleue%2C_Alger%2C_Alg%C3%A9rie_en_1912.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+              "decoding": "async",
+              "loading": "lazy",
+              "width": 2048,
+              "height": 3257
+            },
+            "url": "https://upload.wikimedia.org/wikipedia/commons/1/15/Les_Ateliers_Soupireau_situ%C3%A9s_jadis_au_11_rue_Fontaine_Bleue%2C_Alger%2C_Alg%C3%A9rie_en_1912.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Les_Ateliers_Soupireau_situ%C3%A9s_jadis_au_11_rue_Fontaine_Bleue,_Alger,_Alg%C3%A9rie_en_1912.jpg",
+            "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=152447317",
+            "extmetadata": {
+              "DateTime": {
+                "value": "2024-09-10 01:41:20",
+                "source": "mediawiki-metadata",
+                "hidden": ""
+              },
+              "ObjectName": {
+                "value": "Les Ateliers Soupireau situés jadis au 11 rue Fontaine Bleue, Alger, Algérie en 1912",
+                "source": "mediawiki-metadata"
+              },
+              "ImageDescription": {
+                "value": "Les Ateliers Soupireau situés jadis au 11 rue Fontaine Bleue, Alger, Algérie en 1912.",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "Internet",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "Unknown author<span style=\"display: none;\">Unknown author</span>",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "CC0",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Creative Commons Zero, Public Domain Dedication",
+                "source": "commons-desc-page"
+              },
+              "LicenseUrl": {
+                "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+                "source": "commons-desc-page"
+              },
+              "License": {
+                "value": "cc0",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            },
+            "mime": "image/jpeg"
+          }
+        ],
+        "categories": [
+          {
+            "ns": 14,
+            "title": "Category:Art from Algeria"
+          },
+          {
+            "ns": 14,
+            "title": "Category:Ceramists"
+          },
+          {
+            "ns": 14,
+            "title": "Category:Islamic art"
+          },
+          {
+            "ns": 14,
+            "title": "Category:Zellij"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -3,8 +3,8 @@ import { validateGettyImageLicense, validateGettyLicense } from '../licenseGate.
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asOptionalString, asString, derivePeriodFromYears, httpGet, rejectFor } from './helpers.js';
-import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import { accepted, asFiniteNumber, asOptionalString, asString, derivePeriodFromYears, httpGet, rejectFor } from './helpers.js';
+import { DIMENSIONS_MAX, MEDIUM_MAX, SHORT_TEXT_MAX, buildCreditLine, sanitizeArtistName, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // The Getty Museum publishes its ~250k-object collection as Linked.Art
@@ -91,6 +91,11 @@ function findHomepageUrl(subjectOf: unknown): string {
 
 const PRIMARY_TITLE = 'https://data.getty.edu/local/thesaurus/object-title-primary';
 const ACCESSION_NUMBER = 'http://vocab.getty.edu/aat/300312355';
+const CREDIT_LINE = 'http://vocab.getty.edu/aat/300435418';
+// The full statement ("Unframed: 74.3 × 94.3 cm …"). Getty also publishes the
+// element label and the bare measurement as separate entries under its own
+// local classifications; those are not read.
+const DIMENSIONS_DESCRIPTION = 'http://vocab.getty.edu/aat/300435430';
 const PRODUCER_NAME = 'https://data.getty.edu/local/thesaurus/producer-name';
 const PRODUCER_DESCRIPTION = 'https://data.getty.edu/local/thesaurus/producer-description';
 const PRODUCER_NATIONALITY_AND_DATES = 'https://data.getty.edu/local/thesaurus/nationality-and-dates';
@@ -235,11 +240,13 @@ SELECT DISTINCT ?obj WHERE {
     const attributionSource = producerDescription || producerName || '';
     const attributionType = detectAttributionType(attributionSource);
     const cleanName = cleanArtistName(sanitizeArtistName(producerName || attributionSource));
-    const { nationality, lifespan } = parseNationalityAndDates(nationalityAndDatesRaw);
+    const { nationality, lifespan } = parseNationalityAndDates(
+      nationalityAndDatesRaw === undefined ? undefined : sanitizeText(nationalityAndDatesRaw, SHORT_TEXT_MAX),
+    );
     const region = normalizeRegion(nationality);
 
     const timespan = producedBy?.timespan as Record<string, unknown> | undefined;
-    const displayDate = findContentByClassification(timespan?.identified_by, DISPLAY_NAME) ?? '';
+    const displayDate = sanitizeText(findContentByClassification(timespan?.identified_by, DISPLAY_NAME) ?? '', SHORT_TEXT_MAX);
     const beginYear = yearFromIso(asOptionalString(timespan?.begin_of_the_begin));
     const endYear = yearFromIso(asOptionalString(timespan?.end_of_the_end));
     const dateRange =
@@ -258,7 +265,10 @@ SELECT DISTINCT ?obj WHERE {
     // present on every object; skip them when looking for a medium/type label.
     const BOILERPLATE = new Set(['Artwork', 'Object Record Structure: Whole']);
     const classificationLabel = classifiedAs.map((c) => asString(c._label)).find((l) => l && !BOILERPLATE.has(l));
-    const medium = materialLabels.length > 0 ? materialLabels.join(', ') : classificationLabel ?? '';
+    const medium = sanitizeText(
+      materialLabels.length > 0 ? materialLabels.join(', ') : classificationLabel ?? '',
+      MEDIUM_MAX,
+    );
     const mediumCategory = normalizeMedium(medium || classificationLabel);
 
     // Image rights are verified independently of the object's metadata rights
@@ -324,9 +334,11 @@ SELECT DISTINCT ?obj WHERE {
         apiUrl: `${OBJECT_API}/${uuid}`,
         pageUrl: findHomepageUrl(r.subject_of),
       },
-      description: accessionNumber,
+      description: accessionNumber ? asOptionalString(sanitizeText(accessionNumber, SHORT_TEXT_MAX)) : undefined,
+      dimensions: asOptionalString(sanitizeText(asString(findContentByClassification(r.referred_to_by, DIMENSIONS_DESCRIPTION)), DIMENSIONS_MAX)),
+      creditLine: buildCreditLine('J. Paul Getty Museum', findContentByClassification(r.referred_to_by, CREDIT_LINE), accessionNumber),
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };

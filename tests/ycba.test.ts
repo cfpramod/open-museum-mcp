@@ -633,3 +633,24 @@ describe('YCBA search', () => {
     await expect(ycbaFetcher.search('horse', 5)).rejects.toThrow('403');
   });
 });
+
+describe('YCBA credit line', () => {
+  it('reads the Credit Line statement and accession number verbatim', () => {
+    const result = ycbaFetcher.normalize(rawOf(fixture('ycba-accepted.json'), ACCEPTED_MANIFEST));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.creditLine).toEqual({
+      holder: 'Yale Center for British Art',
+      fund: 'Yale Center for British Art, Paul Mellon Collection',
+      accession: 'B1977.14.73',
+    });
+  });
+
+  it('keeps the accession number when the record has no Credit Line statement', () => {
+    const f = clone(fixture('ycba-accepted.json'));
+    const rec = f.record as { referred_to_by: Array<{ content?: unknown }> };
+    rec.referred_to_by = rec.referred_to_by.filter((e) => e.content !== 'Yale Center for British Art, Paul Mellon Collection');
+    const result = ycbaFetcher.normalize(rawOf(f, ACCEPTED_MANIFEST));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.creditLine).toEqual({ holder: 'Yale Center for British Art', accession: 'B1977.14.73' });
+  });
+});

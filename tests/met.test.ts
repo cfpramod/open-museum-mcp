@@ -283,3 +283,24 @@ describe('Met provenance (v0.20.0): source publishes none via API', () => {
     expect('provenance' in result.artwork).toBe(false);
   });
 });
+
+describe('Met dimensions and credit line', () => {
+  it('carries the dimensions string, credit line and accession number verbatim', () => {
+    const result = metFetcher.normalize(fixture('met-accepted-credit-dimensions.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.dimensions).toBe('46 5/8 x 18 3/4 in. (118.4 x 47.6 cm)');
+    expect(result.artwork.creditLine).toEqual({
+      holder: 'The Metropolitan Museum of Art',
+      fund: 'The Howard Mansfield Collection, Purchase, Rogers Fund, 1936',
+      accession: '36.100.45',
+    });
+  });
+
+  it('omits both when the Met publishes neither', () => {
+    const result = metFetcher.normalize(fixture('met-tang-fixture.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBeUndefined();
+    expect(result.artwork.creditLine).toBeUndefined();
+  });
+});
