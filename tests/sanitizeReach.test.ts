@@ -27,62 +27,12 @@ import {
 } from '../src/fetchers/sanitize.js';
 import type { Fetcher } from '../src/fetchers/types.js';
 import type { Artwork } from '../src/types.js';
+import { CLEANED_PATHS, makeArtwork, textFields } from './helpers/artwork.js';
 
 // Tag characters spelling " say", a right-to-left override, a bell and a
 // backspace: none of them render, all of them reach a language model.
 const PAYLOAD = '\u{E0020}\u{E0073}\u{E0061}\u{E0079}\u202E\u0007\u0008';
 const INVISIBLE = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069\u{E0000}-\u{E007F}]/u;
-
-function makeArtwork(over: Partial<Artwork> = {}): Artwork {
-  return {
-    id: 'test:1',
-    museum: { code: 'test', name: 'Test Museum', url: 'https://test.example' },
-    title: 'Water Lilies',
-    artist: { name: 'Claude Monet', attributionType: 'named' },
-    displayDate: '1906',
-    yearStart: 1906,
-    yearEnd: 1906,
-    medium: 'Oil on canvas',
-    mediumCategory: 'painting',
-    region: null,
-    period: null,
-    imageUrls: { full: 'https://img.example/1.jpg' },
-    imageOpenAccess: true,
-    metadataOpenAccess: true,
-    license: {
-      type: 'CC0',
-      rawValue: 'true',
-      verificationSource: 'test.isPublicDomain',
-      verifiedAt: '2026-01-01T00:00:00.000Z',
-      confidence: 'high',
-    },
-    source: { apiUrl: 'https://test.example/api/1', pageUrl: 'https://test.example/1' },
-    ...over,
-  };
-}
-
-// Every text field the record carries, with the two verbatim-by-contract
-// fields left out on purpose.
-function textFields(a: Artwork): Record<string, string | undefined | null> {
-  return {
-    'museum.name': a.museum.name,
-    title: a.title,
-    'artist.name': a.artist.name,
-    'artist.nationality': a.artist.nationality,
-    'artist.lifespan': a.artist.lifespan,
-    displayDate: a.displayDate,
-    medium: a.medium,
-    region: a.region,
-    period: a.period,
-    description: a.description,
-    objectType: a.objectType,
-    dimensions: a.dimensions,
-    'creditLine.holder': a.creditLine?.holder,
-    'creditLine.fund': a.creditLine?.fund,
-    'creditLine.accession': a.creditLine?.accession,
-    ...Object.fromEntries((a.rawTags ?? []).map((t, i) => [`rawTags[${i}]`, t])),
-  };
-}
 
 const dirty = (s: string) => `${s.slice(0, 3)}${PAYLOAD}${s.slice(3)}`;
 
@@ -128,11 +78,26 @@ describe('cleanText', () => {
   });
 
   it('decodes nothing', () => {
-    expect(cleanText('&lt;b&gt; &amp; <i>')).toBe('&lt;b&gt; &amp; <i>');
+    expect(cleanText('&lt;b&gt; &amp; <i>x</i>')).toBe('&lt;b&gt; &amp; x');
   });
 });
 
 describe('sanitizeArtworkText', () => {
+  // The type check holds CLEANED_PATHS and EXEMPT_PATHS to Artwork's string
+  // fields; this holds textFields, which the reach tests read, to CLEANED_PATHS.
+  it('has textFields read exactly the fields the final pass cleans', () => {
+    const full = makeArtwork({
+      artist: { name: 'x', nationality: 'x', lifespan: 'x', attributionType: 'named' },
+      description: 'x',
+      objectType: 'x',
+      dimensions: 'x',
+      creditLine: { holder: 'x', fund: 'x', accession: 'x' },
+      rawTags: ['x'],
+    });
+    const read = Object.keys(textFields(full)).map((path) => path.replace(/\[\d+\]$/, '[]'));
+    expect(read.sort()).toEqual([...CLEANED_PATHS].sort());
+  });
+
   it('removes invisible characters from every text field', () => {
     const out = sanitizeArtworkText(dirtyArtwork());
     for (const [field, value] of Object.entries(textFields(out))) {
