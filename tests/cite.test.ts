@@ -95,6 +95,74 @@ describe('cite', () => {
     expect(out).not.toMatch(/^Unknown[, ]/);
   });
 
+  describe('a qualified attribution keeps its qualifier', () => {
+    // Adapters store the bare name and carry the qualifier in attributionType, so
+    // a citation that prints the name alone claims the work outright.
+    const qualified = (attributionType: Artwork['artist']['attributionType'], name = 'Adriaen Matham'): Artwork => ({
+      ...sample,
+      title: 'Local animals with a dodo',
+      displayDate: '1632 - 1634',
+      artist: { ...sample.artist, name, attributionType },
+    });
+
+    it('in every style, for every qualified type', () => {
+      for (const [type, phrase] of [
+        ['attributed', 'attributed to'],
+        ['workshop', 'workshop of'],
+        ['circle', 'circle of'],
+        ['follower', 'follower of'],
+        ['after', 'after'],
+      ] as const) {
+        const a = qualified(type);
+        const lead = `${phrase[0].toUpperCase()}${phrase.slice(1)} Adriaen Matham`;
+        expect(cite(a, 'full').startsWith(`${lead}, Local animals with a dodo. 1632 - 1634.`), type).toBe(true);
+        expect(cite(a, 'caption').startsWith(`${lead}, Local animals with a dodo, 1632 - 1634.`), type).toBe(true);
+        expect(cite(a, 'short'), type).toBe(`Local animals with a dodo (${phrase} Adriaen Matham, 1632 - 1634)`);
+      }
+    });
+
+    it('does not repeat a qualifier the name already carries', () => {
+      // A Rijksmuseum work with several makers keeps each qualifier with its name.
+      const a = qualified('attributed', 'attributed to Jan Lanting, Albert Egges van Giffen');
+      expect(cite(a, 'short')).toBe('Local animals with a dodo (attributed to Jan Lanting, Albert Egges van Giffen, 1632 - 1634)');
+      expect(cite(a, 'caption').startsWith('Attributed to Jan Lanting, Albert Egges van Giffen, Local')).toBe(true);
+      const workshop = qualified('workshop', 'Workshop of Rogier van der Weyden');
+      expect(cite(workshop, 'short')).toBe('Local animals with a dodo (workshop of Rogier van der Weyden, 1632 - 1634)');
+      expect(cite(workshop, 'caption').startsWith('Workshop of Rogier van der Weyden, Local')).toBe(true);
+    });
+
+    it('leaves a named name exactly as the museum gives it, even opening a citation', () => {
+      const a = qualified('named', 'de Hooghe, Romeyn');
+      expect(cite(a, 'full').startsWith('de Hooghe, Romeyn, Local animals with a dodo.')).toBe(true);
+      expect(cite(a, 'caption').startsWith('de Hooghe, Romeyn, Local animals with a dodo,')).toBe(true);
+      // Some cached names are lower case or an identifier URI; recasing either breaks it.
+      for (const name of ['davidgsteadman', 'http://www.wikidata.org/entity/Q2939637']) {
+        const n = qualified('named', name);
+        expect(cite(n, 'full').startsWith(`${name}, Local animals with a dodo.`), name).toBe(true);
+        expect(cite(n, 'caption').startsWith(`${name}, Local animals with a dodo,`), name).toBe(true);
+      }
+    });
+
+    it('adds its own qualifier when the name carries a different one', () => {
+      // NGA credits a print "attributed" to its engraver, after another artist's design.
+      const a = qualified('attributed', 'Zacharias Dolendo after Jacques de Gheyn II');
+      expect(cite(a, 'short')).toBe(
+        'Local animals with a dodo (attributed to Zacharias Dolendo after Jacques de Gheyn II, 1632 - 1634)',
+      );
+      expect(cite(a, 'full').startsWith('Attributed to Zacharias Dolendo after Jacques de Gheyn II, Local')).toBe(true);
+    });
+
+    it('leaves a named artist and an anonymous work as they were', () => {
+      expect(cite(qualified('named'), 'short')).toBe('Local animals with a dodo (Adriaen Matham, 1632 - 1634)');
+      expect(cite(qualified('anonymous', 'Unknown'), 'short')).toBe('Local animals with a dodo (Unknown, 1632 - 1634)');
+    });
+
+    it('does not read "after" inside a name as the qualifier', () => {
+      const a = qualified('after', 'Jan Aftermann');
+      expect(cite(a, 'short')).toBe('Local animals with a dodo (after Jan Aftermann, 1632 - 1634)');
+    });
+  });
+
   it('falls back to Met formatters for unregistered museum codes', () => {
     const cleveland: Artwork = {
       ...sample,
