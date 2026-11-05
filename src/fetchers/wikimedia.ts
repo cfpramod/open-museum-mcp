@@ -17,6 +17,7 @@ import {
 import {
   ARTIST_NAME_MAX,
   DESCRIPTION_MAX,
+  SEPARATING_TAGS,
   TITLE_MAX,
   decodeEntities,
   stripHtml,
@@ -24,6 +25,109 @@ import {
   textView,
 } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
+
+// HTML element names: the current WHATWG list plus the obsolete elements
+// browsers still parse. Only a decoded `<name` from this set counts as markup,
+// so text such as `<untitled>` or `5 < 6` survives.
+const HTML_ELEMENTS = new Set(
+  (
+    'a abbr address area article aside audio b base bdi bdo blockquote body br button canvas ' +
+    'caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em embed ' +
+    'fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup hr html i ' +
+    'iframe img input ins kbd label legend li link main map mark math menu meta meter nav ' +
+    'noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp ' +
+    'script search section select selectedcontent slot small source span strong style sub ' +
+    'summary sup svg table tbody td template textarea tfoot th thead time title tr track u ul var video wbr ' +
+    'acronym applet basefont big center dir font frame frameset marquee nobr noframes strike tt ' +
+    // Names the parser still builds an element for: `image` becomes `img`.
+    'bgsound blink image isindex keygen listing menuitem multicol nextid noembed param plaintext rb rtc ' +
+    'spacer xmp'
+  ).split(' '),
+);
+
+// Longest name in HTML_ELEMENTS, plus room for the optional '/' and the
+// character after the name. Derived from the set, so a longer name added to it
+// is still seen whole.
+const TAG_HEAD_MAX = Math.max(...[...HTML_ELEMENTS].map((name) => name.length)) + 2;
+
+// The element name a `<` at `lt` opens, or null when it opens none.
+function elementAt(s: string, lt: number): string | null {
+  const head = /^\/?([a-z][a-z0-9]*)[\s/>]/i.exec(s.slice(lt + 1, lt + 1 + TAG_HEAD_MAX));
+  if (!head) return null;
+  const name = head[1].toLowerCase();
+  return HTML_ELEMENTS.has(name) ? name : null;
+}
+
+// One linear scan that removes `<` up to the first `>` when it opens an HTML
+// element, with stripTags' rules: a tag that ends a line or a block leaves a
+// space, and an unclosed `<…` tail is kept verbatim.
+function removeElementTags(s: string): string {
+  let out = '';
+  let i = 0;
+  while (i < s.length) {
+    const lt = s.indexOf('<', i);
+    if (lt === -1) {
+      out += s.slice(i);
+      break;
+    }
+    const name = elementAt(s, lt);
+    if (name === null) {
+      out += s.slice(i, lt + 1);
+      i = lt + 1;
+      continue;
+    }
+    const gt = s.indexOf('>', lt + 1);
+    if (gt === -1) {
+      out += s.slice(i);
+      break;
+    }
+    out += s.slice(i, lt);
+    if (SEPARATING_TAGS.has(name)) out += ' ';
+    i = gt + 1;
+  }
+  return out;
+}
+
+// Removing a tag joins the text on either side of it, so a `<` kept as text
+// can meet the rest of an element name: `<scr<script>ipt>` becomes `<script>`.
+// Each repeat peels one such layer; source text nests no deeper than this.
+const ESCAPED_TAG_PASSES = 4;
+
+// Commons escapes markup that wikitext does not allow, so an uploader's literal
+// `<a href="...">` arrives as `&lt;a href="..."&gt;`. stripHtml strips real
+// tags before it decodes, so the decoded tag would reach the wire as text. This
+// second pass runs on stripHtml's output. Decoding again first would not help:
+// the escaped anchor on File:Out Of The East.djvu wraps a real one, so a
+// decode-then-strip order leaves `" rel="nofollow">` behind.
+//
+// The result never holds an element tag: after the repeats, any `<` that still
+// opens an element and has a `>` after it gets a space after it, which only
+// splits text and so cannot form a tag of its own. Every step is linear.
+function stripEscapedTags(s: string): string {
+  let text = s;
+  for (let pass = 0; pass < ESCAPED_TAG_PASSES; pass++) {
+    const next = removeElementTags(text);
+    if (next === text) break;
+    text = next;
+  }
+  const lastGt = text.lastIndexOf('>');
+  let out = '';
+  let i = 0;
+  let lt = text.indexOf('<');
+  while (lt !== -1 && lt < lastGt) {
+    if (elementAt(text, lt) !== null) {
+      out += text.slice(i, lt + 1) + ' ';
+      i = lt + 1;
+    }
+    lt = text.indexOf('<', lt + 1);
+  }
+  out += text.slice(i);
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+function commonsText(s: string): string {
+  return stripEscapedTags(stripHtml(s));
+}
 
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
 const COMMONS_PAGE = 'https://commons.wikimedia.org/wiki';
@@ -265,7 +369,7 @@ function splitTitleTranslation(html: string): { original: string; translation: s
 // prefix and file-numbering suffix. Wikidata markers are cut before this, in
 // cutAtQsMarker.
 function titleText(html: string): string {
-  return stripFileNumberSuffix(stripLanguagePrefix(stripHtml(html)));
+  return stripFileNumberSuffix(stripLanguagePrefix(commonsText(html)));
 }
 
 function commonsTitle(objectNameHtml: string): string {
@@ -491,11 +595,11 @@ export const wikimediaFetcher: Fetcher = {
       return reject(id, `wikimedia: ${nonArt} (curation reject)`, raw);
     }
 
-    const artistRaw = stripHtml(dropHiddenElements(getExtField(ext, 'Artist'))).slice(0, ARTIST_NAME_MAX);
+    const artistRaw = commonsText(dropHiddenElements(getExtField(ext, 'Artist'))).slice(0, ARTIST_NAME_MAX);
     const attributionType = detectAttributionType(artistRaw);
     const cleanName = cleanArtistName(artistRaw);
 
-    const description = stripQsMetadata(stripHtml(dropHiddenElements(getExtField(ext, 'ImageDescription')))).slice(
+    const description = stripQsMetadata(commonsText(dropHiddenElements(getExtField(ext, 'ImageDescription')))).slice(
       0,
       DESCRIPTION_MAX,
     );
