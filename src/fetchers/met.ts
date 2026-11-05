@@ -55,7 +55,7 @@ export const metFetcher: Fetcher = {
       url.searchParams.set('limit', String(Math.min(limit - ids.length, MET_SEARCH_PAGE_SIZE)));
       url.searchParams.set('offset', String(consumed));
 
-      const res = await httpGet(url);
+      const res = await httpGet(url, { signal: options.signal });
       if (!res.ok) throw new Error(`Met search failed: ${res.status}`);
       const json = (await res.json()) as { objectIDs?: unknown; total?: unknown };
       const rawBatch: unknown[] = Array.isArray(json.objectIDs) ? json.objectIDs : [];

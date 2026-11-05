@@ -23,11 +23,20 @@ const HTML_ENTITIES: Record<string, string> = {
   nbsp: ' ',
 };
 
+// Decode a numeric character reference only when it names a Unicode scalar
+// value (0..0x10FFFF, excluding the surrogate range 0xD800..0xDFFF). Anything
+// else is left verbatim: String.fromCodePoint throws RangeError above 0x10FFFF,
+// and a lone surrogate would put malformed UTF-16 on the wire.
+function decodeCodePoint(ref: string, codePoint: number): string {
+  if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return ref;
+  return String.fromCodePoint(codePoint);
+}
+
 function decodeEntities(s: string): string {
   return s
     .replace(/&([a-z]+);/gi, (m, name: string) => HTML_ENTITIES[name.toLowerCase()] ?? m)
-    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(parseInt(code, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)));
+    .replace(/&#(\d+);/g, (m, code: string) => decodeCodePoint(m, parseInt(code, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (m, hex: string) => decodeCodePoint(m, parseInt(hex, 16)));
 }
 
 // Remove HTML tags with a single linear pass instead of a `/<[^>]*>/g` global

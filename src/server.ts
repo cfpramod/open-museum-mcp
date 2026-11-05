@@ -22,6 +22,7 @@ import {
 import { handleClearanceRecord } from './clearanceTool.js';
 import { createColorExtractor } from './color/extract.js';
 import { COLOR_FAMILY_NAMES } from './core/index.js';
+import { totalFailureResult } from './totalFailure.js';
 import { Cache } from './db.js';
 import { buildSeedQueryFromConstraints } from './discoverSeed.js';
 import { aicFetcher } from './fetchers/aic.js';
@@ -37,6 +38,7 @@ import { smkFetcher } from './fetchers/smk.js';
 import { waltersFetcher } from './fetchers/walters.js';
 import { wellcomeFetcher } from './fetchers/wellcome.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
+import { ycbaFetcher } from './fetchers/ycba.js';
 import type { Fetcher } from './fetchers/types.js';
 import { VERSION } from './version.js';
 
@@ -72,6 +74,9 @@ const FETCHERS: Record<string, Fetcher> = {
   // Getty Museum — FEDERATE via the public SPARQL endpoint (no REST search or
   // bulk dump exists); per-record REST hydration, keyless, no key required.
   [gettyFetcher.code]: gettyFetcher,
+  // Yale Center for British Art: FEDERATE via Yale's LUX search API; rights read
+  // per object from the YCBA IIIF manifest, keyless, no key required.
+  [ycbaFetcher.code]: ycbaFetcher,
 };
 
 // Europeana requires a per-user API key (free tier, 10K req/day). Only
@@ -126,6 +131,9 @@ const federation = createFederation({
   cache,
   engineVersion: VERSION,
   onReject: (id, reason) => console.error(`[open-museum-mcp] rejected ${id}: ${reason}`),
+  // The message is sanitised in core, so it is safe to log and to return.
+  onSourceFailure: (s) =>
+    console.error(`[open-museum-mcp] source ${s.museum} ${s.status} after ${s.ms ?? 0}ms: ${s.error}`),
   // Node-side colour enrichment. createColorExtractor lazily loads the optional
   // `sharp` dependency; if it's absent (e.g. a sharp-less install) extraction
   // fails open and colour fields stay unset. Workers never inject this.
@@ -171,7 +179,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           museum: {
             type: 'string',
             description:
-              'Optional museum code. Always available: met, cleveland, aic, rijksmuseum, walters, smk, wellcome, nga, getty, wikimedia (Commons). Key-gated: europeana (EUROPEANA_API_KEY), smithsonian (SMITHSONIAN_API_KEY), harvard (HARVARD_API_KEY). Omit to search every registered source.',
+              'Optional museum code. Always available: met, cleveland, aic, rijksmuseum, walters, smk, wellcome, nga, getty, ycba, wikimedia (Commons). Key-gated: europeana (EUROPEANA_API_KEY), smithsonian (SMITHSONIAN_API_KEY), harvard (HARVARD_API_KEY). Omit to search every registered source.',
           },
           has_image: {
             type: 'boolean',
@@ -318,6 +326,8 @@ async function handleSearch(args: unknown) {
   const params = SearchParamsSchema.parse(args);
   try {
     const result = await federation.search(params);
+    const failed = totalFailureResult('search_artworks', result.sources);
+    if (failed) return failed;
     return {
       content: [
         {
@@ -338,6 +348,8 @@ async function handleFacets(args: unknown) {
   const params = SearchParamsSchema.parse(args);
   try {
     const result = await federation.facets(params);
+    const failed = totalFailureResult('facets', result.sources);
+    if (failed) return failed;
     return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
   } catch (err) {
     if (err instanceof UnknownMuseumError) {

@@ -684,6 +684,115 @@ export const validateGettyImageLicense: LicenseValidator = (mediaRaw) => {
   return reject('getty-image: subject_to is not CC0 (image restricted; strict default reject)');
 };
 
+// The Yale Center for British Art is federated through Yale's LUX platform,
+// which aggregates several collections. A LUX object record carries no rights
+// signal of its own; YCBA publishes rights per object in the record's IIIF v2
+// manifest, at two levels that must AGREE before an image is accepted:
+//   1. the manifest `metadata[]` entry labelled "Copyright Statement", which
+//      must be exactly "Public Domain" (other values seen: "© The Artist",
+//      "© Estate of the Artist", "Copyright Undetermined"), and
+//   2. the painting canvas's own `metadata[]` entry labelled "Image Use
+//      Rights", which must be exactly YCBA's CC0 1.0 statement. Copyrighted
+//      works carry an "In Copyright: ..." statement here instead.
+// The manifest-level `license` is CC0 on EVERY record, copyrighted works
+// included, and the manifest's own `attribution` scopes it to metadata only,
+// so it is never read as a rights signal. YCBA's dedication of the image is
+// CC0, so the record is emitted as CC0 (the institution's own assertion), not
+// as a PD determination of our own. Any missing field, duplicate entry with a
+// differing value, non-string value, unexpected IIIF version, a manifest that
+// is not the one the record links to, or a record held by a different
+// collection rejects (strict default deny).
+export const YCBA_GROUP_ID = 'https://lux.collections.yale.edu/data/group/0e8bc04a-6538-4792-b82a-9e0751857e7d';
+export const YCBA_MANIFEST_URL_RE = /^https:\/\/manifests\.collections\.yale\.edu\/v2\/ycba\/obj\/\d+$/;
+const IIIF_PRESENTATION_2_CONTEXT = 'http://iiif.io/api/presentation/2/context.json';
+const YCBA_PUBLIC_DOMAIN_STATEMENT = 'Public Domain';
+const YCBA_CC0_IMAGE_STATEMENT =
+  'No Copyright: You can copy, modify, distribute and perform the work, even for commercial purposes, all without asking permission. (CC0 1.0)';
+
+/**
+ * The single string value of the `metadata[]` entry labelled `label`, or
+ * undefined when it is absent, non-string, or present more than once with
+ * differing values (an ambiguous signal never resolves to "open").
+ */
+function singleIiif2MetadataValue(metadata: unknown, label: string): string | undefined {
+  if (!Array.isArray(metadata)) return undefined;
+  const values = new Set<unknown>();
+  for (const entry of metadata) {
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    if (e.label === label) values.add(e.value);
+  }
+  if (values.size !== 1) return undefined;
+  const [only] = values;
+  return typeof only === 'string' ? only : undefined;
+}
+
+function heldByYcba(record: Record<string, unknown>): boolean {
+  const owners = record.current_owner;
+  if (!Array.isArray(owners)) return false;
+  return owners.some((o) => o && typeof o === 'object' && (o as Record<string, unknown>).id === YCBA_GROUP_ID);
+}
+
+/** First canvas of a IIIF v2 manifest's first sequence, if any. */
+export function firstIiif2Canvas(manifest: Record<string, unknown>): Record<string, unknown> | undefined {
+  const sequences = manifest.sequences;
+  if (!Array.isArray(sequences) || !sequences[0] || typeof sequences[0] !== 'object') return undefined;
+  const canvases = (sequences[0] as Record<string, unknown>).canvases;
+  if (!Array.isArray(canvases) || !canvases[0] || typeof canvases[0] !== 'object') return undefined;
+  return canvases[0] as Record<string, unknown>;
+}
+
+// Takes the combined `{ record, manifest, manifestUrl }` the YCBA fetcher
+// assembles in getRaw, because the rights decision needs both hops.
+export const validateYcbaLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('ycba: object missing or not an object');
+  }
+  const { record, manifest, manifestUrl } = raw as Record<string, unknown>;
+  if (!record || typeof record !== 'object') {
+    return reject('ycba: LUX record missing or not an object');
+  }
+  if (!heldByYcba(record as Record<string, unknown>)) {
+    return reject('ycba: record is not held by the Yale Center for British Art (outside federated scope)');
+  }
+  if (typeof manifestUrl !== 'string' || !YCBA_MANIFEST_URL_RE.test(manifestUrl)) {
+    return reject('ycba: record links no YCBA IIIF v2 manifest (strict default reject)');
+  }
+  if (!manifest || typeof manifest !== 'object') {
+    return reject('ycba: IIIF manifest missing or unreadable (strict default reject)');
+  }
+  const m = manifest as Record<string, unknown>;
+  if (m['@context'] !== IIIF_PRESENTATION_2_CONTEXT || m['@id'] !== manifestUrl) {
+    return reject('ycba: manifest is not the IIIF v2 manifest the record links to (strict default reject)');
+  }
+  const copyrightStatement = singleIiif2MetadataValue(m.metadata, 'Copyright Statement');
+  if (copyrightStatement !== YCBA_PUBLIC_DOMAIN_STATEMENT) {
+    return reject(
+      `ycba: Copyright Statement=${JSON.stringify(copyrightStatement ?? null)} (need exactly "Public Domain"; strict default reject)`,
+    );
+  }
+  const canvas = firstIiif2Canvas(m);
+  const imageUseRights = canvas ? singleIiif2MetadataValue(canvas.metadata, 'Image Use Rights') : undefined;
+  if (imageUseRights !== YCBA_CC0_IMAGE_STATEMENT) {
+    return reject(
+      `ycba: canvas Image Use Rights=${JSON.stringify(imageUseRights ?? null)} does not match the CC0 1.0 statement (both signals must agree; strict default reject)`,
+    );
+  }
+  return {
+    accepted: true,
+    license: {
+      type: 'CC0',
+      rawValue: imageUseRights,
+      verificationSource: 'ycba.iiif-manifest (Copyright Statement + canvas Image Use Rights)',
+      verifiedAt: nowIso(),
+      confidence: 'high',
+    },
+    imageOpenAccess: true,
+    metadataOpenAccess: true,
+    reason: 'ycba: Copyright Statement "Public Domain" and canvas Image Use Rights CC0 1.0 agree',
+  };
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
@@ -697,6 +806,7 @@ const VALIDATORS: Record<string, LicenseValidator> = {
   nga: validateNgaLicense,
   harvard: validateHarvardLicense,
   getty: validateGettyLicense,
+  ycba: validateYcbaLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {

@@ -191,7 +191,7 @@ export const rijksmuseumFetcher: Fetcher = {
       const url = new URL(SEARCH_API);
       url.searchParams.set(facet, query);
       if (options.hasImage !== false) url.searchParams.set('imageAvailable', 'true');
-      const res = await httpGet(url, { headers: { Accept: 'application/ld+json' } });
+      const res = await httpGet(url, { headers: { Accept: 'application/ld+json' }, signal: options.signal });
       if (!res.ok) throw new Error(`Rijksmuseum search failed (${facet}): ${res.status}`);
       const json = (await res.json()) as { orderedItems?: Array<{ id?: unknown }> };
       return arr(json.orderedItems)

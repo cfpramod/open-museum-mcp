@@ -1,0 +1,900 @@
+{
+  "record": {
+    "id": "https://lux.collections.yale.edu/data/object/d113104c-f69b-42ce-906b-134b5901ae9b",
+    "type": "HumanMadeObject",
+    "shows": [
+      {
+        "id": "https://lux.collections.yale.edu/data/visual/c79b9bdb-edef-4785-bcec-6fe787ab12ec",
+        "type": "VisualItem",
+        "_label": "\"Panama Hat\" - Visual Content"
+      }
+    ],
+    "_label": "Panama Hat",
+    "made_of": [
+      {
+        "id": "https://lux.collections.yale.edu/data/concept/207a345b-1285-4ba0-a076-418de41e3c05",
+        "type": "Material",
+        "_label": "wove paper",
+        "equivalent": [
+          {
+            "id": "http://vocab.getty.edu/aat/300014187",
+            "type": "Material",
+            "_label": "wove paper"
+          }
+        ]
+      }
+    ],
+    "@context": "https://linked.art/ns/v1/linked-art.json",
+    "dimension": [
+      {
+        "type": "Dimension",
+        "unit": {
+          "id": "https://lux.collections.yale.edu/data/concept/710b7648-91ce-438a-865d-c39588b7e2c8",
+          "type": "MeasurementUnit",
+          "_label": "centimeters",
+          "equivalent": [
+            {
+              "id": "http://vocab.getty.edu/aat/300379098",
+              "type": "MeasurementUnit",
+              "_label": "centimeters"
+            }
+          ]
+        },
+        "value": 41.3,
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/32c99593-6526-4cd4-98c7-71e5ccfcafc8",
+            "type": "Type",
+            "_label": "Height",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300055644",
+                "type": "Type",
+                "_label": "Height"
+              }
+            ]
+          },
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/cfe2fe7f-2c0b-40d5-b286-faba4081cb4f",
+            "type": "Type",
+            "_label": "Sheet"
+          }
+        ]
+      },
+      {
+        "type": "Dimension",
+        "unit": {
+          "id": "https://lux.collections.yale.edu/data/concept/710b7648-91ce-438a-865d-c39588b7e2c8",
+          "type": "MeasurementUnit",
+          "_label": "centimeters",
+          "equivalent": [
+            {
+              "id": "http://vocab.getty.edu/aat/300379098",
+              "type": "MeasurementUnit",
+              "_label": "centimeters"
+            }
+          ]
+        },
+        "value": 33,
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/5a4bf759-21b6-462f-8119-f9e49b70fedb",
+            "type": "Type",
+            "_label": "Width",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300055647",
+                "type": "Type",
+                "_label": "Width"
+              }
+            ]
+          },
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/cfe2fe7f-2c0b-40d5-b286-faba4081cb4f",
+            "type": "Type",
+            "_label": "Sheet"
+          }
+        ]
+      }
+    ],
+    "member_of": [
+      {
+        "id": "https://lux.collections.yale.edu/data/set/56dc1a97-4dfa-4a30-b028-f816575da1ab",
+        "type": "Set",
+        "_label": "Prints and Drawings Collection, Yale Center for British Art"
+      }
+    ],
+    "equivalent": [
+      {
+        "id": "https://ycba-lux.s3.amazonaws.com/v3/object/4a/4a93d2be-b583-4fd3-86f5-4afa7cec4e5c.json",
+        "type": "HumanMadeObject",
+        "_label": "Panama Hat"
+      }
+    ],
+    "subject_of": [
+      {
+        "type": "LinguisticObject",
+        "_label": "Home page for \"Panama Hat\"",
+        "digitally_carried_by": [
+          {
+            "type": "DigitalObject",
+            "_label": "Online home page for \"Panama Hat\"",
+            "format": "text/html",
+            "access_point": [
+              {
+                "id": "https://collections.britishart.yale.edu/catalog/tms:72202",
+                "type": "DigitalObject"
+              }
+            ],
+            "classified_as": [
+              {
+                "id": "https://lux.collections.yale.edu/data/concept/2eca07bd-be42-4ef5-9ec5-87c1bbfe639d",
+                "type": "Type",
+                "_label": "Web Page",
+                "equivalent": [
+                  {
+                    "id": "http://vocab.getty.edu/aat/300264578",
+                    "type": "Type",
+                    "_label": "Web Page"
+                  }
+                ]
+              }
+            ],
+            "identified_by": [
+              {
+                "type": "Name",
+                "content": "View this record on the Yale Center for British Art website",
+                "classified_as": [
+                  {
+                    "id": "https://lux.collections.yale.edu/data/concept/f7ef5bb4-e7fb-443d-9c6b-371a23e717ec",
+                    "type": "Type",
+                    "_label": "Primary Name",
+                    "equivalent": [
+                      {
+                        "id": "http://vocab.getty.edu/aat/300404670",
+                        "type": "Type",
+                        "_label": "Primary Name"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "LinguisticObject",
+        "_label": "IIIF v2 manifest for \"Panama Hat\"",
+        "digitally_carried_by": [
+          {
+            "type": "DigitalObject",
+            "_label": "IIIF v2 manifest for \"Panama Hat\"",
+            "format": "application/ld+json",
+            "conforms_to": [
+              {
+                "id": "http://iiif.io/api/presentation/2/context.json",
+                "type": "InformationObject"
+              }
+            ],
+            "access_point": [
+              {
+                "id": "https://manifests.collections.yale.edu/v2/ycba/obj/72202",
+                "type": "DigitalObject"
+              }
+            ],
+            "identified_by": [
+              {
+                "type": "Name",
+                "content": "IIIF v2 manifest for \"Panama Hat\""
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "LinguisticObject",
+        "_label": "IIIF v3 manifest for \"Panama Hat\"",
+        "digitally_carried_by": [
+          {
+            "type": "DigitalObject",
+            "_label": "IIIF v3 manifest for \"Panama Hat\"",
+            "format": "application/ld+json",
+            "conforms_to": [
+              {
+                "id": "http://iiif.io/api/presentation/3/context.json",
+                "type": "InformationObject"
+              }
+            ],
+            "access_point": [
+              {
+                "id": "https://manifests.collections.yale.edu/ycba/obj/72202",
+                "type": "DigitalObject"
+              }
+            ],
+            "identified_by": [
+              {
+                "type": "Name",
+                "content": "IIIF v3 manifest for \"Panama Hat\""
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "produced_by": {
+      "part": [
+        {
+          "type": "Production",
+          "classified_as": [
+            {
+              "id": "https://lux.collections.yale.edu/data/concept/a3029201-a45e-412e-89f2-2035646b126e",
+              "type": "Type",
+              "_label": "Primary Artist",
+              "equivalent": [
+                {
+                  "id": "http://vocab.getty.edu/aat/300025103",
+                  "type": "Type",
+                  "_label": "Primary Artist"
+                }
+              ]
+            }
+          ],
+          "carried_out_by": [
+            {
+              "id": "https://lux.collections.yale.edu/data/person/015fbf5e-3bcc-4819-adf9-320e160d4fb9",
+              "type": "Person",
+              "_label": "David Hockney"
+            }
+          ]
+        }
+      ],
+      "type": "Production",
+      "during": [
+        {
+          "id": "https://lux.collections.yale.edu/data/activity/f7cf3723-3a0c-431f-bc2a-4348874a14c1",
+          "type": "Period",
+          "_label": "20th century"
+        }
+      ],
+      "timespan": {
+        "type": "TimeSpan",
+        "identified_by": [
+          {
+            "type": "Name",
+            "content": "1972",
+            "classified_as": [
+              {
+                "id": "https://lux.collections.yale.edu/data/concept/5088ec29-065b-4c66-b49e-e61d3c8f3717",
+                "type": "Type",
+                "_label": "Display Title",
+                "equivalent": [
+                  {
+                    "id": "http://vocab.getty.edu/aat/300404669",
+                    "type": "Type",
+                    "_label": "Display Title"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "end_of_the_end": "1972-12-31T23:59:59Z",
+        "begin_of_the_end": "1972-01-01T00:00:00Z",
+        "end_of_the_begin": "1972-12-31T23:59:59Z",
+        "begin_of_the_begin": "1972-01-01T00:00:00Z",
+        "_seconds_since_epoch_begin_of_the_begin": 63072000,
+        "_seconds_since_epoch_begin_of_the_end": 63072000,
+        "_seconds_since_epoch_end_of_the_begin": 94694399,
+        "_seconds_since_epoch_end_of_the_end": 94694399
+      },
+      "technique": [
+        {
+          "id": "https://lux.collections.yale.edu/data/concept/3007b800-c347-438c-8c46-fbfb86fa1d6a",
+          "type": "Type",
+          "_label": "aquatint",
+          "equivalent": [
+            {
+              "id": "http://vocab.getty.edu/aat/300053242",
+              "type": "Type",
+              "_label": "aquatint"
+            }
+          ]
+        },
+        {
+          "id": "https://lux.collections.yale.edu/data/concept/58c1ecb2-2133-41e1-87d9-16eb76355770",
+          "type": "Type",
+          "_label": "etching (printing process)",
+          "equivalent": [
+            {
+              "id": "http://vocab.getty.edu/aat/300053241",
+              "type": "Type",
+              "_label": "etching (printing process)"
+            }
+          ]
+        }
+      ]
+    },
+    "classified_as": [
+      {
+        "id": "https://lux.collections.yale.edu/data/concept/42aa76c3-e357-443e-95b0-0377324f9e23",
+        "type": "Type",
+        "_label": "intaglio print",
+        "equivalent": [
+          {
+            "id": "http://vocab.getty.edu/aat/300041338",
+            "type": "Type",
+            "_label": "intaglio print"
+          }
+        ],
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/4ea65dc4-76bc-45b7-b54c-a1ca4783d4e2",
+            "type": "Type",
+            "_label": "Type of Work",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300435443",
+                "type": "Type",
+                "_label": "Type of Work"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "https://lux.collections.yale.edu/data/concept/f205dced-45a6-46d4-a4c5-efec14705c55",
+        "type": "Type",
+        "_label": "Visual Works",
+        "equivalent": [
+          {
+            "id": "http://vocab.getty.edu/aat/300191086",
+            "type": "Type",
+            "_label": "Visual Works"
+          }
+        ],
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/3fdac98e-1396-4e75-bb52-33894863c571",
+            "type": "Type",
+            "_label": "Super Type",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300241507",
+                "type": "Type",
+                "_label": "Super Type"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "https://lux.collections.yale.edu/data/concept/4281d203-11bf-49e9-b135-64825dadd5f1",
+        "type": "Type",
+        "_label": "Print",
+        "equivalent": [
+          {
+            "id": "http://vocab.getty.edu/aat/300041273",
+            "type": "Type",
+            "_label": "Print"
+          }
+        ],
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/4ea65dc4-76bc-45b7-b54c-a1ca4783d4e2",
+            "type": "Type",
+            "_label": "Type of Work",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300435443",
+                "type": "Type",
+                "_label": "Type of Work"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "https://lux.collections.yale.edu/data/concept/b34ad31c-4a2f-4cef-aee3-ae8d824e42a2",
+        "type": "Type",
+        "_label": "Collection Item",
+        "equivalent": [
+          {
+            "id": "http://vocab.getty.edu/aat/300404024",
+            "type": "Type",
+            "_label": "Collection Item"
+          }
+        ]
+      }
+    ],
+    "current_owner": [
+      {
+        "id": "https://lux.collections.yale.edu/data/group/0e8bc04a-6538-4792-b82a-9e0751857e7d",
+        "type": "Group",
+        "_label": "Yale Center for British Art"
+      }
+    ],
+    "identified_by": [
+      {
+        "type": "Name",
+        "content": "Panama Hat",
+        "language": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/dfa53b96-4eda-4c9a-b091-10008a726c38",
+            "type": "Language",
+            "_label": "English",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300388277",
+                "type": "Language",
+                "_label": "English"
+              }
+            ]
+          }
+        ],
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/f7ef5bb4-e7fb-443d-9c6b-371a23e717ec",
+            "type": "Type",
+            "_label": "Primary",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300404670",
+                "type": "Type",
+                "_label": "Primary"
+              }
+            ]
+          },
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/ab99d278-9323-4d84-8e97-1846058fc587",
+            "type": "Type",
+            "_label": "Sort Name",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300451544",
+                "type": "Type",
+                "_label": "Final: Sort Title"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "Identifier",
+        "content": "B2019.30",
+        "assigned_by": [
+          {
+            "type": "AttributeAssignment",
+            "carried_out_by": [
+              {
+                "id": "https://lux.collections.yale.edu/data/group/0e8bc04a-6538-4792-b82a-9e0751857e7d",
+                "type": "Group",
+                "_label": "Yale Center for British Art"
+              }
+            ]
+          }
+        ],
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/3d9696be-0b9a-4a3d-b380-7584fbf96ac7",
+            "type": "Type",
+            "_label": "Accession Number",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300312355",
+                "type": "Type",
+                "_label": "Accession Number"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "Identifier",
+        "_label": "Local System Number",
+        "content": "72202",
+        "assigned_by": [
+          {
+            "type": "AttributeAssignment",
+            "carried_out_by": [
+              {
+                "id": "https://lux.collections.yale.edu/data/group/0e8bc04a-6538-4792-b82a-9e0751857e7d",
+                "type": "Group",
+                "_label": "Yale Center for British Art"
+              }
+            ]
+          }
+        ],
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/89630361-18a3-4c4b-bcd7-16894d95defd",
+            "type": "Type",
+            "_label": "System-Assigned Number",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300435704",
+                "type": "Type",
+                "_label": "System-Assigned Number"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "referred_to_by": [
+      {
+        "type": "LinguisticObject",
+        "content": "Inscribed in graphite, lower left: \"104/125\"",
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/a016cca7-9bf0-48aa-8d32-78ced1b3751f",
+            "type": "Type",
+            "_label": "Inscription",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300435414",
+                "type": "Type",
+                "_label": "Inscription"
+              }
+            ],
+            "classified_as": [
+              {
+                "id": "https://lux.collections.yale.edu/data/concept/b079998d-bb47-470a-ad7d-d938bd091f8a",
+                "type": "Type",
+                "_label": "Brief Text",
+                "equivalent": [
+                  {
+                    "id": "http://vocab.getty.edu/aat/300418049",
+                    "type": "Type",
+                    "_label": "Brief Text"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "LinguisticObject",
+        "content": "Signed and dated in graphite, lower right: \"David Hockney 72\"",
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/5cfefaf6-3709-457c-a3d3-e0d004666a4b",
+            "type": "Type",
+            "_label": "Signature",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300028705",
+                "type": "Type",
+                "_label": "Signature"
+              }
+            ],
+            "classified_as": [
+              {
+                "id": "https://lux.collections.yale.edu/data/concept/b079998d-bb47-470a-ad7d-d938bd091f8a",
+                "type": "Type",
+                "_label": "Brief Text",
+                "equivalent": [
+                  {
+                    "id": "http://vocab.getty.edu/aat/300418049",
+                    "type": "Type",
+                    "_label": "Brief Text"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "LinguisticObject",
+        "content": "Sheet: 16 1/4 × 13 inches (41.3 × 33 cm)",
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/53922f57-dab5-43c5-a527-fc20a63fe128",
+            "type": "Type",
+            "_label": "Dimension Statement",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300435430",
+                "type": "Type",
+                "_label": "Dimension Statement"
+              }
+            ],
+            "classified_as": [
+              {
+                "id": "https://lux.collections.yale.edu/data/concept/b079998d-bb47-470a-ad7d-d938bd091f8a",
+                "type": "Type",
+                "_label": "Brief Text",
+                "equivalent": [
+                  {
+                    "id": "http://vocab.getty.edu/aat/300418049",
+                    "type": "Type",
+                    "_label": "Brief Text"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "LinguisticObject",
+        "content": "Etching and aquatint on moderately thick, slightly textured, cream wove paper",
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/a51a170c-211c-4cc1-bb11-52e24836117f",
+            "type": "Type",
+            "_label": "Material Statement",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300435429",
+                "type": "Type",
+                "_label": "Material Statement"
+              }
+            ],
+            "classified_as": [
+              {
+                "id": "https://lux.collections.yale.edu/data/concept/b079998d-bb47-470a-ad7d-d938bd091f8a",
+                "type": "Type",
+                "_label": "Brief Text",
+                "equivalent": [
+                  {
+                    "id": "http://vocab.getty.edu/aat/300418049",
+                    "type": "Type",
+                    "_label": "Brief Text"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "LinguisticObject",
+        "content": "Yale Center for British Art,, Transfer from the Yale University Art Gallery, Estate of Richard Brown Baker",
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/7c0ba119-47cb-4ade-8aa3-32a1e66c8ca9",
+            "type": "Type",
+            "_label": "Credit Line",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300435418",
+                "type": "Type",
+                "_label": "Credit Line"
+              }
+            ],
+            "classified_as": [
+              {
+                "id": "https://lux.collections.yale.edu/data/concept/b079998d-bb47-470a-ad7d-d938bd091f8a",
+                "type": "Type",
+                "_label": "Brief Text",
+                "equivalent": [
+                  {
+                    "id": "http://vocab.getty.edu/aat/300418049",
+                    "type": "Type",
+                    "_label": "Brief Text"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "LinguisticObject",
+        "content": "Accessible by request in the Yale Center for British Art Study Room",
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/03f4eb19-0611-4f31-8e09-fc111c52f898",
+            "type": "Type",
+            "_label": "Access Statement",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300133046",
+                "type": "Type",
+                "_label": "Access Statement"
+              }
+            ],
+            "classified_as": [
+              {
+                "id": "https://lux.collections.yale.edu/data/concept/b079998d-bb47-470a-ad7d-d938bd091f8a",
+                "type": "Type",
+                "_label": "Brief Text",
+                "equivalent": [
+                  {
+                    "id": "http://vocab.getty.edu/aat/300418049",
+                    "type": "Type",
+                    "_label": "Brief Text"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "_content_html": "<span class='lux_data'><a target='_blank' href='https://aeon.library.yale.edu/aeon.dll?Action=10&Form=20&Value=GenericRequestPD&Site=YCBA&Callnumber=B2019.30&ItemTitle=Panama Hat&ItemAuthor=David Hockney&ItemDate=1972&Format=Etching and aquatint on moderately thick, slightly textured, cream wove paper&Location=bacpd&mfhdID=&EADNumber=https://collections.britishart.yale.edu/catalog/tms:72202'>Accessible by request in the Yale Center for British Art Study Room</a></span>"
+      },
+      {
+        "type": "LinguisticObject",
+        "content": "Plan Your Visit to the Yale Center for British Art",
+        "classified_as": [
+          {
+            "id": "https://lux.collections.yale.edu/data/concept/d97f2e4a-1549-4c4b-9a27-bcf41a2b4972",
+            "type": "Type",
+            "_label": "Visitors' Statement",
+            "equivalent": [
+              {
+                "id": "http://vocab.getty.edu/aat/300025883",
+                "type": "Type",
+                "_label": "Visitors' Statement"
+              }
+            ],
+            "classified_as": [
+              {
+                "id": "https://lux.collections.yale.edu/data/concept/b079998d-bb47-470a-ad7d-d938bd091f8a",
+                "type": "Type",
+                "_label": "Brief Text",
+                "equivalent": [
+                  {
+                    "id": "http://vocab.getty.edu/aat/300418049",
+                    "type": "Type",
+                    "_label": "Brief Text"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "_content_html": "<a target='_blank' href='https://britishart.yale.edu/hours-and-visitor-guidelines'>Plan Your Visit to the Yale Center for British Art</a>"
+      }
+    ],
+    "representation": [
+      {
+        "type": "VisualItem",
+        "_label": "Primary Image",
+        "digitally_shown_by": [
+          {
+            "type": "DigitalObject",
+            "_label": "Primary Image",
+            "access_point": [
+              {
+                "id": "https://media.collections.yale.edu/thumbnail/ycba/obj/72202",
+                "type": "DigitalObject"
+              }
+            ],
+            "classified_as": [
+              {
+                "id": "https://lux.collections.yale.edu/data/concept/b28a48ef-4d40-44d1-81c9-27f0411b030b",
+                "type": "Type",
+                "_label": "Digital Image",
+                "equivalent": [
+                  {
+                    "id": "http://vocab.getty.edu/aat/300215302",
+                    "type": "Type",
+                    "_label": "Digital Image"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "current_location": {
+      "id": "https://lux.collections.yale.edu/data/place/0a73efa8-c306-4e1e-821e-5b2f35ebb28a",
+      "type": "Place",
+      "_label": "Yale Center for British Art"
+    }
+  },
+  "manifest": {
+    "@context": "http://iiif.io/api/presentation/2/context.json",
+    "@type": "sc:Manifest",
+    "@id": "https://manifests.collections.yale.edu/v2/ycba/obj/72202",
+    "label": "David Hockney, 1937–2026, Panama Hat, 1972",
+    "metadata": [
+      {
+        "label": "Copyright Statement",
+        "value": "© The Artist"
+      },
+      {
+        "label": "Creator",
+        "value": "David Hockney, 1937–2026"
+      },
+      {
+        "label": "Title",
+        "value": "Panama Hat"
+      },
+      {
+        "label": "Medium",
+        "value": "Etching and aquatint on moderately thick, slightly textured, cream wove paper"
+      },
+      {
+        "label": "Physical Description",
+        "value": "Sheet: 16 1/4 × 13 inches (41.3 × 33 cm)"
+      },
+      {
+        "label": "Credit Line",
+        "value": "Yale Center for British Art,, Transfer from the Yale University Art Gallery, Estate of Richard Brown Baker"
+      },
+      {
+        "label": "Institution",
+        "value": "Yale Center for British Art"
+      },
+      {
+        "label": "Collection",
+        "value": "Prints and Drawings"
+      },
+      {
+        "label": "Call Number",
+        "value": "B2019.30"
+      }
+    ],
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attribution": "Metadata describing Yale Center for British Art collections is public domain under CC0. Copyright or other restrictions may apply to cultural works or images of those works in this record.",
+    "logo": "https://static.britishart.yale.edu/images/ycba_logo.jpg",
+    "related": {
+      "@id": "https://collections.britishart.yale.edu/catalog/tms:72202",
+      "format": "text/html"
+    },
+    "seeAlso": [
+      {
+        "@id": "https://harvester-bl.britishart.yale.edu/oaicatmuseum/OAIHandler?verb=GetRecord&identifier=oai:tms.ycba.yale.edu:72202&metadataPrefix=lido",
+        "foramt": "text/xml",
+        "profile": "http://www.lido-schema.org/schema/v1.0/lido-v1.0.xsd"
+      },
+      {
+        "@id": "http://collection.britishart.yale.edu/id/page/object/72202",
+        "foramt": "text/rdf+n3",
+        "profile": ""
+      }
+    ],
+    "sequences": [
+      {
+        "@id": "https://manifests.collections.yale.edu/v2/ycba/obj/72202/sequence/0",
+        "@type": "sc:Sequence",
+        "canvases": [
+          {
+            "@id": "https://manifests.collections.yale.edu/canvas/ycba/3b5ed3d8-7485-4050-919c-46cff2a2322a",
+            "@type": "sc:Canvas",
+            "label": "recto, cropped to image",
+            "height": 860,
+            "width": 701,
+            "images": [
+              {
+                "@type": "oa:Annotation",
+                "@id": "https://manifests.collections.yale.edu/annotation/ycba/3b5ed3d8-7485-4050-919c-46cff2a2322a",
+                "motivation": "sc:painting",
+                "resource": {
+                  "@id": "https://images.collections.yale.edu/iiif/2/ycba:3b5ed3d8-7485-4050-919c-46cff2a2322a/full/full/0/default.jpg",
+                  "@type": "dctypes:Image",
+                  "format": "image/jpeg",
+                  "service": {
+                    "@context": "http://iiif.io/api/image/2/context.json",
+                    "@id": "https://images.collections.yale.edu/iiif/2/ycba:3b5ed3d8-7485-4050-919c-46cff2a2322a",
+                    "profile": "http://iiif.io/api/image/2/level2.json"
+                  },
+                  "height": 860,
+                  "width": 701
+                },
+                "on": "https://manifests.collections.yale.edu/canvas/ycba/3b5ed3d8-7485-4050-919c-46cff2a2322a"
+              }
+            ],
+            "thumbnail": {
+              "@id": "https://media.collections.yale.edu/thumbnail/ycba/3b5ed3d8-7485-4050-919c-46cff2a2322a",
+              "@type": "dctypes:Image",
+              "width": 391,
+              "height": 480
+            },
+            "metadata": [
+              {
+                "label": "Image Use Rights",
+                "value": "In Copyright: This Item is protected by copyright and/or related rights. You are free to use this Item in any way that is permitted by the copyright and related rights legislation that applies to your use. For other uses you need to obtain permission from the rights-holder(s)."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

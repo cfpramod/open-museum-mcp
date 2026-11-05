@@ -116,6 +116,7 @@ const CDN_ALLOWLIST = new Set([
   'ids.si.edu',                      // Smithsonian IDS image server (deliveryService + IIIF)
   'iiif.micr.io',                    // Rijksmuseum images via Micrio IIIF (data.rijksmuseum.nl)
   'iiif.wellcomecollection.org',     // Wellcome Collection IIIF image server
+  'images.collections.yale.edu',     // Yale IIIF image server (Yale Center for British Art)
   // Europeana edmIsShownBy (full images) comes from arbitrary per-provider
   // CDNs — those are intentionally NOT listed here and will fail open.
 ]);

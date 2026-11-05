@@ -515,20 +515,73 @@ describe('parseDisplayDate — algorithmic-complexity DoS guard', () => {
 });
 
 describe('stripHtml — polynomial-ReDoS guard (CodeQL js/polynomial-redos)', () => {
-  it('strips a 1M-char all-"<" payload in <50ms (input bounded before the O(n²) regex)', () => {
-    // Without the STRIP_INPUT_MAX ceiling, `<[^>]*>` on this input is O(n²) and
-    // would hang the sanitizer on attacker-controlled museum text.
-    const payload = '<'.repeat(1_000_000);
+  it('strips a 100k-char all-"<" payload in linear time', () => {
+    // A `<[^>]*>` global replace is O(n²) on this input: measured 2.1s at 40k
+    // chars, so over 10s at 100k. The linear scan takes well under 1ms. The
+    // ceiling sits far from both, so host load (one run measured 28x slower
+    // than usual) cannot fail it and a quadratic regression cannot pass it.
+    // The payload stays small enough that a regression fails here rather than
+    // hanging the run: synchronous regex work cannot be interrupted by a timeout.
+    const payload = '<'.repeat(100_000);
     const start = performance.now();
     const out = sanitizeTitle(payload);
     const elapsed = performance.now() - start;
-    expect(elapsed).toBeLessThan(50);
+    expect(elapsed).toBeLessThan(1000);
     expect(out.length).toBeLessThanOrEqual(256);
   });
 
   it('still strips tags and decodes entities in legitimate short text', () => {
     expect(sanitizeTitle('<b>Sunflowers</b> &amp; Co.')).toBe('Sunflowers & Co.');
     expect(stripHtml('<p>Hello <i>world</i></p>')).toBe('Hello world');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Numeric character references outside the Unicode range must not throw.
+// String.fromCodePoint raises RangeError above 0x10FFFF, so one malformed
+// escape in a museum field would make normalize() throw and hide a clear work.
+// ---------------------------------------------------------------------------
+
+describe('stripHtml — numeric character references outside the Unicode range', () => {
+  it('leaves an out-of-range decimal reference verbatim', () => {
+    expect(stripHtml('a &#99999999; b')).toBe('a &#99999999; b');
+    expect(stripHtml('&#1114112;')).toBe('&#1114112;');
+    expect(stripHtml('&#99999999999999999999999;')).toBe('&#99999999999999999999999;');
+  });
+
+  it('leaves an out-of-range hex reference verbatim', () => {
+    expect(stripHtml('a &#x110000; b')).toBe('a &#x110000; b');
+    expect(stripHtml('&#XFFFFFFFF;')).toBe('&#XFFFFFFFF;');
+  });
+
+  it('leaves surrogate code points verbatim (decimal and hex)', () => {
+    expect(stripHtml('&#55296;')).toBe('&#55296;'); // 0xD800
+    expect(stripHtml('&#57343;')).toBe('&#57343;'); // 0xDFFF
+    expect(stripHtml('&#xD800;')).toBe('&#xD800;');
+    expect(stripHtml('&#xdfff;')).toBe('&#xdfff;');
+  });
+
+  it('decodes the valid boundary values on either side of each excluded range', () => {
+    expect(stripHtml('&#x10FFFF;')).toBe(String.fromCodePoint(0x10ffff));
+    expect(stripHtml('&#1114111;')).toBe(String.fromCodePoint(0x10ffff));
+    expect(stripHtml('&#xD7FF;')).toBe(String.fromCodePoint(0xd7ff));
+    expect(stripHtml('&#xE000;')).toBe(String.fromCodePoint(0xe000));
+    expect(stripHtml('x&#0;y')).toBe(`x${String.fromCodePoint(0)}y`);
+  });
+
+  it('still decodes ordinary references, including leading zeros and astral characters', () => {
+    expect(stripHtml('&#65;&#x42;&#0067;')).toBe('ABC');
+    expect(stripHtml('&#233;t&#xE9;')).toBe('été');
+    expect(stripHtml('&#x1F3A8;')).toBe('🎨');
+  });
+
+  it('met: a malformed reference in the title no longer makes normalize() throw', () => {
+    let result: ReturnType<typeof metFetcher.normalize> | undefined;
+    expect(() => {
+      result = metFetcher.normalize(metRaw({ title: 'Sunflowers &#99999999; &#x110000; &#xD800; &amp; &#233;t&#xE9;' }));
+    }).not.toThrow();
+    accepted(result!);
+    expect(result!.artwork.title).toBe('Sunflowers &#99999999; &#x110000; &#xD800; & été');
   });
 });
 

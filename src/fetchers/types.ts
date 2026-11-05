@@ -2,6 +2,14 @@ import type { ValidationResult } from '../types.js';
 
 export interface SearchOptions {
   hasImage?: boolean;
+  /**
+   * Aborted by the federation when the source exceeds its time bound. A live
+   * fetcher passes it to every request its `search` makes, so a stuck socket is
+   * torn down rather than left to linger after the federation has given up on
+   * it. Sources that answer from a bundled snapshot have no request to abort
+   * and ignore it.
+   */
+  signal?: AbortSignal;
 }
 
 export interface Fetcher {

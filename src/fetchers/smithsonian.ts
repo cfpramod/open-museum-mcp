@@ -386,7 +386,7 @@ export const smithsonianFetcher: Fetcher = {
     url.searchParams.set('start', '0');
     url.searchParams.set('api_key', apiKey());
 
-    const res = await httpGet(url);
+    const res = await httpGet(url, { signal: options.signal });
     if (!res.ok) throw new Error(`Smithsonian search failed: ${res.status}`);
     const json = (await res.json()) as {
       response?: { rows?: Array<{ id?: unknown }> };

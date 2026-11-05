@@ -72,6 +72,24 @@ describe('Harvard search query construction', () => {
     if (prev === undefined) delete process.env.HARVARD_API_KEY;
     else process.env.HARVARD_API_KEY = prev;
   });
+
+  // `q` ORs every term (stop words included) and ranks one verbose record first for
+  // any common word; `keyword` requires all content terms. Pin which one is sent.
+  it('searches with the AND-semantics `keyword` parameter, never the OR-matching `q`', async () => {
+    const prev = process.env.HARVARD_API_KEY;
+    process.env.HARVARD_API_KEY = 'test-key';
+    let captured: URL | undefined;
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      captured = new URL(String(input));
+      return new Response(JSON.stringify({ records: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await harvardFetcher.search('two cows in a landscape', 5);
+    expect(captured?.searchParams.get('keyword')).toBe('two cows in a landscape');
+    expect(captured?.searchParams.has('q')).toBe(false);
+    expect(captured?.searchParams.get('sort')).toBe('rank');
+    if (prev === undefined) delete process.env.HARVARD_API_KEY;
+    else process.env.HARVARD_API_KEY = prev;
+  });
 });
 
 describe('Harvard provenance mapping (v0.20.0, openclearance P-7 posture)', () => {
