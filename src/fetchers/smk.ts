@@ -36,6 +36,7 @@ const SMK_FIELDS = [
   'artist',
   'techniques',
   'object_names',
+  'dimensions',
   'object_url',
   'frontend_url',
 ].join(',');
@@ -50,6 +51,123 @@ function pickTitle(titles: unknown): string {
   const english = entries.find((t) => /english|engelsk/i.test(asString(t.language)));
   const chosen = english ?? entries[0];
   return chosen ? asString(chosen.title) : '';
+}
+
+// SMK publishes `dimensions` only as structured {part, type, unit, value}
+// entries (Danish names by default, English type and unit names with lang=en),
+// so the size is composed here in one fixed format. Its `notes` text is not
+// used: in the 2026-10-26 census of the 39,517 public-domain image records it
+// disagreed with the values on 4,398 of 49,074 entries it could be checked on.
+// Parts are SMK's cataloguing terms: blad (sheet), plade (plate), billed
+// (image), montering (mount), netto (net: the work itself) and brutto (gross:
+// with whatever frame, base or mount it has). SMK does not say which of these a
+// gross size includes, and records casts and drawings with a gross size only,
+// so brutto is written "Overall" and netto "Object", never "Framed". A part
+// with an unknown name, a measurement it cannot read, two values for one
+// measurement or two units is dropped whole, never written in part.
+// A size with no part is written only when no other size in the record names
+// one.
+// Maps, not object literals: a plain object would read inherited keys such as
+// "constructor" or "__proto__" as SMK terms.
+const SMK_DIMENSION_PARTS = new Map<string, string>([
+  ['bladmaal', 'Sheet'],
+  ['plademaal', 'Plate'],
+  ['billedmaal', 'Image'],
+  ['monteringsmaal', 'Mount'],
+  ['netto', 'Object'],
+  ['nettomaal', 'Object'],
+  ['brutto', 'Overall'],
+  ['bruttomaal', 'Overall'],
+]);
+const SMK_DIMENSION_TYPES = new Map<string, 'height' | 'width' | 'depth' | 'diameter'>([
+  ['højde', 'height'],
+  ['height', 'height'],
+  ['bredde', 'width'],
+  ['width', 'width'],
+  ['dybde', 'depth'],
+  ['depth', 'depth'],
+  ['diameter', 'diameter'],
+]);
+// A weight is not a size: skipped without affecting the rest of its part.
+const SMK_IGNORED_TYPES = new Set(['vægt', 'weight']);
+const SMK_DIMENSION_UNITS = new Map<string, 'mm' | 'cm'>([
+  ['millimeter', 'mm'],
+  ['milimeter', 'mm'],
+  ['mm', 'mm'],
+  ['centimeter', 'cm'],
+  ['cm', 'cm'],
+]);
+const SMK_DIMENSION_VALUE = /^\d{1,6}(\.\d{1,4})?$/;
+const SMK_DIMENSION_ORDER = ['height', 'width', 'depth', 'diameter'] as const;
+
+interface SmkDimensionPart {
+  label: string | undefined;
+  readable: boolean;
+  measures: Array<{ type: (typeof SMK_DIMENSION_ORDER)[number]; unit: 'mm' | 'cm'; value: string }>;
+}
+
+/**
+ * Compose SMK's structured measurements into one string: each part in the
+ * order the record first gives it, "Label: H x W [x D] unit", parts joined by
+ * "; ". A part without both height and width, or with a diameter, labels each
+ * measurement instead ("Sheet: diameter 265 mm"). Undefined when no part is
+ * readable.
+ */
+function composeSmkDimensions(dimensions: unknown): string | undefined {
+  if (!Array.isArray(dimensions)) return undefined;
+  const parts = new Map<string, SmkDimensionPart>();
+  let namesPart = false;
+  for (const entry of dimensions) {
+    if (!entry || typeof entry !== 'object') continue;
+    const d = entry as Record<string, unknown>;
+    let key: string;
+    let label: string | undefined;
+    if (d.part === undefined || d.part === null) {
+      key = '';
+    } else {
+      label = typeof d.part === 'string'
+        ? SMK_DIMENSION_PARTS.get(d.part.toLowerCase().replace(/å/g, 'aa'))
+        : undefined;
+      key = label ?? `?${String(d.part)}`;
+    }
+    let part = parts.get(key);
+    if (!part) {
+      part = { label, readable: key === '' || label !== undefined, measures: [] };
+      parts.set(key, part);
+    }
+    const typeName = typeof d.type === 'string' ? d.type.toLowerCase() : '';
+    if (SMK_IGNORED_TYPES.has(typeName)) continue;
+    if (key !== '') namesPart = true;
+    const type = SMK_DIMENSION_TYPES.get(typeName);
+    const unit = typeof d.unit === 'string' ? SMK_DIMENSION_UNITS.get(d.unit.toLowerCase()) : undefined;
+    const value = typeof d.value === 'string' && SMK_DIMENSION_VALUE.test(d.value) && Number(d.value) > 0
+      ? d.value
+      : undefined;
+    if (type === undefined || unit === undefined || value === undefined) {
+      part.readable = false;
+      continue;
+    }
+    part.measures.push({ type, unit, value });
+  }
+
+  const written: string[] = [];
+  for (const [key, part] of parts) {
+    if (!part.readable || part.measures.length === 0) continue;
+    // Beside a named part, a size with no part could measure anything
+    // (KMS317 gives a net size and then one with no part), so it is not
+    // written rather than guessed at.
+    if (key === '' && namesPart) continue;
+    const units = new Set(part.measures.map((x) => x.unit));
+    const byType = new Map(part.measures.map((x) => [x.type, x.value]));
+    if (units.size !== 1 || byType.size !== part.measures.length) continue;
+    const unit = part.measures[0].unit;
+    const present = SMK_DIMENSION_ORDER.filter((t) => byType.has(t));
+    const size = byType.has('height') && byType.has('width') && !byType.has('diameter')
+      ? `${present.map((t) => byType.get(t)).join(' x ')} ${unit}`
+      : present.map((t) => `${t} ${byType.get(t)} ${unit}`).join(', ');
+    written.push(part.label ? `${part.label}: ${size}` : size);
+  }
+  return written.length > 0 ? written.join('; ') : undefined;
 }
 
 /** Extract a signed year from an SMK ISO date string (handles BCE leading '-'). */
@@ -178,9 +296,8 @@ export const smkFetcher: Fetcher = {
         pageUrl: asString(r.frontend_url) || asString(r.object_url),
       },
       description: asOptionalString(firstObjectName),
-      // SMK publishes no credit line. Its `dimensions` are structured
-      // {type, part, unit, value} entries with no display string, so
-      // `dimensions` stays absent rather than being composed here.
+      dimensions: composeSmkDimensions(r.dimensions),
+      // SMK publishes no credit line.
       creditLine: buildCreditLine('Statens Museum for Kunst (National Gallery of Denmark)', undefined, objectNumber),
     };
 
