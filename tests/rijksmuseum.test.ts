@@ -335,7 +335,7 @@ describe('Rijksmuseum makers named by attribution, and records with several time
       () => {
         throw new TypeError('fetch failed');
       },
-      // A 200 whose body parses but is not a person record is a failure, not a nameless person.
+      // A 200 whose body parses but is not a JSON object is a failure, not a nameless person.
       () => new Response('[]', { status: 200 }),
       () => new Response('null', { status: 200 }),
       () => new Response('"Adriaen Matham"', { status: 200 }),

@@ -139,10 +139,11 @@ function unnamedAttributedUris(object: Record<string, unknown>): string[] {
 }
 
 /**
- * The name of a person record. Only a 404 or 410 (the museum no longer has the
- * person) yields ''; a timeout, network error, other status, unreadable body or
- * body that is not a person record throws, since a credit built without that
- * maker must not be cached.
+ * The name of a person record, or '' where the museum has no name to give: a 404
+ * or 410 (the museum no longer has the person), or a record that carries no name.
+ * A timeout, network error, other status, unreadable body or a body that is not a
+ * JSON object throws, since a temporary failure must not be cached as a credit
+ * without that maker.
  */
 async function fetchPersonName(uri: string): Promise<string> {
   try {
@@ -154,7 +155,7 @@ async function fetchPersonName(uri: string): Promise<string> {
     if (res.status === 404 || res.status === 410) return '';
     if (!res.ok) throw new Error(`status ${res.status}`);
     const person: unknown = await res.json();
-    if (!isObj(person) || Array.isArray(person)) throw new Error('body is not a person record');
+    if (!isObj(person) || Array.isArray(person)) throw new Error('body is not a JSON object');
     return pickPrimaryName(person);
   } catch (err) {
     throw new Error(`Rijksmuseum person fetch failed for ${uri}: ${err instanceof Error ? err.message : String(err)}`);
@@ -388,9 +389,9 @@ export const rijksmuseumFetcher: Fetcher = {
     // Dereference the attributed makers named only by reference, at most
     // PERSON_FETCH_CAP of them, all at once, so normalize can credit them by name.
     // A temporary failure (timeout, network error, other status, a body that is
-    // not a person record) fails this fetch, so it is never cached. Two cases
+    // not a JSON object) fails this fetch, so it is never cached. Three cases
     // leave a maker out of a credit that is cached: a person the museum no longer
-    // has (404 or 410), and makers past the cap.
+    // has (404 or 410), a person record that carries no name, and makers past the cap.
     const uris = isObj(object) ? unnamedAttributedUris(object).slice(0, PERSON_FETCH_CAP) : [];
     const names = await Promise.all(uris.map(fetchPersonName));
     const persons = uris.flatMap((uri, i) => (names[i] ? [{ id: uri, name: names[i] }] : []));
