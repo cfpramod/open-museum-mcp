@@ -1,0 +1,65 @@
+{
+  "entityId": "226737",
+  "title": "Soleil couchant sur la Seine à Lavacourt, effet d'hiver",
+  "absolutePath": "https://www.parismuseescollections.paris.fr/node/226737",
+  "fieldCartelAuteur": "Claude Monet",
+  "fieldCartelDatation": "1880",
+  "fieldCartelDenominationTitre": "Soleil couchant sur la Seine à Lavacourt, effet d'hiver",
+  "fieldCartelDimension": "H. 101,5 x l. 150 cm",
+  "fieldCartelMateriaux": "Huile sur toile",
+  "fieldDateProduction": {
+    "startYear": 1880,
+    "endYear": null,
+    "processed": "En 1880"
+  },
+  "fieldDescription": null,
+  "fieldOeuvreDescriptionIcono": {
+    "value": "Vue panoramique du village de Lavacourt dans les Yvelines depuis l'autre berge de la Seine. Placé au centre de la composition, le soleil aux couleurs intenses se reflète sur l'eau et contraste avec l'atmosphère générale bleue."
+  },
+  "fieldMusee": {
+    "entity": {
+      "name": "Petit Palais, musée des Beaux-arts de la Ville de Paris",
+      "fieldMuseeTitreCourt": "Petit Palais"
+    }
+  },
+  "fieldOeuvreTypesObjet": [
+    {
+      "entity": {
+        "name": "Peinture"
+      }
+    }
+  ],
+  "fieldMateriauxTechnique": [
+    {
+      "entity": {
+        "name": "Peinture à l'huile"
+      }
+    },
+    {
+      "entity": {
+        "name": "Toile (matériau)"
+      }
+    }
+  ],
+  "fieldOeuvreAuteurs": [
+    {
+      "entity": {
+        "fieldAuteurAuteur": {
+          "entity": {
+            "name": "Monet, Claude"
+          }
+        }
+      }
+    }
+  ],
+  "fieldVisuels": [
+    {
+      "entity": {
+        "publicUrl": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_143990-30.jpg",
+        "vignette": "https://apicollections.parismusees.paris.fr/sites/default/files/styles/thumbnail/collections/atoms/images/PPA/lpdp_143990-30.jpg?itok=aa6igxoN",
+        "fieldImageLibre": null,
+        "fieldImageDroits": null
+      }
+    }
+  ]
+}

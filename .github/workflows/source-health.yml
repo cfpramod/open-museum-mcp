@@ -60,6 +60,7 @@ jobs:
           EUROPEANA_API_KEY: ${{ secrets.EUROPEANA_API_KEY }}
           SMITHSONIAN_API_KEY: ${{ secrets.SMITHSONIAN_API_KEY }}
           HARVARD_API_KEY: ${{ secrets.HARVARD_API_KEY }}
+          PARISMUSEES_API_KEY: ${{ secrets.PARISMUSEES_API_KEY }}
         run: |
           set +e
           node source-health.mjs --scope keyed > ../report-keyed.txt 2>../stderr-keyed.txt

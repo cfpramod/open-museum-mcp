@@ -793,6 +793,80 @@ export const validateYcbaLicense: LicenseValidator = (raw) => {
   };
 };
 
+// Paris Musées (the 14 City of Paris museums) publishes rights per IMAGE, not
+// per object. Each MediaImage in `fieldVisuels` carries `fieldImageLibre`
+// (true for the museum's Open Content release, null otherwise) and a
+// `fieldImageDroits` statement such as "CC0 Paris Musées / Petit Palais, musée
+// des Beaux-Arts de la Ville de Paris". Live spike (2026-11-19): free images
+// read true + "CC0 …"; non-free images read null, and the public API serves
+// them only as thumbnails.
+//
+// Strict-default-deny: a record is ACCEPTED only when an image has BOTH
+// `fieldImageLibre === true` AND a `fieldImageDroits` beginning "CC0". Either
+// signal alone rejects. The chosen image is the first such one; the fetcher
+// surfaces exactly that image (parisMuseesFreeImage), so the licence describes
+// the asset on the wire.
+//
+// metadataOpenAccess is FALSE: the CC0 release covers the image reproductions
+// (Paris Musées "Open Content", January 2020). No licence for the catalogue
+// metadata itself was found in the API or its documentation, so it is not
+// claimed.
+const PARISMUSEES_CC0_PREFIX = /^CC0\b/i;
+
+interface ParisMuseesImage {
+  full: string;
+  thumbnail?: string;
+  rights: string;
+}
+
+/** The first image that passes the Paris Musées gate, or null. Shared with the fetcher. */
+export function parisMuseesFreeImage(raw: unknown): ParisMuseesImage | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const visuels = (raw as Record<string, unknown>).fieldVisuels;
+  if (!Array.isArray(visuels)) return null;
+  for (const v of visuels) {
+    const entity = v && typeof v === 'object' ? (v as { entity?: unknown }).entity : undefined;
+    if (!entity || typeof entity !== 'object') continue;
+    const e = entity as Record<string, unknown>;
+    const rights = typeof e.fieldImageDroits === 'string' ? e.fieldImageDroits.trim() : '';
+    const full = typeof e.publicUrl === 'string' ? e.publicUrl : '';
+    if (e.fieldImageLibre === true && PARISMUSEES_CC0_PREFIX.test(rights) && full) {
+      const thumbnail = typeof e.vignette === 'string' && e.vignette ? e.vignette : undefined;
+      return { full, thumbnail, rights };
+    }
+  }
+  return null;
+}
+
+export const validateParisMuseesLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('parismusees: object missing or not an object');
+  }
+  const visuels = (raw as Record<string, unknown>).fieldVisuels;
+  if (!Array.isArray(visuels) || visuels.length === 0) {
+    return reject('parismusees: no images (fieldVisuels empty or missing)');
+  }
+  const image = parisMuseesFreeImage(raw);
+  if (!image) {
+    return reject(
+      'parismusees: no image with fieldImageLibre=true and fieldImageDroits=CC0 (strict default reject)',
+    );
+  }
+  return {
+    accepted: true,
+    license: {
+      type: 'CC0',
+      rawValue: image.rights,
+      verificationSource: 'parismusees.fieldVisuels[].fieldImageLibre+fieldImageDroits',
+      verifiedAt: nowIso(),
+      confidence: 'high',
+    },
+    imageOpenAccess: true,
+    metadataOpenAccess: false,
+    reason: 'parismusees: fieldImageLibre=true, fieldImageDroits=CC0',
+  };
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
@@ -807,6 +881,7 @@ const VALIDATORS: Record<string, LicenseValidator> = {
   harvard: validateHarvardLicense,
   getty: validateGettyLicense,
   ycba: validateYcbaLicense,
+  parismusees: validateParisMuseesLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {
