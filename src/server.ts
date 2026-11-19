@@ -30,7 +30,7 @@ import { clevelandFetcher } from './fetchers/cleveland.js';
 import { europeanaFetcher } from './fetchers/europeana.js';
 import { gettyFetcher } from './fetchers/getty.js';
 import { harvardFetcher } from './fetchers/harvard.js';
-import { parisMuseesFetcher } from './fetchers/parismusees.js';
+import { parismuseesFetcher } from './fetchers/parismusees.js';
 import { metFetcher } from './fetchers/met.js';
 import { ngaFetcher } from './fetchers/nga.js';
 import { rijksmuseumFetcher } from './fetchers/rijksmuseum.js';
@@ -115,10 +115,10 @@ if (process.env.HARVARD_API_KEY) {
 }
 
 // Paris Musées requires a free account token. The public API allows 1,000
-// requests a day, so the fetcher batches: two requests per search, whatever the
-// result count. Rights are per image (CC0 only).
+// requests a day, so the fetcher batches: normally two requests per search,
+// whatever the result count. Rights are per image (CC0 only).
 if (process.env.PARISMUSEES_API_KEY) {
-  FETCHERS[parisMuseesFetcher.code] = parisMuseesFetcher;
+  FETCHERS[parismuseesFetcher.code] = parismuseesFetcher;
 } else {
   console.error(
     '[open-museum-mcp] PARISMUSEES_API_KEY not set; Paris Musées fetcher disabled. Set it in ~/.open-museum-mcp/.env or your shell to enable.',

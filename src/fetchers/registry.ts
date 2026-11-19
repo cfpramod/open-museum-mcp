@@ -5,7 +5,7 @@ import { gettyFetcher } from './getty.js';
 import { harvardFetcher } from './harvard.js';
 import { metFetcher } from './met.js';
 import { ngaFetcher } from './nga.js';
-import { parisMuseesFetcher } from './parismusees.js';
+import { parismuseesFetcher } from './parismusees.js';
 import { rijksmuseumFetcher } from './rijksmuseum.js';
 import { smithsonianFetcher } from './smithsonian.js';
 import { smkFetcher } from './smk.js';
@@ -47,7 +47,7 @@ const ALL_FETCHERS: readonly Fetcher[] = [
   europeanaFetcher,
   smithsonianFetcher,
   harvardFetcher,
-  parisMuseesFetcher,
+  parismuseesFetcher,
 ];
 
 /**

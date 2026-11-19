@@ -6,7 +6,7 @@ import { clevelandFetcher } from '../src/fetchers/cleveland.js';
 import { europeanaFetcher } from '../src/fetchers/europeana.js';
 import { gettyFetcher } from '../src/fetchers/getty.js';
 import { harvardFetcher } from '../src/fetchers/harvard.js';
-import { parisMuseesFetcher } from '../src/fetchers/parismusees.js';
+import { parismuseesFetcher } from '../src/fetchers/parismusees.js';
 import { metFetcher } from '../src/fetchers/met.js';
 import { FETCHER_REGISTRY } from '../src/fetchers/registry.js';
 import { rijksmuseumFetcher } from '../src/fetchers/rijksmuseum.js';
@@ -249,7 +249,7 @@ describe('every live fetcher forwards the abort signal to its search request', (
     ['getty', gettyFetcher],
     ['harvard', harvardFetcher],
     ['met', metFetcher],
-    ['parismusees', parisMuseesFetcher],
+    ['parismusees', parismuseesFetcher],
     ['rijksmuseum', rijksmuseumFetcher],
     ['smithsonian', smithsonianFetcher],
     ['smk', smkFetcher],

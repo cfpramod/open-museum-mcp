@@ -51,6 +51,13 @@ describe('FETCHER_REGISTRY (engine coverage metadata)', () => {
     expect(core.FETCHER_REGISTRY.length).toBe(15);
   });
 
+  it('exports every registered fetcher from /core as `${code}Fetcher` (source-health resolves them by that name)', async () => {
+    const core = (await import('../src/core/index.js')) as unknown as Record<string, { code?: string } | undefined>;
+    for (const entry of FETCHER_REGISTRY) {
+      expect(core[`${entry.code}Fetcher`]?.code, entry.code).toBe(entry.code);
+    }
+  });
+
   it('closes the /core export gap: getty/smk/wellcome/harvard/nga/ycba/parismusees are on the public surface', async () => {
     const core = await import('../src/core/index.js');
     expect(core.gettyFetcher.code).toBe('getty');
@@ -59,7 +66,7 @@ describe('FETCHER_REGISTRY (engine coverage metadata)', () => {
     expect(core.harvardFetcher.code).toBe('harvard');
     expect(core.ngaFetcher.code).toBe('nga');
     expect(core.ycbaFetcher.code).toBe('ycba');
-    expect(core.parisMuseesFetcher.code).toBe('parismusees');
+    expect(core.parismuseesFetcher.code).toBe('parismusees');
   });
 });
 

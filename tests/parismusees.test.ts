@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearParisMuseesPrefetch, parisMuseesFetcher } from '../src/fetchers/parismusees.js';
+import { clearParisMuseesPrefetch, parismuseesFetcher } from '../src/fetchers/parismusees.js';
 import { validateLicense } from '../src/licenseGate.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -13,7 +13,7 @@ function fixture(name: string): Record<string, unknown> {
 
 describe('Paris Musées adapter normalization', () => {
   it('accepts a CC0 record (Monet, Soleil couchant sur la Seine à Lavacourt)', () => {
-    const result = parisMuseesFetcher.normalize(fixture('parismusees-accepted.json'));
+    const result = parismuseesFetcher.normalize(fixture('parismusees-accepted.json'));
     expect(result.status).toBe('accepted');
     if (result.status !== 'accepted') return;
     const a = result.artwork;
@@ -45,7 +45,7 @@ describe('Paris Musées adapter normalization', () => {
   });
 
   it('surfaces the free image when it is not the first one', () => {
-    const result = parisMuseesFetcher.normalize(fixture('parismusees-accepted-free-image-not-first.json'));
+    const result = parismuseesFetcher.normalize(fixture('parismusees-accepted-free-image-not-first.json'));
     expect(result.status).toBe('accepted');
     if (result.status !== 'accepted') return;
     expect(result.artwork.imageUrls.full).toContain('lpdp_143990-30.jpg');
@@ -53,7 +53,7 @@ describe('Paris Musées adapter normalization', () => {
   });
 
   it('rejects a record whose only image is not free (fieldImageLibre null)', () => {
-    const result = parisMuseesFetcher.normalize(fixture('parismusees-rejected-not-free.json'));
+    const result = parismuseesFetcher.normalize(fixture('parismusees-rejected-not-free.json'));
     expect(result.status).toBe('rejected');
     if (result.status !== 'rejected') return;
     expect(result.rejection.id).toBe('parismusees:226737');
@@ -61,21 +61,21 @@ describe('Paris Musées adapter normalization', () => {
   });
 
   it('rejects fieldImageLibre=true without a CC0 rights statement (both signals required)', () => {
-    const result = parisMuseesFetcher.normalize(fixture('parismusees-rejected-flag-without-cc0.json'));
+    const result = parismuseesFetcher.normalize(fixture('parismusees-rejected-flag-without-cc0.json'));
     expect(result.status).toBe('rejected');
     if (result.status !== 'rejected') return;
     expect(result.rejection.reason).toContain('strict default reject');
   });
 
   it('rejects a record with no images', () => {
-    const result = parisMuseesFetcher.normalize(fixture('parismusees-rejected-no-image.json'));
+    const result = parismuseesFetcher.normalize(fixture('parismusees-rejected-no-image.json'));
     expect(result.status).toBe('rejected');
     if (result.status !== 'rejected') return;
     expect(result.rejection.reason).toContain('no images');
   });
 
   it('rejects non-objects without throwing', () => {
-    expect(parisMuseesFetcher.normalize(null).status).toBe('rejected');
+    expect(parismuseesFetcher.normalize(null).status).toBe('rejected');
     expect(validateLicense('parismusees', 'nope').accepted).toBe(false);
   });
 
@@ -123,7 +123,7 @@ describe('Paris Musées search batching (1,000 requests a day)', () => {
       // nodeQuery returns its own order and only records with a free image.
       { data: { nodeQuery: { entities: [accepted, second] } } },
     ]);
-    const ids = await parisMuseesFetcher.search('Claude Monet', 10, {});
+    const ids = await parismuseesFetcher.search('Claude Monet', 10, {});
     expect(ids).toEqual(['parismusees:722451', 'parismusees:226737']);
     expect(bodies).toHaveLength(2);
     expect(bodies[0].variables.keys).toEqual(['Claude', 'Monet']);
@@ -131,9 +131,19 @@ describe('Paris Musées search batching (1,000 requests a day)', () => {
     expect(bodies[1].variables.ids).toEqual(['722451', '226737', '999']);
     expect(headers[0].get('auth-token')).toBe('test-token');
 
-    const raw = await parisMuseesFetcher.getRaw('parismusees:226737');
+    const raw = await parismuseesFetcher.getRaw('parismusees:226737');
     expect(bodies).toHaveLength(2);
-    expect(parisMuseesFetcher.normalize(raw).status).toBe('accepted');
+    expect(parismuseesFetcher.normalize(raw).status).toBe('accepted');
+  });
+
+  it('does not let a record that fails the gate take the only place under limit=1', async () => {
+    const noCc0 = fixture('parismusees-rejected-flag-without-cc0.json');
+    const blocked = { ...noCc0, entityId: '111', absolutePath: 'https://www.parismuseescollections.paris.fr/node/111' };
+    stub([
+      { data: { searchAPISearch: { documents: [{ nid_entier_s: 111 }, { nid_entier_s: 226737 }] } } },
+      { data: { nodeQuery: { entities: [blocked, accepted] } } },
+    ]);
+    expect(await parismuseesFetcher.search('monet', 1, {})).toEqual(['parismusees:226737']);
   });
 
   it('honours the limit after de-duplication', async () => {
@@ -141,18 +151,18 @@ describe('Paris Musées search batching (1,000 requests a day)', () => {
       { data: { searchAPISearch: { documents: [{ nid_entier_s: 226737 }, { nid_entier_s: 722451 }] } } },
       { data: { nodeQuery: { entities: [accepted, second] } } },
     ]);
-    expect(await parisMuseesFetcher.search('monet', 1, {})).toEqual(['parismusees:226737']);
+    expect(await parismuseesFetcher.search('monet', 1, {})).toEqual(['parismusees:226737']);
   });
 
   it('skips the hydrate request when search finds nothing', async () => {
     stub([{ data: { searchAPISearch: { documents: [] } } }]);
-    expect(await parisMuseesFetcher.search('zzzz', 5, {})).toEqual([]);
+    expect(await parismuseesFetcher.search('zzzz', 5, {})).toEqual([]);
     expect(bodies).toHaveLength(1);
   });
 
   it('fetches a record it has not prefetched with one request', async () => {
     stub([{ data: { nodeQuery: { entities: [accepted] } } }]);
-    const raw = await parisMuseesFetcher.getRaw('parismusees:226737');
+    const raw = await parismuseesFetcher.getRaw('parismusees:226737');
     expect(bodies).toHaveLength(1);
     expect(bodies[0].variables.id).toEqual(['226737']);
     expect((raw as { entityId?: string }).entityId).toBe('226737');
@@ -170,7 +180,7 @@ describe('Paris Musées search batching (1,000 requests a day)', () => {
           : new Response(JSON.stringify({ data: { nodeQuery: { entities: [accepted] } } }), { status: 200 });
       }),
     );
-    const pending = parisMuseesFetcher.getRaw('parismusees:226737');
+    const pending = parismuseesFetcher.getRaw('parismusees:226737');
     await vi.advanceTimersByTimeAsync(1000);
     await expect(pending).resolves.toMatchObject({ entityId: '226737' });
     expect(calls).toBe(2);
@@ -185,23 +195,23 @@ describe('Paris Musées search batching (1,000 requests a day)', () => {
         return new Response('', { status: 429 });
       }),
     );
-    await expect(parisMuseesFetcher.getRaw('parismusees:226737')).rejects.toThrow('429');
+    await expect(parismuseesFetcher.getRaw('parismusees:226737')).rejects.toThrow('429');
     expect(calls).toBe(1);
   });
 
   it('surfaces GraphQL errors, which arrive with HTTP 200', async () => {
     stub([{ errors: [{ message: 'Internal server error' }], data: null }]);
-    await expect(parisMuseesFetcher.search('monet', 5, {})).rejects.toThrow('Internal server error');
+    await expect(parismuseesFetcher.search('monet', 5, {})).rejects.toThrow('Internal server error');
   });
 
   it('throws when the key is missing', async () => {
     vi.stubEnv('PARISMUSEES_API_KEY', '');
-    await expect(parisMuseesFetcher.search('monet', 5, {})).rejects.toThrow('PARISMUSEES_API_KEY');
+    await expect(parismuseesFetcher.search('monet', 5, {})).rejects.toThrow('PARISMUSEES_API_KEY');
   });
 
   it('refuses a non-numeric id before making a request', async () => {
     stub([]);
-    await expect(parisMuseesFetcher.getRaw('parismusees:abc')).rejects.toThrow('invalid id');
+    await expect(parismuseesFetcher.getRaw('parismusees:abc')).rejects.toThrow('invalid id');
     expect(bodies).toHaveLength(0);
   });
 });

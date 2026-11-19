@@ -19,7 +19,8 @@ import type { Fetcher, SearchOptions } from './types.js';
 //
 // Quota: the public API allows 1,000 requests a day. The federation's usual
 // shape (search → ids, then one getRaw per id) would spend 1 + N requests per
-// search, so `search` instead makes exactly two: a full-text search for
+// search, so `search` instead makes two (one when nothing matches; each may be
+// retried once on a server error, see graphql()): a full-text search for
 // candidate ids, then ONE batched nodeQuery that hydrates every candidate and
 // keeps only those with a free image. The hydrated records are held briefly in
 // memory so the federation's per-id getRaw calls are served without another
@@ -231,7 +232,7 @@ function artistOf(r: Record<string, unknown>): string {
 
 // --- Fetcher ---------------------------------------------------------------------
 
-export const parisMuseesFetcher: Fetcher = {
+export const parismuseesFetcher: Fetcher = {
   code: 'parismusees',
   name: 'Paris Musées',
   requiresApiKey: 'PARISMUSEES_API_KEY',
@@ -259,12 +260,16 @@ export const parisMuseesFetcher: Fetcher = {
     const hydrated = entitiesOf(
       await graphql(HYDRATE_QUERY, { ids: ranked, limit: ranked.length }, options.signal),
     );
+    // Only records that pass the rights gate take a place in the results. The
+    // hydrate query already filters on fieldImageLibre, but the gate also needs a
+    // CC0 statement; a record failing it here would otherwise take a slot under
+    // `limit` and be rejected later, pushing out an eligible one ranked below it.
     const found = new Set<string>();
     for (const raw of hydrated) {
       const nid = asString(raw.entityId);
       if (!nid) continue;
       remember(nid, raw);
-      found.add(nid);
+      if (validateParisMuseesLicense(raw).accepted) found.add(nid);
     }
     // Keep the search ranking; nodeQuery returns its own order.
     return ranked
