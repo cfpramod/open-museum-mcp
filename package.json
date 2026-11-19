@@ -44,7 +44,8 @@
     "smoke:wellcome": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-wellcome.ts",
     "smoke:nga": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-nga.ts",
     "health:sources": "node scripts/source-health.mjs",
-    "smoke:harvard": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-harvard.ts"
+    "smoke:harvard": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-harvard.ts",
+    "smoke:parismusees": "NODE_OPTIONS=--experimental-sqlite tsx scripts/smoke-parismusees.ts"
   },
   "keywords": [
     "mcp",

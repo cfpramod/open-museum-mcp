@@ -112,6 +112,7 @@ export { wikimediaFetcher } from '../fetchers/wikimedia.js';
 export { europeanaFetcher } from '../fetchers/europeana.js';
 export { smithsonianFetcher } from '../fetchers/smithsonian.js';
 export { harvardFetcher } from '../fetchers/harvard.js';
+export { parisMuseesFetcher } from '../fetchers/parismusees.js';
 export { rijksmuseumFetcher } from '../fetchers/rijksmuseum.js';
 export { smkFetcher } from '../fetchers/smk.js';
 export { wellcomeFetcher } from '../fetchers/wellcome.js';
