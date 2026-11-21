@@ -77,9 +77,26 @@ export interface ArtworkImages {
    * museum's CDN and will 403 from server / cloud / CLI environments — browser
    * context only. Surfaces must NOT embed these URLs in SSR-rendered `<img>`
    * tags or use them in server-side image pipelines. Link to `source.pageUrl`
-   * instead, or route through OMA's image proxy once available.
+   * instead, or route through an image proxy.
    * Set centrally by the federation when `Fetcher.hotlinkRestricted = true`.
-   * Confirmed: AIC (Cloudflare WAF), Walters, Smithsonian.
+   *
+   * READ THIS FLAG. Do not maintain a separate list of restricted hosts: a
+   * second list inevitably drifts from this one, and a consumer matching on
+   * hostnames will both miss newly-restricted sources and wrongly suppress
+   * sources that have stopped restricting.
+   *
+   * Which sources carry it is a fact about third-party infrastructure, so it
+   * changes without notice and every claim below is dated rather than standing:
+   *   - `aic` — flagged. Server-side fetches receive a Cloudflare managed
+   *     challenge (not a plain refusal), reproduced 2026-08-31.
+   *   - `walters` — flagged. Same Cloudflare challenge response, reproduced
+   *     2026-08-31.
+   *   - `smithsonian` — flagged, but the restriction did NOT reproduce on
+   *     server-side probes on 2026-08-23 or 2026-08-31, which returned full
+   *     image bytes. The flag is deliberately left in place pending a probe
+   *     from a cloud egress address, since clearing it is a loosening and
+   *     these probes ran from a residential network. Treat the flag as
+   *     authoritative and this note as the reason to re-check it.
    */
   hotlinkRestricted?: boolean;
 }
