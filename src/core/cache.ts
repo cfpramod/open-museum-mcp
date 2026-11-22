@@ -3,6 +3,11 @@ import type { Artwork } from '../types.js';
 /** A value that may be returned synchronously or as a promise. */
 export type Awaitable<T> = T | Promise<T>;
 
+/** The adapter version a cached object was produced under (see `Fetcher.adapterVersion`). */
+export interface ObjectVersion {
+  adapterVersion?: number;
+}
+
 /**
  * The minimal cache surface the federation engine depends on. Two methods for
  * normalized objects, two for search-result ID lists.
@@ -20,8 +25,13 @@ export type Awaitable<T> = T | Promise<T>;
  * load `node:sqlite`.
  */
 export interface CacheStore {
-  getObject(id: string): Awaitable<Artwork | null>;
-  upsertObject(art: Artwork): Awaitable<void>;
+  /**
+   * `expect.adapterVersion`, when given, is the version of the adapter that would now produce this record: a row
+   * stored under any other version is a miss. A store that does not track versions may ignore it.
+   */
+  getObject(id: string, expect?: ObjectVersion): Awaitable<Artwork | null>;
+  /** `meta.adapterVersion` is the version of the adapter that produced `art`, stored with the row. */
+  upsertObject(art: Artwork, meta?: ObjectVersion): Awaitable<void>;
   getQuery(cacheKey: string): Awaitable<string[] | null>;
   putQuery(cacheKey: string, ids: string[]): Awaitable<void>;
 }

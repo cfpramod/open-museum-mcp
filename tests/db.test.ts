@@ -132,7 +132,21 @@ describe('Cache', () => {
       expect(Date.now() - Date.parse(readClock('met:1'))).toBeLessThan(DAY);
     });
 
-    it('restarts the clock when the incoming record carries no verifiedAt at all', () => {
+    it('keeps the old clock when the incoming record carries no verifiedAt: an unstamped write vouches for nothing', () => {
+      const noStamp = (title: string): Artwork => {
+        const a = makeArtwork('met:1', { title });
+        const { verifiedAt: _dropped, ...rest } = a.license;
+        return { ...a, license: rest as Artwork['license'] };
+      };
+      const cache = new Cache({ path });
+      cache.upsertObject(makeArtwork('met:1'));
+      const aged = ageRow('met:1', 80);
+      cache.upsertObject(noStamp('unstamped'));
+      cache.close();
+      expect(readClock('met:1')).toBe(aged);
+    });
+
+    it('keeps the old clock when neither the stored nor the incoming record has a verifiedAt', () => {
       const noStamp = (title: string): Artwork => {
         const a = makeArtwork('met:1', { title });
         const { verifiedAt: _dropped, ...rest } = a.license;
@@ -143,9 +157,7 @@ describe('Cache', () => {
       const aged = ageRow('met:1', 80);
       cache.upsertObject(noStamp('second'));
       cache.close();
-      // Two absent stamps are not "the same rights check": nothing vouches for the old row, so the clock restarts.
-      expect(readClock('met:1')).not.toBe(aged);
-      expect(Date.now() - Date.parse(readClock('met:1'))).toBeLessThan(DAY);
+      expect(readClock('met:1')).toBe(aged);
     });
 
     it('starts the clock on the first write of a row', () => {
@@ -153,6 +165,49 @@ describe('Cache', () => {
       cache.upsertObject(makeArtwork('met:9'));
       cache.close();
       expect(Date.now() - Date.parse(readClock('met:9'))).toBeLessThan(DAY);
+    });
+  });
+
+  describe('adapter version stamp', () => {
+    it('serves a row whose stored version matches, and ignores the version when none is asked for', () => {
+      const cache = new Cache({ path });
+      cache.upsertObject(makeArtwork('met:1'), { adapterVersion: 2 });
+      expect(cache.getObject('met:1', { adapterVersion: 2 })?.id).toBe('met:1');
+      expect(cache.getObject('met:1')?.id).toBe('met:1');
+      cache.close();
+    });
+
+    it('treats a row stored under a different version as a miss', () => {
+      const cache = new Cache({ path });
+      cache.upsertObject(makeArtwork('met:1'), { adapterVersion: 1 });
+      expect(cache.getObject('met:1', { adapterVersion: 2 })).toBe(null);
+      cache.close();
+    });
+
+    it('treats a row stored with no version as a miss once a version is asked for (a row from before the stamp)', () => {
+      const cache = new Cache({ path });
+      cache.upsertObject(makeArtwork('met:1'));
+      expect(cache.getObject('met:1', { adapterVersion: 1 })).toBe(null);
+      expect(cache.getObject('met:1')?.id).toBe('met:1');
+      cache.close();
+    });
+
+    it('opens a cache file created before the stamp existed, adds the column, and keeps its rows', () => {
+      const old = new DatabaseSync(path);
+      old.exec(`CREATE TABLE objects (
+        id TEXT PRIMARY KEY, museum_code TEXT NOT NULL, title TEXT NOT NULL, artist_name TEXT,
+        attribution_type TEXT NOT NULL, display_date TEXT, year_start INTEGER, year_end INTEGER,
+        medium TEXT, region TEXT, period TEXT, license_type TEXT NOT NULL, full_record TEXT NOT NULL,
+        cached_at TEXT NOT NULL)`);
+      old.prepare(`INSERT INTO objects (id, museum_code, title, attribution_type, license_type, full_record, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`).run('met:7', 'met', 'Old', 'named', 'CC0', JSON.stringify(makeArtwork('met:7')), new Date().toISOString());
+      old.close();
+      const cache = new Cache({ path });
+      expect(cache.getObject('met:7')?.id).toBe('met:7');
+      expect(cache.getObject('met:7', { adapterVersion: 1 })).toBe(null);
+      cache.upsertObject(makeArtwork('met:7'), { adapterVersion: 1 });
+      expect(cache.getObject('met:7', { adapterVersion: 1 })?.id).toBe('met:7');
+      cache.close();
     });
   });
 

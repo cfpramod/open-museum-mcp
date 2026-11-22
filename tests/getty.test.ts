@@ -346,3 +346,9 @@ describe('Getty search: the SPARQL endpoint now requires an access token', () =>
     expect(calls.some((u) => u.includes('/sparql'))).toBe(false);
   });
 });
+
+describe('Getty adapter version', () => {
+  it('declares a version, so rows cached before the media-image rights fix are re-read once', () => {
+    expect(gettyFetcher.adapterVersion).toBe(2);
+  });
+});
