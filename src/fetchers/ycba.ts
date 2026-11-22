@@ -63,6 +63,37 @@ function releaseSlot(): void {
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Read a Yale response. A 2xx must carry a JSON body. When the service answers
+ * with a challenge page or other non-JSON content instead (an empty 202, an
+ * empty 2xx body, an HTML page), there is no data to read: that is reported as
+ * the source being temporarily unavailable, in words a client can show, rather
+ * than as a JSON parse crash. Other non-2xx statuses carry no body here.
+ */
+async function readJsonBody(res: Response): Promise<unknown> {
+  const challenged = res.headers.has('x-amzn-waf-action');
+  if (!res.ok) {
+    if (challenged && res.status !== 404 && res.status !== 410) throw unavailable(res.status);
+    return null;
+  }
+  const text = challenged ? '' : await res.text();
+  if (text.trim() === '') throw unavailable(res.status);
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw unavailable(res.status);
+  }
+}
+
+/** A non-JSON answer in place of data: not transient, so never retried. */
+class YcbaUnavailableError extends Error {}
+
+function unavailable(status: number): Error {
+  return new YcbaUnavailableError(
+    `YCBA (LUX) temporarily unavailable: the service answered with a challenge or non-JSON response (HTTP ${status}); try again later`,
+  );
+}
+
+/**
  * GET a Yale JSON resource inside the concurrency limit, retrying transient
  * failures (network errors and RETRYABLE_STATUS) with backoff. Resolves with
  * the final status and, for a 2xx, the parsed body. `redirect` is passed
@@ -86,9 +117,9 @@ async function yaleGetJson(
         redirect,
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });
-      outcome = { status: res.status, body: res.ok ? await res.json() : null };
+      outcome = { status: res.status, body: await readJsonBody(res) };
     } catch (err) {
-      if (!canRetry || signal?.aborted) throw err;
+      if (err instanceof YcbaUnavailableError || !canRetry || signal?.aborted) throw err;
       outcome = { status: 0, body: null };
     } finally {
       releaseSlot();

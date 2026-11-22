@@ -633,3 +633,77 @@ describe('YCBA search', () => {
     await expect(ycbaFetcher.search('horse', 5)).rejects.toThrow('403');
   });
 });
+
+describe('YCBA unavailable: non-JSON responses', () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    vi.restoreAllMocks();
+  });
+
+  const challenge202 = (): Response =>
+    new Response('', { status: 202, headers: { 'x-amzn-waf-action': 'challenge' } });
+
+  it('reports search as temporarily unavailable on an empty 202 challenge, not a JSON crash', async () => {
+    const calls = stubFetch(challenge202);
+    const err = await ycbaFetcher.search('winter', 10).then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.message).toContain('temporarily unavailable');
+    expect(err?.message).toContain('202');
+    expect(err?.message).not.toMatch(/JSON input|Unexpected end/);
+    expect(calls).toHaveLength(1); // a challenge is not retried
+  });
+
+  it('treats an empty 200 body and an HTML 200 page the same way', async () => {
+    stubFetch(() => new Response('', { status: 200 }));
+    await expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('temporarily unavailable');
+    stubFetch(() => new Response('<html>Just a moment</html>', { status: 200, headers: { 'Content-Type': 'text/html' } }));
+    await expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('temporarily unavailable');
+  });
+
+  it('treats a WAF-challenged 403 as unavailable too, but a plain 403 keeps its status error', async () => {
+    stubFetch(() => new Response('', { status: 403, headers: { 'x-amzn-waf-action': 'challenge' } }));
+    await expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('temporarily unavailable');
+    stubFetch(() => new Response('Forbidden', { status: 403 }));
+    await expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('403');
+  });
+
+  it('getRaw reports a challenged record fetch as unavailable', async () => {
+    stubFetch(challenge202);
+    await expect(ycbaFetcher.getRaw(ACCEPTED_ID)).rejects.toThrow('temporarily unavailable');
+  });
+
+  it('still fails closed (no throw) when only the manifest hop is challenged', async () => {
+    stubFetch((url) => (url.includes('/data/object/') ? json(fixture('ycba-accepted.json').record) : challenge202()));
+    const raw = await ycbaFetcher.getRaw(ACCEPTED_ID);
+    expect(ycbaFetcher.normalize(raw).status).toBe('rejected');
+  });
+  it('still returns an empty list for a legitimate empty search result', async () => {
+    stubFetch(() => json({ orderedItems: [] }));
+    await expect(ycbaFetcher.search('no such thing', 10)).resolves.toEqual([]);
+    stubFetch(() => json({}));
+    await expect(ycbaFetcher.search('no such thing', 10)).resolves.toEqual([]);
+  });
+
+  it('does not retry an unavailable answer even when its status is retryable, but still retries a plain 503', async () => {
+    const unavailableCalls = stubFetch(() => new Response('', { status: 503, headers: { 'x-amzn-waf-action': 'challenge' } }));
+    await expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('temporarily unavailable');
+    expect(unavailableCalls).toHaveLength(1);
+
+    vi.useFakeTimers();
+    const plainCalls = stubFetch(() => new Response('', { status: 503 }));
+    const settled = expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('503');
+    await vi.runAllTimersAsync();
+    await settled;
+    expect(plainCalls).toHaveLength(3);
+    vi.useRealTimers();
+  });
+
+  it('reads a bare 204 as unavailable (no JSON body to read)', async () => {
+    stubFetch(() => new Response(null, { status: 204 }));
+    await expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('temporarily unavailable');
+  });
+});
