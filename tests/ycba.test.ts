@@ -316,11 +316,11 @@ type FetchHandler = (url: string) => Response | Promise<Response>;
 
 function stubFetch(handler: FetchHandler): string[] {
   const calls: string[] = [];
-  globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
     const url = input instanceof Request ? input.url : String(input);
     calls.push(url);
     return handler(url);
-  }) as unknown as typeof fetch;
+  }));
   return calls;
 }
 
@@ -328,9 +328,7 @@ const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 describe('YCBA getRaw: two-hop hydration', () => {
-  const realFetch = globalThis.fetch;
   afterEach(() => {
-    globalThis.fetch = realFetch;
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -349,10 +347,10 @@ describe('YCBA getRaw: two-hop hydration', () => {
   it('sends the identifying User-Agent (LUX answers anonymous clients with 403)', async () => {
     const f = fixture('ycba-accepted.json');
     const agents: Array<string | null> = [];
-    globalThis.fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       agents.push(new Headers(init?.headers).get('User-Agent'));
       return String(input) === ACCEPTED_MANIFEST ? json(f.manifest) : json(f.record);
-    }) as unknown as typeof fetch;
+    }));
     await ycbaFetcher.getRaw(ACCEPTED_ID);
     expect(agents).toHaveLength(2);
     for (const ua of agents) expect(ua).toContain('open-museum-mcp');
@@ -404,10 +402,10 @@ describe('YCBA getRaw: two-hop hydration', () => {
     const f = fixture('ycba-accepted.json');
     const timeout = vi.spyOn(AbortSignal, 'timeout');
     const signals: Array<AbortSignal | null | undefined> = [];
-    globalThis.fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       signals.push(init?.signal);
       return String(input) === ACCEPTED_MANIFEST ? json(f.manifest) : json(f.record);
-    }) as unknown as typeof fetch;
+    }));
     await ycbaFetcher.getRaw(ACCEPTED_ID);
     expect(timeout.mock.calls).toEqual([[20_000], [20_000]]);
     expect(signals).toEqual(timeout.mock.results.map((r) => r.value));
@@ -416,10 +414,10 @@ describe('YCBA getRaw: two-hop hydration', () => {
   it('refuses redirects on the manifest hop, so the host check covers the address fetched', async () => {
     const f = fixture('ycba-accepted.json');
     const redirects = new Map<string, RequestInit['redirect']>();
-    globalThis.fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       redirects.set(String(input), init?.redirect);
       return String(input) === ACCEPTED_MANIFEST ? json(f.manifest) : json(f.record);
-    }) as unknown as typeof fetch;
+    }));
     await ycbaFetcher.getRaw(ACCEPTED_ID);
     expect(redirects.get(ACCEPTED_MANIFEST)).toBe('error');
   });
@@ -445,10 +443,8 @@ describe('YCBA getRaw: two-hop hydration', () => {
 });
 
 describe('YCBA resilience: backoff and bounded concurrency', () => {
-  const realFetch = globalThis.fetch;
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => {
-    globalThis.fetch = realFetch;
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -542,11 +538,7 @@ describe('YCBA resilience: backoff and bounded concurrency', () => {
 });
 
 describe('YCBA search', () => {
-  const realFetch = globalThis.fetch;
-  afterEach(() => {
-    globalThis.fetch = realFetch;
-    vi.restoreAllMocks();
-  });
+  afterEach(() => vi.restoreAllMocks());
 
   const page = {
     type: 'OrderedCollectionPage',
@@ -588,13 +580,13 @@ describe('YCBA search', () => {
 
   it("a caller's abort cancels the request and is not retried", async () => {
     let calls = 0;
-    globalThis.fetch = vi.fn(
+    vi.stubGlobal('fetch', vi.fn(
       (_input: string | URL | Request, init?: RequestInit) =>
         new Promise<Response>((_resolve, reject) => {
           calls++;
           init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
         }),
-    ) as unknown as typeof fetch;
+    ));
     const controller = new AbortController();
     const pending = ycbaFetcher.search('horse', 5, { signal: controller.signal });
     await vi.waitFor(() => expect(calls).toBe(1));

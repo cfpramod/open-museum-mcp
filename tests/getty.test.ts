@@ -123,11 +123,11 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
   it('does NOT fetch shows[0].id when its host is not data.getty.edu (SSRF vector)', async () => {
     const objectUrl = 'http://169.254.169.254/latest/meta-data/iam/security-credentials/';
     const calls: string[] = [];
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       calls.push(url);
       return new Response(JSON.stringify(objectFixtureWithShowsId(objectUrl)), { status: 200 });
-    }) as unknown as typeof fetch;
+    }));
 
     const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
 
@@ -144,12 +144,12 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
   // and the object (whose only `shows` entry is showsId) for everything else.
   function serveShowsId(showsId: string): string[] {
     const calls: string[] = [];
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       calls.push(url);
       if (url === MEDIA_URL) return new Response(JSON.stringify(fixture('getty-media-accepted.json')), { status: 200 });
       return new Response(JSON.stringify(objectFixtureWithShowsId(showsId)), { status: 200 });
-    }) as unknown as typeof fetch;
+    }));
     return calls;
   }
 
@@ -209,11 +209,11 @@ describe('Getty getRaw: SSRF host guard on the media hydration fetch', () => {
 
   it('does NOT fetch a malformed shows[0].id that fails URL parsing', async () => {
     const calls: string[] = [];
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       calls.push(url);
       return new Response(JSON.stringify(objectFixtureWithShowsId('not a url')), { status: 200 });
-    }) as unknown as typeof fetch;
+    }));
 
     const raw = (await gettyFetcher.getRaw('getty:c88b3df0-de91-4f5b-a9ef-7b2b9a6d8abb')) as { media: unknown };
     expect(calls).toHaveLength(1);
@@ -302,10 +302,6 @@ describe('Getty getRaw: the image is the first `shows` entry that is a media ima
 
 describe('Getty search: the SPARQL endpoint now requires an access token', () => {
   afterEach(() => vi.restoreAllMocks());
-  const realFetch = globalThis.fetch;
-  afterEach(() => {
-    globalThis.fetch = realFetch;
-  });
 
   const unauthorized = () =>
     new Response(
@@ -314,7 +310,7 @@ describe('Getty search: the SPARQL endpoint now requires an access token', () =>
     );
 
   it('fails with an explicit, actionable error on 401 instead of a bare status', async () => {
-    globalThis.fetch = vi.fn(async () => unauthorized()) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', vi.fn(async () => unauthorized()));
     const err = await gettyFetcher.search('horse', 5).then(
       () => null,
       (e: unknown) => e as Error,
@@ -326,21 +322,21 @@ describe('Getty search: the SPARQL endpoint now requires an access token', () =>
   });
 
   it('treats 403 the same way', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('{}', { status: 403 })) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 403 })));
     await expect(gettyFetcher.search('horse', 5)).rejects.toThrow(/Getty search is unavailable.*HTTP 403/);
   });
 
   it('keeps the plain failure message for other statuses', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('{}', { status: 500 })) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })));
     await expect(gettyFetcher.search('horse', 5)).rejects.toThrow('Getty SPARQL search failed: 500');
   });
 
   it('does not touch get-by-id: getRaw still reads the open object endpoint', async () => {
     const calls: string[] = [];
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       calls.push(String(input));
       return new Response(JSON.stringify({ id: 'x' }), { status: 200 });
-    }) as unknown as typeof fetch;
+    }));
     await gettyFetcher.getRaw('getty:0a2c0f3f-8d20-4a84-b3e3-5d1f6c4b0b1a');
     expect(calls[0]).toContain('/museum/collection/object/');
     expect(calls.some((u) => u.includes('/sparql'))).toBe(false);
