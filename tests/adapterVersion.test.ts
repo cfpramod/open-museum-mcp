@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createFederation } from '../src/core/index.js';
+import { createFederation, type CacheStore } from '../src/core/index.js';
 import { Cache } from '../src/db.js';
 import type { Fetcher } from '../src/fetchers/types.js';
 import type { Artwork } from '../src/types.js';
@@ -94,5 +94,37 @@ describe('a fetcher adapterVersion evicts rows cached under another version', ()
     const out = await fed.getArtwork('met:1');
     expect(out.ok && out.artwork.imageOpenAccess).toBe(false); // the cached answer, as before
     expect(calls()).toBe(0);
+  });
+});
+
+describe('a CacheStore that ignores the version keeps working', () => {
+  // The two version parameters on CacheStore are optional. This store implements neither: its methods take only
+  // the arguments the interface had before versions existed, as a store written against the old interface would.
+  function oldStyleStore(): { store: CacheStore; rows: Map<string, Artwork> } {
+    const rows = new Map<string, Artwork>();
+    const store: CacheStore = {
+      getObject: (id: string) => rows.get(id) ?? null,
+      upsertObject: (art: Artwork) => {
+        rows.set(art.id, art);
+      },
+      getQuery: () => null,
+      putQuery: () => {},
+    };
+    return { store, rows };
+  }
+
+  it('serves a cached row for a versioned fetcher (it cannot evict on version) and still writes on a miss', async () => {
+    const { store, rows } = oldStyleStore();
+    const { fetcher, calls } = stubFetcher(2);
+    const fed = createFederation({ fetchers: { met: fetcher }, cache: store });
+
+    const missed = await fed.getArtwork('met:1'); // miss: live fetch, written
+    expect(missed.ok).toBe(true);
+    expect(calls()).toBe(1);
+    expect(rows.has('met:1')).toBe(true);
+
+    const hit = await fed.getArtwork('met:1'); // hit: the store ignores the expected version, so it serves it
+    expect(hit.ok).toBe(true);
+    expect(calls()).toBe(1);
   });
 });

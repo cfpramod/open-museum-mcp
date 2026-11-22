@@ -158,6 +158,9 @@ interface GettyRaw {
 export const gettyFetcher: Fetcher = {
   code: 'getty',
   name: 'J. Paul Getty Museum',
+  // 2: the release that reads image rights from the first Getty media image in `shows`, not its first entry.
+  // Rows cached under the old reading (an open image reported closed) are re-read once on their next access.
+  adapterVersion: 2,
 
   async search(query: string, limit: number, options: SearchOptions = {}): Promise<string[]> {
     const term = escapeSparqlLiteral(query.toLowerCase());
