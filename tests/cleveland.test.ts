@@ -270,3 +270,25 @@ describe('Cleveland provenance entries are text, raw is the source array (opencl
     ]);
   });
 });
+
+describe('Cleveland provenance entries: whitespace is not text', () => {
+  it('drops a step with only whitespace left in both strings, and a date that is only whitespace', () => {
+    const raw = structuredClone(fixture('cleveland-accepted.json')) as Record<string, unknown>;
+    const inner = (raw.data ?? raw) as Record<string, unknown>;
+    const published = [
+      { description: '<br>\n', sortorder: 1 },
+      { description: '&nbsp;', date: '<b> </b>', sortorder: 2 },
+      { description: 'Sold in Paris', date: '<i>\t</i>', sortorder: 3 },
+      { description: '<br>', date: '1912', sortorder: 4 },
+    ];
+    inner.provenance = structuredClone(published);
+    const result = clevelandFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const prov = result.artwork.provenance!;
+    expect(prov.raw).toBe(JSON.stringify(published));
+    expect(prov.entries).toEqual([
+      { description: 'Sold in Paris' },
+      { description: '', date: '1912' },
+    ]);
+  });
+});

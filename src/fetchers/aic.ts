@@ -6,13 +6,13 @@ import type { Artwork, ValidationResult } from '../types.js';
 import {
   asFiniteNumber,
   asOptionalString,
+  provenanceText,
   asString,
   httpGet,
   isValidPositiveInt,
   rejectFor,
 } from './helpers.js';
 import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
-import { textForm } from '../textForm.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const AIC_API = 'https://api.artic.edu/api/v1';
@@ -195,12 +195,12 @@ export const aicFetcher: Fetcher = {
     // markup (P-11). A block with no text left carries no entry; raw still holds it.
     // Absent = not published here, never a finding.
     const provText = asOptionalString(r.provenance_text);
-    const provDescription = provText ? textForm(provText) : '';
+    const provDescription = provText ? provenanceText(provText) : undefined;
     const provenance = provText
       ? {
           raw: provText,
           rawFormat: 'text' as const,
-          ...(provDescription.trim() ? { entries: [{ description: provDescription }] } : {}),
+          ...(provDescription !== undefined ? { entries: [{ description: provDescription }] } : {}),
         }
       : undefined;
 

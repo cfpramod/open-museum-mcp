@@ -7,6 +7,7 @@
  * helpers express the most-common narrowings once.
  */
 
+import { textForm } from '../textForm.js';
 import type { ValidationResult } from '../types.js';
 
 /**
@@ -41,6 +42,17 @@ export function httpGet(url: string | URL, init?: RequestInit): Promise<Response
 /** Returns the string value, or "" for any non-string input. */
 export function asString(v: unknown): string {
   return typeof v === 'string' ? v : '';
+}
+
+/**
+ * The text form of an HTML source string for use in a provenance entry, or undefined when no text is left.
+ * "No text" means empty or whitespace only (`<br>\n` and `&nbsp;` both leave nothing worth an entry), and
+ * it is the one test every provenance adapter applies to `description` and `date`. A string that does have
+ * text is returned as the text form made it: whitespace inside it, or around it, is not touched.
+ */
+export function provenanceText(source: string): string | undefined {
+  const text = textForm(source);
+  return text.trim() === '' ? undefined : text;
 }
 
 /** Returns the trimmed-truthy string, or undefined for missing/empty/non-string. */

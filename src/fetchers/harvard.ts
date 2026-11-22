@@ -3,9 +3,8 @@ import { validateHarvardLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asOptionalString, asString, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
+import { asFiniteNumber, asOptionalString, asString, httpGet, pickMaxResolution, provenanceText, rejectFor } from './helpers.js';
 import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
-import { textForm } from '../textForm.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 // Harvard Art Museums — keyless-to-you-but-keyed REST API (api.harvardartmuseums.org,
@@ -146,12 +145,12 @@ export const harvardFetcher: Fetcher = {
     // markup (P-11). A block with no text left carries no entry; raw still holds it.
     // Absent = not published here, never a finding.
     const provText = asOptionalString(r.provenance);
-    const provDescription = provText ? textForm(provText) : '';
+    const provDescription = provText ? provenanceText(provText) : undefined;
     const provenance = provText
       ? {
           raw: provText,
           rawFormat: 'text' as const,
-          ...(provDescription.trim() ? { entries: [{ description: provDescription }] } : {}),
+          ...(provDescription !== undefined ? { entries: [{ description: provDescription }] } : {}),
         }
       : undefined;
 

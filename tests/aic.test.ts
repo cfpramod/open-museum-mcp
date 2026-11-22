@@ -346,3 +346,16 @@ describe('AIC provenance entries are text, raw is the source string (openclearan
     expect('entries' in prov).toBe(false);
   });
 });
+
+describe('AIC provenance entries: whitespace is not text', () => {
+  it('carries no entry when only whitespace is left after the markup goes, and keeps raw', () => {
+    const published = '<br>\n&nbsp;';
+    const raw = structuredClone(fixture('aic-accepted.json')) as { data: Record<string, unknown> };
+    raw.data.provenance_text = published;
+    const result = aicFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const prov = result.artwork.provenance!;
+    expect(prov.raw).toBe(published);
+    expect('entries' in prov).toBe(false);
+  });
+});

@@ -6,6 +6,7 @@ import type { Artwork, Model3D, ValidationResult } from '../types.js';
 import {
   asFiniteNumber,
   asOptionalString,
+  provenanceText,
   asString,
   coerceFiniteNumber,
   httpGet,
@@ -14,7 +15,6 @@ import {
   rejectFor,
 } from './helpers.js';
 import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
-import { textForm } from '../textForm.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const CLEVELAND_API = 'https://openaccess-api.clevelandart.org/api';
@@ -187,11 +187,10 @@ export const clevelandFetcher: Fetcher = {
       .sort((a, b) => (coerceFiniteNumber(a.sortorder) ?? 0) - (coerceFiniteNumber(b.sortorder) ?? 0))
       .flatMap((p) => {
         // Each string is the source's HTML; the entry holds its text form (openclearance #59 section 4).
-        const description = textForm(asString(p.description));
-        const dateText = asOptionalString(p.date);
-        const date = dateText ? textForm(dateText) || undefined : undefined;
-        if (!description && !date) return []; // a step with no text left carries nothing to surface; it still survives in `raw`
-        return [{ description, ...(date ? { date } : {}) }];
+        const description = provenanceText(asString(p.description));
+        const date = provenanceText(asString(p.date));
+        if (description === undefined && date === undefined) return []; // a step with no text left carries nothing to surface; it still survives in `raw`
+        return [{ description: description ?? '', ...(date !== undefined ? { date } : {}) }];
       });
     const provenance =
       provSteps.length > 0
