@@ -157,7 +157,7 @@ describe('the rights bound on a cache hit', () => {
     expect(out).toEqual({ ok: false, reason: 'met: no longer open' });
   });
 
-  it('treats a record with no usable verifiedAt as stale, and says its age is unknown', async () => {
+  it('treats a record with no usable verifiedAt as stale, and says so with nulls rather than invented values', async () => {
     const { store, rows } = memoryStore();
     rows.set('met:1', artwork('met:1', undefined));
     rows.set('met:2', artwork('met:2', 'not a date'));
@@ -166,8 +166,8 @@ describe('the rights bound on a cache hit', () => {
     const one = await f.getArtwork('met:1');
     const two = await f.getArtwork('met:2');
     expect(s.calls()).toBe(2);
-    expect(one.ok && one.freshness).toMatchObject({ rightsVerifiedAt: '', rightsAgeDays: null, rightsStale: true });
-    expect(two.ok && two.freshness).toMatchObject({ rightsVerifiedAt: 'not a date', rightsAgeDays: null, rightsStale: true });
+    expect(one.ok && one.freshness).toMatchObject({ rightsVerifiedAt: null, rightsAgeDays: null, rightsStale: true });
+    expect(two.ok && two.freshness).toMatchObject({ rightsVerifiedAt: null, rightsAgeDays: null, rightsStale: true });
   });
 
   it('serves a stale record with rightsStale true when its fetcher is not registered (nothing to re-verify with)', async () => {

@@ -139,8 +139,8 @@ export interface Freshness {
   servedFrom: 'cache' | 'live';
   /** When the cached row was written. Present when `servedFrom` is `'cache'` and the cache store can say. */
   cachedAt?: string;
-  /** When the rights gate last checked this record: the record's `license.verifiedAt`. Empty when the record carries none. */
-  rightsVerifiedAt: string;
+  /** When the rights gate last checked this record: the record's `license.verifiedAt`. `null` when it is missing or unreadable. */
+  rightsVerifiedAt: string | null;
   /** Whole days from `rightsVerifiedAt` to this read. `null` when `rightsVerifiedAt` is missing or unreadable. */
   rightsAgeDays: number | null;
   /**
@@ -461,7 +461,7 @@ export function createFederation(opts: FederationOptions): Federation {
     return {
       servedFrom,
       ...(servedFrom === 'cache' && cachedAt !== undefined ? { cachedAt } : {}),
-      rightsVerifiedAt: artwork.license?.verifiedAt ?? '',
+      rightsVerifiedAt: age === null ? null : (artwork.license?.verifiedAt ?? null),
       rightsAgeDays: age === null ? null : Math.max(0, Math.floor(age / MS_PER_DAY)),
       rightsStale: stale,
       engineVersion,
