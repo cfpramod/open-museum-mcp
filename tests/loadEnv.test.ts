@@ -93,6 +93,46 @@ describe('loadEnv: cwd .env, then ~/.open-museum-mcp/.env', () => {
   });
 });
 
+// True when the source reads from the dotenv package in any form. Matching the call `dotenv.config(` is not
+// enough: an aliased default import, a named `config` import, a side-effect `import 'dotenv/config'`, a
+// `require` and a dynamic `import()` all reach the same unguarded cwd lookup without ever spelling it.
+const DOTENV_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(['"])dotenv(?:\/[^'"]*)?\1/;
+const DOTENV_CALL = /\bdotenv\s*\.\s*config\s*\(/;
+const importsDotenv = (source: string): boolean => DOTENV_SPECIFIER.test(source) || DOTENV_CALL.test(source);
+
+describe('the dotenv import detector', () => {
+  const offending = [
+    ["import dotenv from 'dotenv';", 'a default import'],
+    ['import dotenv from "dotenv";', 'a default import in double quotes'],
+    ["import env from 'dotenv';\nenv.config();", 'an aliased default import'],
+    ["import { config } from 'dotenv';", 'a named config import'],
+    ["import { config as load, parse } from 'dotenv';", 'a renamed named import'],
+    ["import * as dotenv from 'dotenv';", 'a namespace import'],
+    ["import 'dotenv/config';", 'the side-effect import'],
+    ["import dotenv from 'dotenv/config.js';", 'a subpath import'],
+    ["const d = require('dotenv');", 'a require'],
+    ["const { config } = await import('dotenv');", 'a dynamic import'],
+    ["import dotenv from 'dotenv'\ndotenv . config ( { quiet: true } )", 'a spaced call'],
+  ] as const;
+  for (const [source, what] of offending) {
+    it(`flags ${what}`, () => {
+      expect(importsDotenv(source)).toBe(true);
+    });
+  }
+
+  const clean = [
+    ["import { loadEnv } from '../src/loadEnv.js';", 'the guarded loader'],
+    ["const note = 'see the dotenvx docs';", 'a similar word in a string'],
+    ["import { x } from './dotenv-helper.js';", 'a local file with a similar name'],
+    ["// dotenv is only imported in src/loadEnv.ts", 'a comment that names the package'],
+  ] as const;
+  for (const [source, what] of clean) {
+    it(`does not flag ${what}`, () => {
+      expect(importsDotenv(source)).toBe(false);
+    });
+  }
+});
+
 describe('loadEnv is the only reader of a .env file', () => {
   // dotenv.config() asks for process.cwd() itself, even with an explicit path, so a process whose launch
   // directory has gone away dies on it. Every entry point (the server and the dev smoke scripts) must go
@@ -110,10 +150,10 @@ describe('loadEnv is the only reader of a .env file', () => {
     expect(files.some((f) => f.name === 'scripts/smoke-curation.ts')).toBe(true);
   });
 
-  it('has no dotenv.config() call outside the guarded loader', () => {
+  it('has no dotenv import of any kind outside the guarded loader', () => {
     const offenders = files
       .filter((f) => f.name !== 'src/loadEnv.ts')
-      .filter((f) => /\bdotenv\s*\.\s*config\s*\(/.test(readFileSync(f.url, 'utf8')))
+      .filter((f) => importsDotenv(readFileSync(f.url, 'utf8')))
       .map((f) => f.name);
     expect(offenders).toEqual([]);
   });
