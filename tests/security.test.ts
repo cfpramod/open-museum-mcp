@@ -20,7 +20,7 @@ import { wikimediaFetcher } from '../src/fetchers/wikimedia.js';
 import { createColorExtractor, isSafeImageUrl } from '../src/color/extract.js';
 import { Cache } from '../src/db.js';
 import { parseDisplayDate } from '../src/dateParser.js';
-import { sanitizeTitle, stripHtml } from '../src/fetchers/sanitize.js';
+import { cleanText, decodeEntities, sanitizeTitle, stripHtml, textView } from '../src/fetchers/sanitize.js';
 import type { Artwork } from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -538,6 +538,153 @@ describe('stripHtml — polynomial-ReDoS guard (CodeQL js/polynomial-redos)', ()
   it('still strips tags and decodes entities in legitimate short text', () => {
     expect(sanitizeTitle('<b>Sunflowers</b> &amp; Co.')).toBe('Sunflowers & Co.');
     expect(stripHtml('<p>Hello <i>world</i></p>')).toBe('Hello world');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Line breaks and block boundaries separate words. A browser renders `a<br>b`
+// and `<div>a</div><div>b</div>` on two lines; deleting the tag outright fused
+// the two words into one ("De triomf van de DoodsThe Triumph of Death" on a
+// Commons title). Inline tags still join with nothing, so markup inside a
+// word ("Mon<i>et</i>") keeps the word whole.
+// ---------------------------------------------------------------------------
+
+describe('stripHtml: line breaks and block boundaries separate words', () => {
+  it('separates words across a line break, in every spelling', () => {
+    expect(stripHtml('a<br>b')).toBe('a b');
+    expect(stripHtml('a<br/>b')).toBe('a b');
+    expect(stripHtml('a<br />b')).toBe('a b');
+    expect(stripHtml('a<BR>b')).toBe('a b');
+    expect(stripHtml('a<hr>b')).toBe('a b');
+  });
+
+  it('separates words across closing and opening block tags', () => {
+    expect(stripHtml('<p>one</p><p>two</p>')).toBe('one two');
+    expect(stripHtml('one<div>two</div>')).toBe('one two');
+    expect(stripHtml('<ul><li>one</li><li>two</li></ul>')).toBe('one two');
+    expect(stripHtml('<table><tr><td>a</td><td>b</td></tr></table>')).toBe('a b');
+    expect(stripHtml('<h2>Head</h2>Body')).toBe('Head Body');
+  });
+
+  it('separates the two lines of a Commons {{title}} template', () => {
+    expect(stripHtml('<div>NL</div><br><i><a href="x">EN</a></i>')).toBe('NL EN');
+  });
+
+  it('joins across inline tags with nothing, so words stay whole', () => {
+    expect(stripHtml('Mon<i>et</i>')).toBe('Monet');
+    expect(stripHtml('<b>Van</b> Gogh')).toBe('Van Gogh');
+    expect(stripHtml('a<span>b</span>c')).toBe('abc');
+    expect(stripHtml('<bdi>Name</bdi>')).toBe('Name');
+    expect(stripHtml('x<pre-x>y')).toBe('xy');
+  });
+
+  it('collapses the separators a run of block tags leaves behind', () => {
+    expect(stripHtml('<div><p>one</p></div><br><br><div>two</div>')).toBe('one two');
+  });
+});
+
+describe('textView: the text stripHtml reads, with where each character came from', () => {
+  it('maps text through inline tags, and a block tag to the space it leaves', () => {
+    expect(textView('a<i>b</i><br>c')).toEqual({ text: 'ab c', offsets: [0, 4, 9, 13] });
+  });
+
+  it('maps every character of a decoded reference to the reference', () => {
+    expect(textView('a&#x2003;b&nbsp;c&#128512;')).toEqual({
+      text: 'a\u2003b c\u{1F600}',
+      offsets: [0, 1, 9, 10, 16, 17, 17],
+    });
+  });
+
+  it('maps a reference after a tag to its place in the markup, not in the stripped text', () => {
+    expect(textView('a<i>&#32;</i>b')).toEqual({ text: 'a b', offsets: [0, 4, 13] });
+  });
+
+  it('maps a reference it leaves verbatim character by character', () => {
+    expect(textView('a&foo;b&#99999999;')).toEqual({
+      text: 'a&foo;b&#99999999;',
+      offsets: Array.from({ length: 18 }, (_, k) => k),
+    });
+  });
+
+  it('keeps a "<" that no ">" closes as text, as stripTags does', () => {
+    expect(textView('3 < 4 &lt;')).toEqual({ text: '3 < 4 <', offsets: [0, 1, 2, 3, 4, 5, 6] });
+  });
+
+  it('gives the same text as stripHtml before its whitespace collapse', () => {
+    const html = '<div>Zonnebloemen</div><br><i>Sun&#32;flowers</i> 1 < 2';
+    expect(textView(html).text.replace(/\s+/g, ' ').trim()).toBe(stripHtml(html));
+  });
+
+  it('decodes an escaped reference once, as stripHtml does', () => {
+    expect(textView('a&amp;#32;b').text).toBe('a&#32;b');
+    expect(stripHtml('a&amp;#32;b')).toBe('a&#32;b');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HTML decodes a character reference once. Decoding in successive passes
+// turns "&amp;#32;" into a space and "&amp;lt;" into "<", which the page shows
+// as the literal text "&#32;" and "&lt;". The text view and stripHtml must
+// also read the same text, so a marker found in one is found in the other.
+// ---------------------------------------------------------------------------
+
+describe('decodeEntities: one pass, shared with the text view', () => {
+  it('leaves the reference an escaped ampersand spells, rather than decoding it again', () => {
+    expect(decodeEntities('&amp;lt;i&amp;gt;')).toBe('&lt;i&gt;');
+    expect(decodeEntities('&amp;#32;&amp;#x20;&amp;amp;')).toBe('&#32;&#x20;&amp;');
+  });
+
+  // Markup built from the pieces that exercise the tag walk and every
+  // reference form, including references behind an escaped ampersand.
+  const PIECES = [
+    'a', 'Z', '7', ' ', '\t', '\n', ';', '#', 'x', '&', '<', '>', '/', '"', '=',
+    '<i>', '</i>', '<br>', '<div>', '</div>', '<span style="display:none">', '</span>',
+    '<p class="q">', '<x <y>', '< ', '&amp;', '&lt;', '&gt;', '&quot;', '&apos;',
+    '&nbsp;', '&AMP;', '&foo;', '&#32;', '&#x20;', '&#X41;', '&#160;', '&#128512;',
+    '&#99999999;', '&#xD800;', '&#x110000;', '&amp;#32;', '&amp;#x3A;', '&amp;lt;',
+    '&amp;amp;', '&&#35;32;', '&#38;#32;',
+  ];
+
+  // A fixed-seed generator, so a failure names an input that reproduces.
+  function markup(seed: number, count: number): string[] {
+    let state = seed >>> 0;
+    const next = (): number => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    return Array.from({ length: count }, () => {
+      let s = '';
+      const pieces = Math.floor(next() * 24);
+      for (let k = 0; k < pieces; k++) s += PIECES[Math.floor(next() * PIECES.length)];
+      return s;
+    });
+  }
+
+  const CASES = markup(0x5eed, 3000);
+
+  // Each check lists the inputs it fails on, so a failure names them all.
+  it('reads the text stripHtml cleans: cleaning the textView text gives stripHtml', () => {
+    const differ = CASES.filter((html) => cleanText(textView(html).text) !== stripHtml(html));
+    expect(differ).toEqual([]);
+  });
+
+  it('maps every character textView reads to a position in the markup, in order', () => {
+    const misplaced = CASES.filter((html) => {
+      const { text, offsets } = textView(html);
+      return (
+        offsets.length !== text.length ||
+        offsets.some((at, k) => at < 0 || at >= html.length || (k > 0 && at < offsets[k - 1]))
+      );
+    });
+    expect(misplaced).toEqual([]);
+  });
+
+  it('decodes any text with its ampersands escaped back to that text', () => {
+    const changed = CASES.filter((text) => decodeEntities(text.replace(/&/g, '&amp;')) !== text);
+    expect(changed).toEqual([]);
   });
 });
 
