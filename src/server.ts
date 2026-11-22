@@ -7,7 +7,6 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import dotenv from 'dotenv';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -40,16 +39,11 @@ import { wellcomeFetcher } from './fetchers/wellcome.js';
 import { wikimediaFetcher } from './fetchers/wikimedia.js';
 import { ycbaFetcher } from './fetchers/ycba.js';
 import type { Fetcher } from './fetchers/types.js';
+import { loadEnv } from './loadEnv.js';
 import { VERSION } from './version.js';
 
-// Load env vars before reading any keys. Cwd `.env` (developer flow) wins
-// over `~/.open-museum-mcp/.env` (production / MCP-client-launched flow);
-// dotenv ignores files that don't exist, so missing-file is not an error.
-// `quiet: true` suppresses dotenv's "◇ injected env" stdout chatter, which
-// otherwise corrupts the MCP stdio transport (any non-JSON-RPC stdout
-// breaks the client's parser).
-dotenv.config({ quiet: true });
-dotenv.config({ quiet: true, path: join(homedir(), '.open-museum-mcp', '.env') });
+// Load env vars before reading any keys (see loadEnv for the order and why).
+loadEnv();
 
 const FETCHERS: Record<string, Fetcher> = {
   [metFetcher.code]: metFetcher,
