@@ -10,7 +10,12 @@ export type Awaitable<T> = T | Promise<T>;
  * Implementations may be synchronous or asynchronous: the MCP server's
  * `node:sqlite` cache returns values directly, while an edge deployment
  * (e.g. Cloudflare KV) returns promises. The federation `await`s every call,
- * so both satisfy this interface. Keeping the surface this small is what lets
+ * so both satisfy this interface.
+ *
+ * Expiry: an object's lifetime should be measured from its rights check
+ * (`license.verifiedAt`), not from the last write. The engine writes a cached
+ * object back when it enriches it on read (a colour backfill); such a write
+ * carries the same `verifiedAt` and must not restart the object's lifetime. Keeping the surface this small is what lets
  * the same engine run on a stdio server and on a Workers runtime that cannot
  * load `node:sqlite`.
  */

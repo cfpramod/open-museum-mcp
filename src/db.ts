@@ -116,6 +116,13 @@ export class Cache {
     `);
   }
 
+  /**
+   * Write a normalized record. The 90-day expiry clock (`cached_at`) bounds how old the rights check behind a
+   * served record can be, so it restarts only when the write carries a NEW rights check, that is a different
+   * `license.verifiedAt` (a fresh fetch through the rights gate). A write that carries the same `verifiedAt` as
+   * the stored row (an enrichment such as a colour backfill on a cache hit) updates the data and leaves the
+   * clock where it was.
+   */
   upsertObject(art: Artwork): void {
     const stmt = this.db.prepare(`
       INSERT INTO objects (
@@ -139,7 +146,11 @@ export class Cache {
         period = excluded.period,
         license_type = excluded.license_type,
         full_record = excluded.full_record,
-        cached_at = excluded.cached_at
+        cached_at = CASE
+          WHEN json_extract(objects.full_record, '$.license.verifiedAt') IS json_extract(excluded.full_record, '$.license.verifiedAt')
+            THEN objects.cached_at
+          ELSE excluded.cached_at
+        END
     `);
 
     stmt.run({
