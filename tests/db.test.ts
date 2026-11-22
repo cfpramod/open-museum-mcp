@@ -77,6 +77,85 @@ describe('Cache', () => {
     cache.close();
   });
 
+  describe('the expiry clock follows the rights check, not the last write', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const readClock = (id: string): string => {
+      const db = new DatabaseSync(path);
+      const row = db.prepare('SELECT cached_at FROM objects WHERE id = ?').get(id) as { cached_at: string };
+      db.close();
+      return row.cached_at;
+    };
+    const ageRow = (id: string, days: number): string => {
+      const db = new DatabaseSync(path);
+      const aged = new Date(Date.now() - days * DAY).toISOString();
+      db.prepare('UPDATE objects SET cached_at = ? WHERE id = ?').run(aged, id);
+      db.close();
+      return aged;
+    };
+
+    it('keeps the original cached_at when a write adds data to the same rights check', () => {
+      const cache = new Cache({ path });
+      cache.upsertObject(makeArtwork('met:1'));
+      const aged = ageRow('met:1', 80);
+      // Enrichment: same record, same license.verifiedAt, one field added.
+      cache.upsertObject(makeArtwork('met:1', { dominantColor: '#aa0000' }));
+      cache.close();
+      expect(readClock('met:1')).toBe(aged);
+      const cache2 = new Cache({ path });
+      expect(cache2.getObject('met:1')?.dominantColor).toBe('#aa0000'); // the data did update
+      cache2.close();
+    });
+
+    it('restarts the clock when the write carries a new rights check', () => {
+      const cache = new Cache({ path });
+      cache.upsertObject(makeArtwork('met:1'));
+      const aged = ageRow('met:1', 80);
+      const fresh = makeArtwork('met:1');
+      cache.upsertObject({ ...fresh, license: { ...fresh.license, verifiedAt: new Date().toISOString() } });
+      cache.close();
+      expect(Date.now() - Date.parse(readClock('met:1'))).toBeLessThan(DAY);
+      expect(readClock('met:1')).not.toBe(aged);
+    });
+
+    it('overwrites a row whose stored record is corrupt, without throwing, and leaves a readable row', () => {
+      const cache = new Cache({ path });
+      cache.upsertObject(makeArtwork('met:1'));
+      cache.close();
+      const db = new DatabaseSync(path);
+      db.prepare('UPDATE objects SET full_record = ? WHERE id = ?').run('{not json', 'met:1');
+      db.close();
+      const cache2 = new Cache({ path });
+      expect(cache2.getObject('met:1')).toBe(null); // a corrupt row is a miss
+      expect(() => cache2.upsertObject(makeArtwork('met:1', { title: 'Repaired' }))).not.toThrow();
+      expect(cache2.getObject('met:1')?.title).toBe('Repaired');
+      cache2.close();
+      expect(Date.now() - Date.parse(readClock('met:1'))).toBeLessThan(DAY);
+    });
+
+    it('restarts the clock when the incoming record carries no verifiedAt at all', () => {
+      const noStamp = (title: string): Artwork => {
+        const a = makeArtwork('met:1', { title });
+        const { verifiedAt: _dropped, ...rest } = a.license;
+        return { ...a, license: rest as Artwork['license'] };
+      };
+      const cache = new Cache({ path });
+      cache.upsertObject(noStamp('first'));
+      const aged = ageRow('met:1', 80);
+      cache.upsertObject(noStamp('second'));
+      cache.close();
+      // Two absent stamps are not "the same rights check": nothing vouches for the old row, so the clock restarts.
+      expect(readClock('met:1')).not.toBe(aged);
+      expect(Date.now() - Date.parse(readClock('met:1'))).toBeLessThan(DAY);
+    });
+
+    it('starts the clock on the first write of a row', () => {
+      const cache = new Cache({ path });
+      cache.upsertObject(makeArtwork('met:9'));
+      cache.close();
+      expect(Date.now() - Date.parse(readClock('met:9'))).toBeLessThan(DAY);
+    });
+  });
+
   it('treats expired object rows as cache misses', () => {
     const cache = new Cache({ path });
     cache.upsertObject(makeArtwork('met:1'));
