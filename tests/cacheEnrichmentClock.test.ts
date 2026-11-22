@@ -13,7 +13,7 @@ import type { Artwork } from '../src/types.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 
-function artwork(id: string): Artwork {
+function artwork(id: string, verifiedAt: string): Artwork {
   return {
     id,
     museum: { code: 'met', name: 'The Metropolitan Museum of Art', url: 'https://www.metmuseum.org' },
@@ -32,7 +32,7 @@ function artwork(id: string): Artwork {
       type: 'CC0',
       rawValue: 'true',
       verificationSource: 'test',
-      verifiedAt: '2026-04-25T00:00:00Z',
+      verifiedAt,
       confidence: 'high',
     },
     citation: { full: 'x', caption: 'x', short: 'x' },
@@ -59,10 +59,12 @@ describe('a cache hit that is enriched on read keeps its original expiry clock',
   };
 
   it('does not restart the clock, so the row still expires 90 days after its original check', async () => {
+    // A row is enriched on read only while its rights check is inside the rights bound (30 days), so the
+    // row here was checked and cached 20 days ago.
+    const original = new Date(Date.now() - 20 * DAY).toISOString();
     const cache = new Cache({ path });
-    cache.upsertObject(artwork('met:1'));
+    cache.upsertObject(artwork('met:1', original));
     const db = new DatabaseSync(path);
-    const original = new Date(Date.now() - 80 * DAY).toISOString();
     db.prepare('UPDATE objects SET cached_at = ? WHERE id = ?').run(original, 'met:1');
     db.close();
 
