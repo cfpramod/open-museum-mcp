@@ -249,3 +249,25 @@ describe('Cleveland provenance mapping (v0.20.0, openclearance P-7 posture)', ()
     expect('provenance' in result.artwork).toBe(false);
   });
 });
+
+describe('Cleveland dimensions and credit line', () => {
+  it('carries measurements, credit line and accession number verbatim', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted-credit-measurements.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBe(
+      'Painting only: 172.4 x 79 cm (67 7/8 x 31 1/8 in.); Including mounting: 252.7 x 105.4 cm (99 1/2 x 41 1/2 in.)',
+    );
+    expect(result.artwork.creditLine).toEqual({
+      holder: 'Cleveland Museum of Art',
+      fund: 'Mr. and Mrs. William H. Marlatt Fund',
+      accession: '1975.93',
+    });
+  });
+
+  it('keeps the accession number when no credit line is published, and omits dimensions', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.creditLine).toEqual({ holder: 'Cleveland Museum of Art', accession: '1958.31' });
+    expect(result.artwork.dimensions).toBeUndefined();
+  });
+});

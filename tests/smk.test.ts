@@ -115,3 +115,20 @@ describe('SMK search query construction', () => {
     expect(decoded).not.toContain('[has_image:true]');
   });
 });
+
+describe('SMK credit line', () => {
+  it('carries the object number; SMK publishes no credit line', () => {
+    const result = smkFetcher.normalize(fixture('smk-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.creditLine).toEqual({
+      holder: 'Statens Museum for Kunst (National Gallery of Denmark)',
+      accession: 'KMS3352',
+    });
+  });
+
+  it('leaves dimensions absent: SMK publishes only structured measurements', () => {
+    const result = smkFetcher.normalize(fixture('smk-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBeUndefined();
+  });
+});

@@ -4,8 +4,8 @@ import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mapp
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
 import { isNonArtEuropeana } from './curation.js';
-import { asOptionalString, asString, httpGet } from './helpers.js';
-import { sanitizeArtistName, sanitizeDescription, sanitizeTitle } from './sanitize.js';
+import { accepted, asOptionalString, asString, httpGet } from './helpers.js';
+import { SHORT_TEXT_MAX, sanitizeArtistName, sanitizeDescription, sanitizeText, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const EUROPEANA_API = 'https://api.europeana.eu/record/v2';
@@ -93,11 +93,11 @@ function parseRecord(raw: Record<string, unknown>): {
     pickLangAware(raw.dcCreatorLangAware) ||
     firstString(raw.dcCreator),
   );
-  const displayDate =
-    firstString(raw.year) ||
-    firstString(raw.edmTimespanLabel) ||
-    firstString(raw.dcDate);
-  const dataProvider = firstString(raw.dataProvider);
+  const displayDate = sanitizeText(
+    firstString(raw.year) || firstString(raw.edmTimespanLabel) || firstString(raw.dcDate),
+    SHORT_TEXT_MAX,
+  );
+  const dataProvider = sanitizeText(firstString(raw.dataProvider), SHORT_TEXT_MAX);
   const country = firstString(raw.country);
   const edmIsShownAt = firstString(raw.edmIsShownAt);
   const edmIsShownBy = firstString(raw.edmIsShownBy);
@@ -267,6 +267,6 @@ export const europeanaFetcher: Fetcher = {
       description: asOptionalString(parsed.description),
     };
 
-    return { status: 'accepted', artwork };
+    return accepted(artwork);
   },
 };

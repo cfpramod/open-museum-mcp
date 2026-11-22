@@ -1,0 +1,321 @@
+{
+  "status": 200,
+  "responseCode": 1,
+  "response": {
+    "id": "ld1-1643400021979-1643400044690-0",
+    "title": "Drafting Pen, William J. Powell",
+    "unitCode": "NASM",
+    "type": "edanmdm",
+    "url": "edanmdm:nasm_A20100223000",
+    "content": {
+      "freetext": {
+        "date": [
+          {
+            "label": "Date",
+            "content": "c. 1920s-1930s"
+          }
+        ],
+        "name": [
+          {
+            "label": "Pilot",
+            "content": "William J. Powell"
+          }
+        ],
+        "notes": [
+          {
+            "label": "Physical Description",
+            "content": "Metal drafting pen with dial used to control ink line thickness."
+          },
+          {
+            "label": "Summary",
+            "content": "During the 1920s William J. Powell led a small group of Black air enthusiasts in Los Angeles. He established the Bessie Coleman Flying Club in 1929 and sponsored the first all-Black air show on Labor Day 1931. As part of his effort to make aviation accessible to African American students, he taught classes on aeronautics at the Bessie Coleman Flying Club. This drafting pen was among the equipment he used while teaching."
+          },
+          {
+            "label": "Long Description",
+            "content": "Born in 1897, William J. Powell earned an engineering degree from the University of Illinois. In 1917 he enlisted in officer training school and served in a segregated unit during World War I. During the war Powell was injured in a poison gas attack, and he suffered health problems throughout his life as a result."
+          },
+          {
+            "label": "Long Description",
+            "content": "After the war Powell opened service stations in Chicago. He became interested in aviation, but the only school that would train him was located in Los Angeles. Thus, he sold his businesses in Chicago and moved to the West Coast. After learning to fly, Powell dreamed of opening an all-Black flight school."
+          },
+          {
+            "label": "Long Description",
+            "content": "By the 1930s Los Angeles had become an important center for Black aviation. Powell organized the Bessie Coleman Aero Club to promote aviation awareness in the Black community. On Labor Day 1931, the flying club sponsored the first all-Black air show held in the United States, an event that attracted an estimated 15,000 spectators. Through the efforts of the Bessie Coleman School, the number of Black aviators increased dramatically despite the economic hardships of the Great Depression."
+          },
+          {
+            "label": "Long Description",
+            "content": "William J. Powell used many methods to attract African Americans to the field of aviation. He made a film about a young man who wanted to be a flyer, and for two years he published the Craftsmen Aero-News, a monthly journal about black aviation. He offered scholarships with free technical training in aeronautics for Black youth. He invited celebrities, such as jazz musician Duke Ellington and boxer Joe Louis, to lend their names—and their funds—to his cause."
+          },
+          {
+            "label": "Long Description",
+            "content": "Powell published Black Wings in 1934. Dedicated to Bessie Coleman, the book entreated Black men and women “to fill the air with black wings.” A visionary supporter of aviation, Powell urged Black youth to carve out their own destiny—to become pilots, aircraft designers, and business leaders in the field of aviation."
+          }
+        ],
+        "place": [
+          {
+            "label": "Country of Origin",
+            "content": "Unknown"
+          }
+        ],
+        "setName": [
+          {
+            "label": "See more items in",
+            "content": "National Air and Space Museum Collection"
+          },
+          {
+            "label": "Location",
+            "content": "National Air and Space Museum in Washington, DC"
+          },
+          {
+            "label": "Exhibition",
+            "content": "Barron Hilton Pioneers of Flight"
+          }
+        ],
+        "creditLine": [
+          {
+            "label": "Credit Line",
+            "content": "Gift of William J. Powell, III"
+          }
+        ],
+        "dataSource": [
+          {
+            "label": "Data Source",
+            "content": "National Air and Space Museum"
+          }
+        ],
+        "identifier": [
+          {
+            "label": "Inventory Number",
+            "content": "A20100223000"
+          }
+        ],
+        "objectType": [
+          {
+            "label": "Type",
+            "content": "PERSONAL EQUIPMENT-Accessories"
+          }
+        ],
+        "objectRights": [
+          {
+            "label": "Restrictions & Rights",
+            "content": "CC0"
+          }
+        ],
+        "physicalDescription": [
+          {
+            "label": "Materials",
+            "content": "Iron alloy, metal alloy, copper alloy"
+          },
+          {
+            "label": "Dimensions",
+            "content": "3-D: 12 × 0.7 × 0.3cm (4 3/4 × 1/4 × 1/8 in.)"
+          }
+        ]
+      },
+      "indexedStructured": {
+        "date": [
+          "1920s",
+          "1930s"
+        ],
+        "name": [
+          "Powell, William J."
+        ],
+        "place": [
+          "Unknown"
+        ],
+        "exhibition": [
+          {
+            "building": "NASM"
+          }
+        ],
+        "geoLocation": [
+          {
+            "L2": {
+              "type": "Country",
+              "content": "Unknown"
+            }
+          }
+        ],
+        "object_type": [
+          "Costume accessories",
+          "Personal equipment"
+        ],
+        "onPhysicalExhibit": [
+          "Yes"
+        ],
+        "online_media_type": [
+          "Images"
+        ]
+      },
+      "descriptiveNonRepeating": {
+        "guid": "http://n2t.net/ark:/65665/nv9016a0e00-b00c-4b3d-833d-49d61ffe8ffd",
+        "title": {
+          "label": "Object Name",
+          "content": "Drafting Pen, William J. Powell"
+        },
+        "record_ID": "nasm_A20100223000",
+        "unit_code": "NASM",
+        "title_sort": "DRAFTING PEN, WILLIAM J. POWELL",
+        "data_source": "National Air and Space Museum",
+        "record_link": "http://n2t.net/ark:/65665/nv9016a0e00-b00c-4b3d-833d-49d61ffe8ffd",
+        "online_media": {
+          "media": [
+            {
+              "id": "media:NASM-NASM2011-00615",
+              "guid": "http://n2t.net/ark:/65665/gf4b8292bd6-0e23-4113-bb06-9d319dd8d87b",
+              "type": "Images",
+              "idsId": "NASM-NASM2011-00615",
+              "usage": {
+                "access": "CC0"
+              },
+              "width": 4840,
+              "height": 2885,
+              "content": "https://ids.si.edu/ids/deliveryService?id=NASM-NASM2011-00615",
+              "maxsize": 0,
+              "thumbnail": "https://ids.si.edu/ids/deliveryService?id=NASM-NASM2011-00615",
+              "altTextAccessibility": "",
+              "extDescrAccessibility": "",
+              "resources": [
+                {
+                  "label": "High-resolution TIFF",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-NASM2011-00615.tif",
+                  "width": 4840,
+                  "height": 2885,
+                  "dimensions": "4840x2885"
+                },
+                {
+                  "label": "High-resolution JPEG",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-NASM2011-00615.jpg",
+                  "width": 4840,
+                  "height": 2885,
+                  "dimensions": "4840x2885"
+                },
+                {
+                  "label": "Screen Image",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-NASM2011-00615_screen"
+                },
+                {
+                  "label": "Thumbnail Image",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-NASM2011-00615_thumb"
+                }
+              ]
+            },
+            {
+              "id": "media:NASM-3DFF8AF8329D2_01",
+              "guid": "http://n2t.net/ark:/65665/gf4784955a0-3eca-4c8d-a792-573aaddf86cd",
+              "type": "Images",
+              "idsId": "NASM-3DFF8AF8329D2_01",
+              "usage": {
+                "access": "CC0"
+              },
+              "width": 6803,
+              "height": 3527,
+              "content": "https://ids.si.edu/ids/deliveryService?id=NASM-3DFF8AF8329D2_01",
+              "maxsize": 0,
+              "thumbnail": "https://ids.si.edu/ids/deliveryService?id=NASM-3DFF8AF8329D2_01",
+              "altTextAccessibility": "",
+              "extDescrAccessibility": "",
+              "resources": [
+                {
+                  "label": "Screen Image",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-3DFF8AF8329D2_01_screen"
+                },
+                {
+                  "label": "Thumbnail Image",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-3DFF8AF8329D2_01_thumb"
+                }
+              ]
+            },
+            {
+              "id": "media:NASM-3DFF8AF8329D2_02",
+              "guid": "http://n2t.net/ark:/65665/gf4b951a1f3-d6f1-471d-9b4c-ecaad9f5ac8b",
+              "type": "Images",
+              "idsId": "NASM-3DFF8AF8329D2_02",
+              "usage": {
+                "access": "CC0"
+              },
+              "width": 7665,
+              "height": 2646,
+              "content": "https://ids.si.edu/ids/deliveryService?id=NASM-3DFF8AF8329D2_02",
+              "maxsize": 0,
+              "thumbnail": "https://ids.si.edu/ids/deliveryService?id=NASM-3DFF8AF8329D2_02",
+              "altTextAccessibility": "",
+              "extDescrAccessibility": "",
+              "resources": [
+                {
+                  "label": "Screen Image",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-3DFF8AF8329D2_02_screen"
+                },
+                {
+                  "label": "Thumbnail Image",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-3DFF8AF8329D2_02_thumb"
+                }
+              ]
+            },
+            {
+              "id": "media:NASM-3DFF8AF8329D2_03",
+              "guid": "http://n2t.net/ark:/65665/gf49348cb26-a20d-4114-8400-cfc24ae498c9",
+              "type": "Images",
+              "idsId": "NASM-3DFF8AF8329D2_03",
+              "usage": {
+                "access": "CC0"
+              },
+              "width": 7856,
+              "height": 3123,
+              "content": "https://ids.si.edu/ids/deliveryService?id=NASM-3DFF8AF8329D2_03",
+              "maxsize": 0,
+              "thumbnail": "https://ids.si.edu/ids/deliveryService?id=NASM-3DFF8AF8329D2_03",
+              "altTextAccessibility": "",
+              "extDescrAccessibility": "",
+              "resources": [
+                {
+                  "label": "Screen Image",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-3DFF8AF8329D2_03_screen"
+                },
+                {
+                  "label": "Thumbnail Image",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-3DFF8AF8329D2_03_thumb"
+                }
+              ]
+            },
+            {
+              "id": "media:NASM-3DFF8AF8329D2_04",
+              "guid": "http://n2t.net/ark:/65665/gf4e96e38e8-cdfc-4c0d-b6fd-74908a037b9d",
+              "type": "Images",
+              "idsId": "NASM-3DFF8AF8329D2_04",
+              "usage": {
+                "access": "CC0"
+              },
+              "width": 4986,
+              "height": 2982,
+              "content": "https://ids.si.edu/ids/deliveryService?id=NASM-3DFF8AF8329D2_04",
+              "maxsize": 0,
+              "thumbnail": "https://ids.si.edu/ids/deliveryService?id=NASM-3DFF8AF8329D2_04",
+              "altTextAccessibility": "",
+              "extDescrAccessibility": "",
+              "resources": [
+                {
+                  "label": "Screen Image",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-3DFF8AF8329D2_04_screen"
+                },
+                {
+                  "label": "Thumbnail Image",
+                  "url": "https://ids.si.edu/ids/download?id=NASM-3DFF8AF8329D2_04_thumb"
+                }
+              ]
+            }
+          ],
+          "mediaCount": 5
+        },
+        "metadata_usage": {
+          "access": "CC0"
+        }
+      }
+    },
+    "hash": "02ac02ed6def5bdd6ff9530ddd7b4a3096b5254f",
+    "docSignature": "cd1317ee4d616f5646654ba2498fd99a",
+    "timestamp": "1663784943",
+    "lastTimeUpdated": "1792830826",
+    "version": ""
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "continue": {
+    "iistart": "2024-04-01T14:57:31Z",
+    "continue": "||categories"
+  },
+  "query": {
+    "pages": [
+      {
+        "pageid": 74450965,
+        "ns": 6,
+        "title": "File:The Triumph of Death by Pieter Bruegel the Elder.jpg",
+        "imagerepository": "local",
+        "imageinfo": [
+          {
+            "size": 1689490,
+            "width": 2126,
+            "height": 1517,
+            "thumburl": "https://upload.wikimedia.org/wikipedia/commons/b/b3/The_Triumph_of_Death_by_Pieter_Bruegel_the_Elder.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+            "thumbwidth": 2048,
+            "thumbheight": 1461,
+            "thumbattribs": {
+              "src": "https://upload.wikimedia.org/wikipedia/commons/b/b3/The_Triumph_of_Death_by_Pieter_Bruegel_the_Elder.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+              "decoding": "async",
+              "loading": "lazy",
+              "width": 2048,
+              "height": 1461
+            },
+            "url": "https://upload.wikimedia.org/wikipedia/commons/b/b3/The_Triumph_of_Death_by_Pieter_Bruegel_the_Elder.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:The_Triumph_of_Death_by_Pieter_Bruegel_the_Elder.jpg",
+            "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=74450965",
+            "extmetadata": {
+              "DateTime": {
+                "value": "2024-06-08 16:58:32",
+                "source": "mediawiki-metadata",
+                "hidden": ""
+              },
+              "ObjectName": {
+                "value": "<div class=\"fn\">\n<div style=\"font-weight:bold;display:inline-block;\">De triomf van de Doods</div><br><i><a href=\"https://en.wikipedia.org/wiki/The_Triumph_of_Death\" class=\"extiw\" title=\"en:The Triumph of Death\">The Triumph of Death</a></i></div>",
+                "source": "commons-desc-page"
+              },
+              "Artist": {
+                "value": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Pieter_Bruegel_the_Elder\" class=\"extiw\" title=\"w:en:Pieter Bruegel the Elder\"><span title=\"Flemish painter (1526–1569)\">Pieter Brueghel the Elder</span></a></bdi>",
+                "source": "commons-desc-page"
+              },
+              "ImageDescription": {
+                "value": "Obra moral que muestra el triunfo de la Muerte sobre las cosas mundanas, simbolizado a través de un gran ejército de esqueletos arrasando la Tierra. Al fondo aparece un paisaje yermo donde aún se desarrollan escenas de destrucción. En un primer plano, la Muerte al frente de sus ejércitos sobre un caballo rojizo, destruye el mundo de los vivos, quienes son conducidos a un enorme ataúd, sin esperanza de salvación. Todos los estamentos sociales están incluidos en la composición, sin que el poder o la devoción pueda salvarles.",
+                "source": "commons-desc-page"
+              },
+              "Credit": {
+                "value": "<a rel=\"nofollow\" class=\"external text\" href=\"http://www.museodelprado.es/en/the-collection/online-gallery/on-line-gallery/obra/the-triumph-of-death/\">Museo del Prado</a>",
+                "source": "commons-desc-page"
+              },
+              "LicenseShortName": {
+                "value": "Public domain",
+                "source": "commons-desc-page",
+                "hidden": ""
+              },
+              "UsageTerms": {
+                "value": "Public domain",
+                "source": "commons-desc-page"
+              },
+              "License": {
+                "value": "pd",
+                "source": "commons-templates",
+                "hidden": ""
+              }
+            },
+            "mime": "image/jpeg"
+          }
+        ],
+        "categories": [
+          {
+            "ns": 14,
+            "title": "Category:1540 European drought"
+          },
+          {
+            "ns": 14,
+            "title": "Category:Cultural aspects of death"
+          },
+          {
+            "ns": 14,
+            "title": "Category:Philosophical pessimism"
+          },
+          {
+            "ns": 14,
+            "title": "Category:The Triumph of Death by Pieter Bruegel (I)"
+          }
+        ]
+      }
+    ]
+  }
+}

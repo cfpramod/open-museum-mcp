@@ -455,3 +455,69 @@ describe('Smithsonian non-Western curation deepening (unit pass + expanded art f
     }
   });
 });
+
+describe('Smithsonian dimensions and credit line', () => {
+  it('reads Dimensions, Credit Line and Object number from freetext, held by the data source unit', () => {
+    const result = smithsonianFetcher.normalize(fixture('smithsonian-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBe('length: 15 in. (38.0 cm)');
+    expect(result.artwork.creditLine).toEqual({
+      holder: 'Smithsonian American Art Museum',
+      fund: 'Smithsonian American Art Museum, Gift of John Gellatly',
+      accession: '1929.8.175.19',
+    });
+  });
+
+  it('omits both when the freetext carries neither', () => {
+    const raw = clone('smithsonian-accepted.json');
+    const content = ((raw.response ?? raw) as { content: { freetext: Record<string, unknown> } }).content;
+    content.freetext.physicalDescription = [{ label: 'Medium', content: 'faience and glass' }];
+    delete content.freetext.creditLine;
+    delete content.freetext.identifier;
+    const result = smithsonianFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.dimensions).toBeUndefined();
+    expect(result.artwork.creditLine).toBeUndefined();
+  });
+
+  // Units label the object's own number differently. These records are
+  // unedited responses from the live API, one per label.
+  for (const [file, holder, fund, accession] of [
+    ['smithsonian-accepted-chndm-accession-number.json', 'Cooper Hewitt, Smithsonian Design Museum', 'Gift of Leverton Harris', '1913-13-19'],
+    ['smithsonian-accepted-nmah-id-number.json', 'National Museum of American History', undefined, '2009.0129.01'],
+    ['smithsonian-accepted-nasm-inventory-number.json', 'National Air and Space Museum', 'Gift of William J. Powell, III', 'A20100223000'],
+    ['smithsonian-accepted-nmai-catalog-number.json', 'National Museum of the American Indian', undefined, '18/9845'],
+  ]) {
+    it(`reads the object number under the unit's own label: ${file}`, () => {
+      const result = smithsonianFetcher.normalize(fixture(file!));
+      if (result.status !== 'accepted') throw new Error('expected accepted');
+      expect(result.artwork.creditLine).toEqual({ holder, ...(fund ? { fund } : {}), accession });
+    });
+  }
+
+  it('takes the ID number over the accession number, which names the lot the object came in', () => {
+    const raw = clone('smithsonian-accepted-nmah-id-number.json');
+    const content = ((raw.response ?? raw) as { content: { freetext: { identifier: Array<{ label: string; content: string }> } } }).content;
+    expect(content.freetext.identifier.map((e) => e.label)).toEqual(['ID Number', 'accession number', 'catalog number']);
+    content.freetext.identifier.reverse();
+    const result = smithsonianFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.creditLine?.accession).toBe('2009.0129.01');
+  });
+
+  // The credit line names the unit that holds the object; with no unit named,
+  // it is absent rather than credited to the Institution as a whole.
+  for (const dataSource of ['', undefined]) {
+    it(`omits the credit line when the record names no unit (data_source ${JSON.stringify(dataSource)})`, () => {
+      const raw = clone('smithsonian-accepted.json');
+      const content = ((raw.response ?? raw) as { content: { descriptiveNonRepeating: Record<string, unknown> } }).content;
+      if (dataSource === undefined) delete content.descriptiveNonRepeating.data_source;
+      else content.descriptiveNonRepeating.data_source = dataSource;
+      const result = smithsonianFetcher.normalize(raw);
+      if (result.status !== 'accepted') throw new Error('expected accepted');
+      expect(result.artwork.museum.name).toBe('Smithsonian Institution');
+      expect(result.artwork.creditLine).toBeUndefined();
+      expect(result.artwork.dimensions).toBe('length: 15 in. (38.0 cm)');
+    });
+  }
+});
