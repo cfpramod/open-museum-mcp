@@ -32,6 +32,11 @@ export interface CacheStore {
   getObject(id: string, expect?: ObjectVersion): Awaitable<Artwork | null>;
   /** `meta.adapterVersion` is the version of the adapter that produced `art`, stored with the row. */
   upsertObject(art: Artwork, meta?: ObjectVersion): Awaitable<void>;
+  /**
+   * When the object's row was written, as an ISO timestamp, or null when there is no row. Optional: a store that
+   * cannot say leaves `freshness.cachedAt` out of what it serves.
+   */
+  getCachedAt?(id: string): Awaitable<string | null>;
   getQuery(cacheKey: string): Awaitable<string[] | null>;
   putQuery(cacheKey: string, ids: string[]): Awaitable<void>;
 }

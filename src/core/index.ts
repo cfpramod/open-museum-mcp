@@ -18,6 +18,7 @@ export {
   type FacetResult,
   type FacetCount,
   type FetchOutcome,
+  type Freshness,
   type CiteOutcome,
 } from './federation.js';
 
