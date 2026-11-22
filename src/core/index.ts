@@ -21,7 +21,7 @@ export {
   type CiteOutcome,
 } from './federation.js';
 
-export type { CacheStore, Awaitable } from './cache.js';
+export type { CacheStore, Awaitable, ObjectVersion } from './cache.js';
 
 // Per-source outcome carried on every search and facets result.
 export {

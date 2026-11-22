@@ -1,6 +1,7 @@
 import { chmodSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import type { ObjectVersion } from './core/cache.js';
 import type { Artwork, Tradition } from './types.js';
 
 const OBJECT_TTL_DAYS = 90;
@@ -89,7 +90,8 @@ export class Cache {
         period TEXT,
         license_type TEXT NOT NULL,
         full_record TEXT NOT NULL,
-        cached_at TEXT NOT NULL
+        cached_at TEXT NOT NULL,
+        adapter_version INTEGER
       );
 
       CREATE INDEX IF NOT EXISTS idx_objects_year_start ON objects(year_start);
@@ -114,6 +116,12 @@ export class Cache {
         museums_json TEXT NOT NULL DEFAULT '[]'
       );
     `);
+    // A cache file created before the adapter version stamp has no such column: add it. Existing rows keep NULL,
+    // which no declared version matches, so they are re-read once on their next read by a versioned adapter.
+    const columns = this.db.prepare(`PRAGMA table_info(objects)`).all() as { name: string }[];
+    if (!columns.some((c) => c.name === 'adapter_version')) {
+      this.db.exec(`ALTER TABLE objects ADD COLUMN adapter_version INTEGER`);
+    }
   }
 
   /**
@@ -121,20 +129,21 @@ export class Cache {
    * served record can be, so it restarts only when the write carries a NEW rights check, that is a different
    * `license.verifiedAt` (a fresh fetch through the rights gate). A write that carries the same `verifiedAt` as
    * the stored row (an enrichment such as a colour backfill on a cache hit) updates the data and leaves the
-   * clock where it was. Fail safe: a stored record that is not valid JSON, or an incoming record with no
-   * `verifiedAt`, vouches for nothing, so the clock restarts (`json_extract` would otherwise throw on the
-   * corrupt row, and the row could never be overwritten).
+   * clock where it was. An incoming record with NO `verifiedAt` vouches for nothing, so it never grants a new
+   * lifetime: the old clock is kept (also when the stored record has none either). A stored record that is not
+   * valid JSON restarts the clock (`json_extract` would otherwise throw on it, and the row could never be
+   * overwritten); it cannot be read anyway. `meta.adapterVersion` is stored with the row.
    */
-  upsertObject(art: Artwork): void {
+  upsertObject(art: Artwork, meta?: ObjectVersion): void {
     const stmt = this.db.prepare(`
       INSERT INTO objects (
         id, museum_code, title, artist_name, attribution_type,
         display_date, year_start, year_end, medium, region, period,
-        license_type, full_record, cached_at
+        license_type, full_record, cached_at, adapter_version
       ) VALUES (
         @id, @museum_code, @title, @artist_name, @attribution_type,
         @display_date, @year_start, @year_end, @medium, @region, @period,
-        @license_type, @full_record, @cached_at
+        @license_type, @full_record, @cached_at, @adapter_version
       )
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
@@ -151,13 +160,14 @@ export class Cache {
         cached_at = CASE
           WHEN json_valid(objects.full_record) THEN
             CASE
-              WHEN json_extract(excluded.full_record, '$.license.verifiedAt') IS NOT NULL
-               AND json_extract(objects.full_record, '$.license.verifiedAt') IS json_extract(excluded.full_record, '$.license.verifiedAt')
+              WHEN json_extract(excluded.full_record, '$.license.verifiedAt') IS NULL THEN objects.cached_at
+              WHEN json_extract(objects.full_record, '$.license.verifiedAt') IS json_extract(excluded.full_record, '$.license.verifiedAt')
                 THEN objects.cached_at
               ELSE excluded.cached_at
             END
           ELSE excluded.cached_at
-        END
+        END,
+        adapter_version = excluded.adapter_version
     `);
 
     stmt.run({
@@ -175,6 +185,7 @@ export class Cache {
       license_type: art.license.type,
       full_record: JSON.stringify(art),
       cached_at: new Date().toISOString(),
+      adapter_version: meta?.adapterVersion ?? null,
     });
   }
 
@@ -228,12 +239,14 @@ export class Cache {
     }
   }
 
-  getObject(id: string): Artwork | null {
-    const row = this.db.prepare(`SELECT full_record, cached_at FROM objects WHERE id = ?`).get(id) as
-      | { full_record: string; cached_at: string }
+  getObject(id: string, expect?: ObjectVersion): Artwork | null {
+    const row = this.db.prepare(`SELECT full_record, cached_at, adapter_version FROM objects WHERE id = ?`).get(id) as
+      | { full_record: string; cached_at: string; adapter_version: number | null }
       | undefined;
     if (!row) return null;
     if (this.isExpired(row.cached_at, OBJECT_TTL_DAYS)) return null;
+    // A row stored under another adapter version (or before versions existed) predates the current rights logic.
+    if (expect?.adapterVersion !== undefined && row.adapter_version !== expect.adapterVersion) return null;
     try {
       return JSON.parse(row.full_record) as Artwork;
     } catch {

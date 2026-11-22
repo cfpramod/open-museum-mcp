@@ -11,7 +11,7 @@ import {
 } from '../color/colorMath.js';
 import type { Artwork } from '../types.js';
 import { filterByYearRange } from '../yearFilter.js';
-import type { CacheStore } from './cache.js';
+import type { CacheStore, ObjectVersion } from './cache.js';
 import { wrapTier0, type Tier0Envelope } from './clearance/envelope.js';
 import { buildClearancePayload } from './clearance/manifest.js';
 import { failedSource, type SourceStatus } from './sourceStatus.js';
@@ -394,6 +394,10 @@ export function createFederation(opts: FederationOptions): Federation {
     }
   }
 
+  // The adapter version a cache read expects and a cache write stores: undefined when the fetcher declares none.
+  const versionOf = (f: Fetcher | undefined): ObjectVersion | undefined =>
+    f?.adapterVersion !== undefined ? { adapterVersion: f.adapterVersion } : undefined;
+
   async function getArtwork(id: string): Promise<FetchOutcome> {
     if (!ID_REGEX.test(id)) {
       return { ok: false, reason: `invalid artwork id: ${id}` };
@@ -409,13 +413,14 @@ export function createFederation(opts: FederationOptions): Federation {
     // time. (The query-cache holds only object IDs, not the copyrighted records.)
     // A cached record whose fetcher is no longer registered is still served.
     if (!fetcher?.noCache) {
-      const cached = await cache.getObject(id);
+      const version = versionOf(fetcher);
+      const cached = await cache.getObject(id, version);
       if (cached) {
         // Backfill colour onto a record cached before it had any — a pre-v0.8b row
         // still within the 90-day TTL, or one written by a sharp-less/Workers
         // process. Without this, such rows would stay colourless until natural
         // expiry and silently under-return from colour search/facets.
-        if (await enrichColor(cached)) await cache.upsertObject(cached);
+        if (await enrichColor(cached)) await cache.upsertObject(cached, version);
         // Backfill hotlinkRestricted onto records cached before v0.16 added it.
         if (fetcher?.hotlinkRestricted) cached.imageUrls.hotlinkRestricted = true;
         return { ok: true, artwork: cached };
@@ -435,7 +440,7 @@ export function createFederation(opts: FederationOptions): Federation {
     if (fetcher.hotlinkRestricted) result.artwork.imageUrls.hotlinkRestricted = true;
 
     await enrichColor(result.artwork);
-    if (!fetcher.noCache) await cache.upsertObject(result.artwork);
+    if (!fetcher.noCache) await cache.upsertObject(result.artwork, versionOf(fetcher));
     return { ok: true, artwork: result.artwork };
   }
 

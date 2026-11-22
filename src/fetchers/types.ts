@@ -25,6 +25,15 @@ export interface Fetcher {
    */
   noCache?: boolean;
   /**
+   * Declare a version for this adapter's rights-bearing logic, and bump it in the SAME change as any fix that
+   * alters what the adapter accepts or rejects, or any rights-bearing field it reads (a licence, an image-open or
+   * metadata-open flag). The object cache stores the version a row was written under, and a read treats a row
+   * stored under any other version (including one stored before versions existed) as a miss, so the fix reaches
+   * already-cached rows on their next read instead of after their 90 days. Absent means this adapter never evicts
+   * on version.
+   */
+  adapterVersion?: number;
+  /**
    * When true, ALL image URLs from this fetcher are hotlink-restricted: they 403
    * (or serve a bot-challenge page) from server / cloud / CLI environments, and
    * also from a browser when embedded cross-origin (e.g. an `<img>` on another
