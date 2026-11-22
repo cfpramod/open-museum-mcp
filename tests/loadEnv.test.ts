@@ -96,7 +96,7 @@ describe('loadEnv: cwd .env, then ~/.open-museum-mcp/.env', () => {
 // True when the source reads from the dotenv package in any form. Matching the call `dotenv.config(` is not
 // enough: an aliased default import, a named `config` import, a side-effect `import 'dotenv/config'`, a
 // `require` and a dynamic `import()` all reach the same unguarded cwd lookup without ever spelling it.
-const DOTENV_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(['"])dotenv(?:\/[^'"]*)?\1/;
+const DOTENV_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(['"`])dotenv(?:\/[^'"`]*)?\1/;
 const DOTENV_CALL = /\bdotenv\s*\.\s*config\s*\(/;
 const importsDotenv = (source: string): boolean => DOTENV_SPECIFIER.test(source) || DOTENV_CALL.test(source);
 
@@ -112,6 +112,8 @@ describe('the dotenv import detector', () => {
     ["import dotenv from 'dotenv/config.js';", 'a subpath import'],
     ["const d = require('dotenv');", 'a require'],
     ["const { config } = await import('dotenv');", 'a dynamic import'],
+    ["const d = require(`dotenv`);", 'a require with a backtick-quoted specifier'],
+    ["const { config } = await import(`dotenv/config`);", 'a dynamic import with a backtick-quoted specifier'],
     ["import dotenv from 'dotenv'\ndotenv . config ( { quiet: true } )", 'a spaced call'],
   ] as const;
   for (const [source, what] of offending) {
@@ -120,6 +122,9 @@ describe('the dotenv import detector', () => {
     });
   }
 
+  // What a static source scan cannot see, stated rather than hidden: `createRequire(import.meta.url)('dotenv')`
+  // and an import whose specifier is computed (`import(name)`) never spell the package where a scan can read it.
+  // The scan is a guard against the common forms, not a proof.
   const clean = [
     ["import { loadEnv } from '../src/loadEnv.js';", 'the guarded loader'],
     ["const note = 'see the dotenvx docs';", 'a similar word in a string'],
