@@ -23,6 +23,12 @@ export {
 
 export type { CacheStore, Awaitable } from './cache.js';
 
+// The text form of an HTML source string (openclearance provenance-source-markup
+// proposal, section 4): the one derivation a producer uses to turn a source
+// string that is HTML into an interpretation string that is text. Not idempotent;
+// never apply it to its own output.
+export { textForm } from '../textForm.js';
+
 // Per-source outcome carried on every search and facets result.
 export {
   SOURCE_STATUSES,

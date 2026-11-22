@@ -3,7 +3,7 @@ import { validateHarvardLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asOptionalString, asString, httpGet, pickMaxResolution, rejectFor } from './helpers.js';
+import { asFiniteNumber, asOptionalString, asString, httpGet, pickMaxResolution, provenanceText, rejectFor } from './helpers.js';
 import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
@@ -138,12 +138,20 @@ export const harvardFetcher: Fetcher = {
 
     const { width, height } = imageDims(r.images);
 
-    // Provenance: published as ONE free-text block. P-7 posture: `raw` is the
-    // text VERBATIM (authoritative); `entries` is the minimal interpretation —
-    // exactly one entry, same text. Absent = not published here, never a finding.
+    // Provenance: published as ONE block of HTML or text. P-7 posture: `raw` is the
+    // string VERBATIM, markup and character references in place (authoritative);
+    // `entries` is the minimal interpretation, one entry holding the string's TEXT
+    // FORM (openclearance #59 section 4), so an interpretation string never carries
+    // markup (P-11). A block with no text left carries no entry; raw still holds it.
+    // Absent = not published here, never a finding.
     const provText = asOptionalString(r.provenance);
+    const provDescription = provText ? provenanceText(provText) : undefined;
     const provenance = provText
-      ? { raw: provText, rawFormat: 'text' as const, entries: [{ description: provText }] }
+      ? {
+          raw: provText,
+          rawFormat: 'text' as const,
+          ...(provDescription !== undefined ? { entries: [{ description: provDescription }] } : {}),
+        }
       : undefined;
 
     const artwork: Artwork = {
