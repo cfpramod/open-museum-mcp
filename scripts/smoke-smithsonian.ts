@@ -1,17 +1,11 @@
 // Live smoke for the Smithsonian fetcher — hits the real api.si.edu (EDAN).
 // Loads ~/.open-museum-mcp/.env, runs search -> getRaw -> normalize, and reports
 // accepted artworks + non-art rejections so the curation gate is visible live.
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import dotenv from 'dotenv';
+import { loadEnv } from '../src/loadEnv.js';
 import { smithsonianFetcher } from '../src/fetchers/smithsonian.js';
 
-// Load env exactly as src/server.ts does: shell/CWD .env first, then the
-// canonical ~/.open-museum-mcp/.env (missing files are ignored by dotenv).
-function loadEnv() {
-  dotenv.config({ quiet: true });
-  dotenv.config({ quiet: true, path: join(homedir(), '.open-museum-mcp', '.env') });
-}
+// Env is loaded by the same guarded loader the server uses (src/loadEnv.ts): shell
+// first, then the CWD .env, then the canonical ~/.open-museum-mcp/.env.
 
 async function runQuery(query: string) {
   console.log(`\n${'='.repeat(70)}\nQUERY: "${query}"\n${'='.repeat(70)}`);

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -39,6 +39,27 @@ describe('loadEnv: cwd .env, then ~/.open-museum-mcp/.env', () => {
     expect(process.env.OMM_TEST_HOME_ONLY).toBe('from-home');
   });
 
+  it('says so on stderr, once, when the working directory is unavailable, and keeps stdout clean', () => {
+    vi.spyOn(process, 'cwd').mockImplementation(() => {
+      throw Object.assign(new Error('ENOENT: no such file or directory, uv_cwd'), { code: 'ENOENT', syscall: 'uv_cwd' });
+    });
+    const err = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const out = vi.spyOn(process.stdout, 'write');
+    loadEnv({ home });
+    expect(err).toHaveBeenCalledTimes(1);
+    expect(String(err.mock.calls[0]?.[0])).toBe(
+      '[open-museum-mcp] working directory is unavailable; skipping the .env in it.\n',
+    );
+    expect(out).not.toHaveBeenCalled();
+  });
+
+  it('prints no notice when the working directory is available', () => {
+    vi.spyOn(process, 'cwd').mockReturnValue(cwdDir);
+    const err = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    loadEnv({ home });
+    expect(err).not.toHaveBeenCalled();
+  });
+
   it('lets the cwd .env win over the home file for a key both define', () => {
     vi.spyOn(process, 'cwd').mockReturnValue(cwdDir);
     writeCwd('OMM_TEST_BOTH=from-cwd\nOMM_TEST_CWD_ONLY=cwd\n');
@@ -69,5 +90,31 @@ describe('loadEnv: cwd .env, then ~/.open-museum-mcp/.env', () => {
     const out = vi.spyOn(process.stdout, 'write');
     loadEnv({ home });
     expect(out).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadEnv is the only reader of a .env file', () => {
+  // dotenv.config() asks for process.cwd() itself, even with an explicit path, so a process whose launch
+  // directory has gone away dies on it. Every entry point (the server and the dev smoke scripts) must go
+  // through loadEnv, which guards that call.
+  const roots = [new URL('../src/', import.meta.url), new URL('../scripts/', import.meta.url)];
+  const files = roots.flatMap((dir) =>
+    readdirSync(dir, { recursive: true, encoding: 'utf8' })
+      .filter((f) => /\.(ts|mjs|js)$/.test(f))
+      .map((f) => ({ name: `${dir.pathname.split('/').slice(-2)[0]}/${f}`, url: new URL(f, dir) })),
+  );
+
+  it('finds the source files it is meant to scan', () => {
+    expect(files.length).toBeGreaterThan(20);
+    expect(files.some((f) => f.name === 'src/loadEnv.ts')).toBe(true);
+    expect(files.some((f) => f.name === 'scripts/smoke-curation.ts')).toBe(true);
+  });
+
+  it('has no dotenv.config() call outside the guarded loader', () => {
+    const offenders = files
+      .filter((f) => f.name !== 'src/loadEnv.ts')
+      .filter((f) => /\bdotenv\s*\.\s*config\s*\(/.test(readFileSync(f.url, 'utf8')))
+      .map((f) => f.name);
+    expect(offenders).toEqual([]);
   });
 });
