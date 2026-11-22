@@ -229,13 +229,19 @@ export interface ObjectProvenance {
   rawFormat: 'text' | 'structured-json';
   /**
    * INTERPRETATION of `raw`, and deliberately a minimal one: one entry per
-   * step AS PUBLISHED, museum order, museum wording. The engine does NOT parse
+   * step AS PUBLISHED, museum order, museum wording. Every string in an entry
+   * is TEXT, never markup: where the source publishes HTML, the entry holds
+   * the string's text form (markup removed, character references decoded
+   * once; see `textForm`), so it never holds a `<` followed by an ASCII
+   * letter, `/`, `!` or `?` (openclearance P-11). The markup, links included,
+   * survives only in `raw`. The engine does NOT parse
    * holders or dates out of prose, does NOT merge, drop, or synthesize steps,
    * and does NOT promote gaps to entries (gap promotion is manifest-producer
    * interpretation governed by the openclearance spec; the museum's own gap
    * language — "?–1963", a bare dealer first step — survives verbatim in the
    * step text and in `raw`). Free-text sources (AIC, Harvard) publish one
-   * block, so they carry exactly one entry.
+   * block, so they carry one entry, or none when the block holds no text
+   * once its markup is removed.
    */
   entries?: ProvenanceEntry[];
   /**
@@ -249,11 +255,12 @@ export interface ObjectProvenance {
 
 /** One step of a published provenance record. See {@link ObjectProvenance.entries}. */
 export interface ProvenanceEntry {
-  /** The source's wording for this step, verbatim (may include the source's own uncertainty language). */
+  /** The source's wording for this step (may include the source's own uncertainty language), as text: where the source publishes HTML, its text form. */
   description: string;
   /**
-   * The source's date text for this step, verbatim (e.g. "1912", "?–1963",
-   * "1930–"). Absent when the source publishes none — never derived.
+   * The source's date text for this step (e.g. "1912", "?–1963", "1930–"),
+   * as text like `description`. Absent when the source publishes none, or
+   * none is left once markup is removed. Never derived.
    */
   date?: string;
 }

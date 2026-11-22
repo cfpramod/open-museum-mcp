@@ -14,6 +14,7 @@ import {
   rejectFor,
 } from './helpers.js';
 import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import { textForm } from '../textForm.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const CLEVELAND_API = 'https://openaccess-api.clevelandart.org/api';
@@ -174,7 +175,8 @@ export const clevelandFetcher: Fetcher = {
     // JSON-serialized (nothing dropped — citations/footnotes/sortorder all
     // survive inside it, and it is authoritative); `entries` = the minimal
     // interpretation, one entry per published step in museum order, wording
-    // verbatim. No step is merged, dropped, or synthesized; the museum's own
+    // verbatim apart from markup (each string is its text form, openclearance
+    // #59). No step is merged, dropped, or synthesized; the museum's own
     // gap language ("?–1963") rides inside the verbatim text. Absent field =
     // "not published here", never a finding.
     const provRaw = Array.isArray(r.provenance) ? (r.provenance as unknown[]) : [];
@@ -184,9 +186,11 @@ export const clevelandFetcher: Fetcher = {
     const provEntries = [...provSteps]
       .sort((a, b) => (coerceFiniteNumber(a.sortorder) ?? 0) - (coerceFiniteNumber(b.sortorder) ?? 0))
       .flatMap((p) => {
-        const description = asString(p.description);
-        const date = asOptionalString(p.date);
-        if (!description && !date) return []; // a fully empty step carries nothing to surface; it still survives in `raw`
+        // Each string is the source's HTML; the entry holds its text form (openclearance #59 section 4).
+        const description = textForm(asString(p.description));
+        const dateText = asOptionalString(p.date);
+        const date = dateText ? textForm(dateText) || undefined : undefined;
+        if (!description && !date) return []; // a step with no text left carries nothing to surface; it still survives in `raw`
         return [{ description, ...(date ? { date } : {}) }];
       });
     const provenance =

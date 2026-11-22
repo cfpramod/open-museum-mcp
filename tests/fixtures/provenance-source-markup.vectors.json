@@ -1,0 +1,342 @@
+{
+  "title": "Provenance source markup: text form and interpretation-string vectors",
+  "description": "Vectors for the text form of an HTML source string (section 4) and for the check that an interpretation string is text (section 3, P-11). Every '\u003c', '\u003e' and '\u0026' in this file is written as a JSON escape (\\u003c, \\u003e, \\u0026), so the file holds no literal markup: decode the JSON to get the strings.",
+  "format": {
+    "textForm": "source is a source string as published, read as HTML. text is its text form. Compare code point for code point.",
+    "check": "value is an interpretation string. verdict is text when no '\u003c' in it is followed by an ASCII letter, '/', '!' or '?', and markup otherwise.",
+    "interpretationTextPattern": "The same check as a JSON Schema pattern (ECMA-262): a string matches it exactly when its verdict is text."
+  },
+  "interpretationTextPattern": "^(?:[^\u003c]|\u003c(?![A-Za-z/!?]))*$",
+  "textForm": [
+    {
+      "id": "plain",
+      "source": "Sold to the present owner, 1963.",
+      "text": "Sold to the present owner, 1963.",
+      "shows": "Text with no markup and no references is unchanged."
+    },
+    {
+      "id": "whitespace-kept",
+      "source": "  Paris\n  1920  ",
+      "text": "  Paris\n  1920  ",
+      "shows": "Whitespace is not normalised: the text form removes markup and decodes references, nothing else."
+    },
+    {
+      "id": "lt-space",
+      "source": "Dated \u003c 1900 in the sale list",
+      "text": "Dated \u003c 1900 in the sale list",
+      "shows": "A '\u003c' followed by a space is text."
+    },
+    {
+      "id": "lt-digit",
+      "source": "5\u003c6 and \u003c3",
+      "text": "5\u003c6 and \u003c3",
+      "shows": "A '\u003c' followed by a digit is text."
+    },
+    {
+      "id": "lt-equals",
+      "source": "a \u003c= b",
+      "text": "a \u003c= b",
+      "shows": "A '\u003c' followed by '=' is text."
+    },
+    {
+      "id": "lt-end",
+      "source": "Lot 5 \u003c",
+      "text": "Lot 5 \u003c",
+      "shows": "A '\u003c' at the end of the string is text."
+    },
+    {
+      "id": "lt-non-ascii-letter",
+      "source": "\u003c\u00e9t\u00e9",
+      "text": "\u003c\u00e9t\u00e9",
+      "shows": "Only an ASCII letter after '\u003c' opens a tag; a non-ASCII letter does not."
+    },
+    {
+      "id": "gt-alone",
+      "source": "a \u003e b",
+      "text": "a \u003e b",
+      "shows": "A '\u003e' on its own is text."
+    },
+    {
+      "id": "link",
+      "source": "Letter (\u003ca href=\"https://example.org/letters/11251\"\u003eletter of 1892\u003c/a\u003e).",
+      "text": "Letter (letter of 1892).",
+      "shows": "A link keeps its text and loses its target. The target survives only in raw."
+    },
+    {
+      "id": "block-and-comment",
+      "source": "\u003cdiv\u003e\u003c!--block--\u003eBorn 1860.\u003c/div\u003e",
+      "text": "Born 1860.",
+      "shows": "Block tags and a comment are removed."
+    },
+    {
+      "id": "block-joins-words",
+      "source": "End of note.\u003c/div\u003e\u003cdiv\u003eNext note.",
+      "text": "End of note.Next note.",
+      "shows": "Removed tags leave nothing, so text either side of a block boundary joins (open question 1)."
+    },
+    {
+      "id": "line-break-joins-words",
+      "source": "Paris\u003cbr\u003eLondon",
+      "text": "ParisLondon",
+      "shows": "A line break tag also leaves nothing (open question 1)."
+    },
+    {
+      "id": "comment-holding-gt",
+      "source": "A\u003c!-- x \u003e y --\u003eB",
+      "text": "AB",
+      "shows": "Inside a comment a '\u003e' does not end it; only the comment's own end does."
+    },
+    {
+      "id": "comment-unterminated",
+      "source": "A\u003c!-- no end",
+      "text": "A!-- no end",
+      "shows": "A comment that never ends is read as markup that ends at its first '\u003e'. With no '\u003e', it loses its '\u003c' alone."
+    },
+    {
+      "id": "comment-end-bang",
+      "source": "x\u003c!-- y --!\u003e visible --\u003ez",
+      "text": "x visible --\u003ez",
+      "shows": "HTML also ends a comment at '--!\u003e', so the text after it is kept."
+    },
+    {
+      "id": "comment-abrupt",
+      "source": "A\u003c!--\u003eB--\u003eC",
+      "text": "AB--\u003eC",
+      "shows": "'\u003c!--\u003e' is a complete, empty comment in HTML, so the text after it is kept."
+    },
+    {
+      "id": "comment-abrupt-dash",
+      "source": "A\u003c!---\u003eB--\u003eC",
+      "text": "AB--\u003eC",
+      "shows": "'\u003c!---\u003e' is a complete, empty comment too."
+    },
+    {
+      "id": "comment-bang-too-early",
+      "source": "A\u003c!--!\u003eB--\u003eC",
+      "text": "AC",
+      "shows": "The '--' before '!\u003e' must follow the opening '\u003c!--', so '\u003c!--!\u003e' does not end the comment."
+    },
+    {
+      "id": "comment-unterminated-reread",
+      "source": "A\u003c!-- \u003cb\u003ex\u003c/b\u003e y",
+      "text": "Ax y",
+      "shows": "A comment that never ends is read as markup that ends at its first '\u003e', and the text after that '\u003e' is read as usual."
+    },
+    {
+      "id": "tag-unclosed",
+      "source": "Sale \u003clot 12]: Paris",
+      "text": "Sale lot 12]: Paris",
+      "shows": "A tag with no closing '\u003e' loses its '\u003c' alone and keeps the text after it."
+    },
+    {
+      "id": "tag-uppercase",
+      "source": "\u003cDIV\u003eGift\u003c/DIV\u003e",
+      "text": "Gift",
+      "shows": "Tag names are matched without regard to case."
+    },
+    {
+      "id": "tag-end-empty",
+      "source": "a\u003c/\u003eb",
+      "text": "ab",
+      "shows": "'\u003c/' opens markup even with no name."
+    },
+    {
+      "id": "processing-instruction",
+      "source": "\u003c?xml version=\"1.0\"?\u003eText",
+      "text": "Text",
+      "shows": "'\u003c?' opens markup."
+    },
+    {
+      "id": "nested-rebuild",
+      "source": "\u003c\u003cb\u003eb\u003ex",
+      "text": "x",
+      "shows": "Removing an inner tag can form an outer one, which is read as markup as it forms."
+    },
+    {
+      "id": "nested-rebuild-deep",
+      "source": "\u003c\u003c\u003cb\u003eb\u003eb\u003ex",
+      "text": "x",
+      "shows": "Three levels deep: each removal forms the next tag, so a fixed number of passes would not be enough."
+    },
+    {
+      "id": "nested-formed-tag-read-whole",
+      "source": "\u003c\u003cb\u003eb\u003cb\u003ex",
+      "text": "x",
+      "shows": "Markup that a removal forms is read as it forms: removing the first '\u003cb\u003e' leaves '\u003cb\u003cb\u003e', which HTML reads as one tag."
+    },
+    {
+      "id": "split-script",
+      "source": "\u003cscr\u003cb\u003eipt\u003ealert(1)\u003c/script\u003e",
+      "text": "ipt\u003ealert(1)",
+      "shows": "A tag broken by an inner tag is removed through the first '\u003e'; the '\u003e' left after it is text."
+    },
+    {
+      "id": "nbsp",
+      "source": "Paris,\u0026nbsp;1920",
+      "text": "Paris,\u00a01920",
+      "shows": "A named reference decodes to its character: here U+00A0, which is kept, not turned into a space."
+    },
+    {
+      "id": "amp",
+      "source": "Smith \u0026amp; Co.",
+      "text": "Smith \u0026 Co.",
+      "shows": "\u0026amp; decodes to '\u0026'."
+    },
+    {
+      "id": "numeric-decimal",
+      "source": "Caf\u0026#233;",
+      "text": "Caf\u00e9",
+      "shows": "Decimal numeric references decode."
+    },
+    {
+      "id": "numeric-hex",
+      "source": "Caf\u0026#xE9;",
+      "text": "Caf\u00e9",
+      "shows": "Hexadecimal numeric references decode."
+    },
+    {
+      "id": "numeric-c1-remap",
+      "source": "\u0026#128;100",
+      "text": "\u20ac100",
+      "shows": "Numeric references in the C1 range decode as the HTML standard maps them (128 is the euro sign)."
+    },
+    {
+      "id": "numeric-null",
+      "source": "a\u0026#0;b",
+      "text": "a\ufffdb",
+      "shows": "A numeric reference to U+0000 decodes to U+FFFD, as in HTML."
+    },
+    {
+      "id": "numeric-surrogate",
+      "source": "a\u0026#xD800;b",
+      "text": "a\ufffdb",
+      "shows": "A numeric reference to a surrogate decodes to U+FFFD, as in HTML."
+    },
+    {
+      "id": "numeric-control",
+      "source": "a\u0026#1;b",
+      "text": "a\u0001b",
+      "shows": "A numeric reference to a control character decodes to it, as in HTML. Some HTML decoders drop it instead; this vector catches that."
+    },
+    {
+      "id": "numeric-noncharacter",
+      "source": "a\u0026#xFFFE;b",
+      "text": "a\ufffeb",
+      "shows": "A numeric reference to a noncharacter decodes to it, as in HTML. Some HTML decoders drop it instead; this vector catches that."
+    },
+    {
+      "id": "legacy-no-semicolon",
+      "source": "\u0026copy 1920",
+      "text": "\u00a9 1920",
+      "shows": "A legacy named reference without ';' decodes, as HTML does in text."
+    },
+    {
+      "id": "legacy-prefix",
+      "source": "\u0026notit;",
+      "text": "\u00acit;",
+      "shows": "The longest legacy name that prefixes the text decodes; the rest stays."
+    },
+    {
+      "id": "unknown-name",
+      "source": "A\u0026D Gallery",
+      "text": "A\u0026D Gallery",
+      "shows": "'\u0026' before a name that is not a reference stays as it is."
+    },
+    {
+      "id": "escaped-text-lt",
+      "source": "5 \u0026lt; 6",
+      "text": "5 \u003c 6",
+      "shows": "An escaped '\u003c' that is text decodes to '\u003c' and stays."
+    },
+    {
+      "id": "escaped-markup",
+      "source": "\u0026lt;b\u0026gt;bold\u0026lt;/b\u0026gt;",
+      "text": "bold",
+      "shows": "Escaped markup decodes to markup and is then removed."
+    },
+    {
+      "id": "escaped-comment",
+      "source": "\u0026lt;!-- a \u0026gt; b --\u0026gt;",
+      "text": "",
+      "shows": "An escaped comment decodes to a comment and is then removed whole."
+    },
+    {
+      "id": "decode-once",
+      "source": "\u0026amp;lt;b\u0026amp;gt;",
+      "text": "\u0026lt;b\u0026gt;",
+      "shows": "References are decoded once: a doubly escaped tag leaves as escaped text (open question 2)."
+    }
+  ],
+  "check": [
+    {
+      "id": "text-plain",
+      "value": "M. Laurent, Lyon",
+      "verdict": "text"
+    },
+    {
+      "id": "text-lt-space",
+      "value": "5 \u003c 6",
+      "verdict": "text"
+    },
+    {
+      "id": "text-lt-digit",
+      "value": "\u003c3",
+      "verdict": "text"
+    },
+    {
+      "id": "text-lt-equals",
+      "value": "a \u003c= b",
+      "verdict": "text"
+    },
+    {
+      "id": "text-lt-end",
+      "value": "Lot 5 \u003c",
+      "verdict": "text"
+    },
+    {
+      "id": "text-lt-non-ascii",
+      "value": "\u003c\u00e9t\u00e9",
+      "verdict": "text"
+    },
+    {
+      "id": "text-gt",
+      "value": "x \u003e y",
+      "verdict": "text"
+    },
+    {
+      "id": "text-escaped",
+      "value": "\u0026lt;b\u0026gt;",
+      "verdict": "text"
+    },
+    {
+      "id": "markup-start-tag",
+      "value": "\u003ca href=x\u003e",
+      "verdict": "markup"
+    },
+    {
+      "id": "markup-uppercase",
+      "value": "a\u003cB\u003e",
+      "verdict": "markup"
+    },
+    {
+      "id": "markup-unclosed",
+      "value": "\u003cb",
+      "verdict": "markup"
+    },
+    {
+      "id": "markup-end-tag",
+      "value": "\u003c/div\u003e",
+      "verdict": "markup"
+    },
+    {
+      "id": "markup-comment",
+      "value": "\u003c!--",
+      "verdict": "markup"
+    },
+    {
+      "id": "markup-pi",
+      "value": "\u003c?x",
+      "verdict": "markup"
+    }
+  ]
+}

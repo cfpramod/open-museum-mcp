@@ -312,3 +312,37 @@ describe('AIC provenance mapping (v0.20.0, openclearance P-7 posture)', () => {
     expect(prov!.entries![0].description).toBe(prov!.raw); // interpretation IS the text, unaltered
   });
 });
+
+describe('AIC provenance entries are text, raw is the source string (openclearance #59, P-7 and P-11)', () => {
+  // The source publishes this HTML. raw carries it as published; the interpretation string is its text form.
+  const published =
+    'Sold by <a href="https://example.org/letters/11251">the dealer</a> &amp; Sons, Paris, 1892.<!-- internal > note -->&nbsp;[1]';
+
+  it('keeps raw exactly as published and derives the entry from its text form', () => {
+    const raw = structuredClone(fixture('aic-accepted.json')) as { data: Record<string, unknown> };
+    raw.data.provenance_text = published;
+    const result = aicFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const prov = result.artwork.provenance!;
+    expect(prov.raw).toBe(published);
+    expect(prov.entries).toEqual([{ description: 'Sold by the dealer & Sons, Paris, 1892.\u00a0[1]' }]);
+  });
+
+  it('never leaves markup in an entry, even when the source escapes it', () => {
+    const raw = structuredClone(fixture('aic-accepted.json')) as { data: Record<string, unknown> };
+    raw.data.provenance_text = 'Held by &lt;b&gt;the family&lt;/b&gt; until 1920.';
+    const result = aicFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.provenance!.entries![0].description).toBe('Held by the family until 1920.');
+  });
+
+  it('carries no entry when the text form is empty, and keeps raw', () => {
+    const raw = structuredClone(fixture('aic-accepted.json')) as { data: Record<string, unknown> };
+    raw.data.provenance_text = '<br><!-- nothing -->';
+    const result = aicFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const prov = result.artwork.provenance!;
+    expect(prov.raw).toBe('<br><!-- nothing -->');
+    expect('entries' in prov).toBe(false);
+  });
+});

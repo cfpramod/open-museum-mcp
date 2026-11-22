@@ -12,6 +12,7 @@ import {
   rejectFor,
 } from './helpers.js';
 import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
+import { textForm } from '../textForm.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
 const AIC_API = 'https://api.artic.edu/api/v1';
@@ -187,12 +188,20 @@ export const aicFetcher: Fetcher = {
     const maxResolution =
       thumbW !== null && thumbH !== null ? { width: thumbW, height: thumbH } : undefined;
 
-    // Provenance: published as ONE free-text block. P-7 posture: `raw` is the
-    // text VERBATIM (authoritative); `entries` is the minimal interpretation —
-    // exactly one entry, same text. Absent = not published here, never a finding.
+    // Provenance: published as ONE block of HTML or text. P-7 posture: `raw` is the
+    // string VERBATIM, markup and character references in place (authoritative);
+    // `entries` is the minimal interpretation, one entry holding the string's TEXT
+    // FORM (openclearance #59 section 4), so an interpretation string never carries
+    // markup (P-11). A block with no text left carries no entry; raw still holds it.
+    // Absent = not published here, never a finding.
     const provText = asOptionalString(r.provenance_text);
+    const provDescription = provText ? textForm(provText) : '';
     const provenance = provText
-      ? { raw: provText, rawFormat: 'text' as const, entries: [{ description: provText }] }
+      ? {
+          raw: provText,
+          rawFormat: 'text' as const,
+          ...(provDescription.trim() ? { entries: [{ description: provDescription }] } : {}),
+        }
       : undefined;
 
     const artwork: Artwork = {

@@ -249,3 +249,24 @@ describe('Cleveland provenance mapping (v0.20.0, openclearance P-7 posture)', ()
     expect('provenance' in result.artwork).toBe(false);
   });
 });
+
+describe('Cleveland provenance entries are text, raw is the source array (openclearance #59, P-7 and P-11)', () => {
+  it('derives each entry from the text form of its source strings and keeps raw as received', () => {
+    const raw = structuredClone(fixture('cleveland-accepted.json')) as Record<string, unknown>;
+    const inner = (raw.data ?? raw) as Record<string, unknown>;
+    const published = [
+      { description: 'Sold by <a href="https://example.org/x">the dealer</a> &amp; Sons', date: '1912&ndash;13', sortorder: 1 },
+      { description: '<br>', date: '<!-- x -->', sortorder: 2 },
+      { description: 'Given to the museum', sortorder: 3 },
+    ];
+    inner.provenance = structuredClone(published);
+    const result = clevelandFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    const prov = result.artwork.provenance!;
+    expect(prov.raw).toBe(JSON.stringify(published));
+    expect(prov.entries).toEqual([
+      { description: 'Sold by the dealer & Sons', date: '1912\u201313' },
+      { description: 'Given to the museum' },
+    ]);
+  });
+});
