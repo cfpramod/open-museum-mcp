@@ -64,18 +64,18 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 /**
  * Read a Yale response. A 2xx must carry a JSON body. When the service answers
- * with a challenge page or other non-JSON content instead (an empty 202, an
+ * with a page or other non-JSON content instead (an empty 202, an
  * empty 2xx body, an HTML page), there is no data to read: that is reported as
  * the source being temporarily unavailable, in words a client can show, rather
  * than as a JSON parse crash. Other non-2xx statuses carry no body here.
  */
 async function readJsonBody(res: Response): Promise<unknown> {
-  const challenged = res.headers.has('x-amzn-waf-action');
+  const flagged = res.headers.has('x-amzn-waf-action');
   if (!res.ok) {
-    if (challenged && res.status !== 404 && res.status !== 410) throw unavailable(res.status);
+    if (flagged && res.status !== 404 && res.status !== 410) throw unavailable(res.status);
     return null;
   }
-  const text = challenged ? '' : await res.text();
+  const text = flagged ? '' : await res.text();
   if (text.trim() === '') throw unavailable(res.status);
   try {
     return JSON.parse(text) as unknown;
@@ -89,7 +89,7 @@ class YcbaUnavailableError extends Error {}
 
 function unavailable(status: number): Error {
   return new YcbaUnavailableError(
-    `YCBA (LUX) temporarily unavailable: the service answered with a challenge or non-JSON response (HTTP ${status}); try again later`,
+    `YCBA (LUX) temporarily unavailable: the service answered with a non-JSON response (HTTP ${status}); try again later`,
   );
 }
 

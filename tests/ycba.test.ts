@@ -641,11 +641,11 @@ describe('YCBA unavailable: non-JSON responses', () => {
     vi.restoreAllMocks();
   });
 
-  const challenge202 = (): Response =>
-    new Response('', { status: 202, headers: { 'x-amzn-waf-action': 'challenge' } });
+  const marked202 = (): Response =>
+    new Response('', { status: 202, headers: { 'x-amzn-waf-action': 'marker' } });
 
-  it('reports search as temporarily unavailable on an empty 202 challenge, not a JSON crash', async () => {
-    const calls = stubFetch(challenge202);
+  it('reports search as temporarily unavailable on an empty 202 carrying the marker header, not a JSON crash', async () => {
+    const calls = stubFetch(marked202);
     const err = await ycbaFetcher.search('winter', 10).then(
       () => null,
       (e: unknown) => e as Error,
@@ -654,7 +654,7 @@ describe('YCBA unavailable: non-JSON responses', () => {
     expect(err?.message).toContain('temporarily unavailable');
     expect(err?.message).toContain('202');
     expect(err?.message).not.toMatch(/JSON input|Unexpected end/);
-    expect(calls).toHaveLength(1); // a challenge is not retried
+    expect(calls).toHaveLength(1); // this answer is not retried
   });
 
   it('treats an empty 200 body and an HTML 200 page the same way', async () => {
@@ -664,20 +664,20 @@ describe('YCBA unavailable: non-JSON responses', () => {
     await expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('temporarily unavailable');
   });
 
-  it('treats a WAF-challenged 403 as unavailable too, but a plain 403 keeps its status error', async () => {
-    stubFetch(() => new Response('', { status: 403, headers: { 'x-amzn-waf-action': 'challenge' } }));
+  it('treats a header-flagged 403 as unavailable too, but a plain 403 keeps its status error', async () => {
+    stubFetch(() => new Response('', { status: 403, headers: { 'x-amzn-waf-action': 'marker' } }));
     await expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('temporarily unavailable');
     stubFetch(() => new Response('Forbidden', { status: 403 }));
     await expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('403');
   });
 
-  it('getRaw reports a challenged record fetch as unavailable', async () => {
-    stubFetch(challenge202);
+  it('getRaw reports a record fetch answered this way as unavailable', async () => {
+    stubFetch(marked202);
     await expect(ycbaFetcher.getRaw(ACCEPTED_ID)).rejects.toThrow('temporarily unavailable');
   });
 
-  it('still fails closed (no throw) when only the manifest hop is challenged', async () => {
-    stubFetch((url) => (url.includes('/data/object/') ? json(fixture('ycba-accepted.json').record) : challenge202()));
+  it('still fails closed (no throw) when only the manifest hop is answered this way', async () => {
+    stubFetch((url) => (url.includes('/data/object/') ? json(fixture('ycba-accepted.json').record) : marked202()));
     const raw = await ycbaFetcher.getRaw(ACCEPTED_ID);
     expect(ycbaFetcher.normalize(raw).status).toBe('rejected');
   });
@@ -689,17 +689,20 @@ describe('YCBA unavailable: non-JSON responses', () => {
   });
 
   it('does not retry an unavailable answer even when its status is retryable, but still retries a plain 503', async () => {
-    const unavailableCalls = stubFetch(() => new Response('', { status: 503, headers: { 'x-amzn-waf-action': 'challenge' } }));
+    const unavailableCalls = stubFetch(() => new Response('', { status: 503, headers: { 'x-amzn-waf-action': 'marker' } }));
     await expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('temporarily unavailable');
     expect(unavailableCalls).toHaveLength(1);
 
     vi.useFakeTimers();
-    const plainCalls = stubFetch(() => new Response('', { status: 503 }));
-    const settled = expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('503');
-    await vi.runAllTimersAsync();
-    await settled;
-    expect(plainCalls).toHaveLength(3);
-    vi.useRealTimers();
+    try {
+      const plainCalls = stubFetch(() => new Response('', { status: 503 }));
+      const settled = expect(ycbaFetcher.search('winter', 10)).rejects.toThrow('503');
+      await vi.runAllTimersAsync();
+      await settled;
+      expect(plainCalls).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reads a bare 204 as unavailable (no JSON body to read)', async () => {
