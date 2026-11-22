@@ -126,9 +126,208 @@ describe('SMK credit line', () => {
     });
   });
 
-  it('leaves dimensions absent: SMK publishes only structured measurements', () => {
+});
+
+describe('SMK dimensions composed from structured measurements', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function dimsOf(dimensions: unknown): string | undefined {
+    const raw = { ...(fixture('smk-accepted.json') as Record<string, unknown>), dimensions };
+    const result = smkFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    return result.artwork.dimensions;
+  }
+  const m = (part: string | undefined, type: string, unit: string | undefined, value: string) => ({
+    ...(part === undefined ? {} : { part }),
+    type,
+    ...(unit === undefined ? {} : { unit }),
+    value,
+  });
+
+  it('requests dimensions from the API', async () => {
+    let capturedUrl = '';
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      capturedUrl = String(input);
+      return new Response(JSON.stringify({ items: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await smkFetcher.getRaw('smk:KMS3352');
+    const fields = new URL(capturedUrl).searchParams.get('fields')?.split(',') ?? [];
+    expect(fields).toContain('dimensions');
+  });
+
+  it('writes the net and gross size of a painting (the accepted fixture)', () => {
     const result = smkFetcher.normalize(fixture('smk-accepted.json'));
     if (result.status !== 'accepted') throw new Error('expected accepted');
-    expect(result.artwork.dimensions).toBeUndefined();
+    expect(result.artwork.dimensions).toBe('Object: 91 x 73.5 cm; Overall: 94 x 76 x 4.2 cm');
+  });
+
+  it('writes a sheet size in millimetres', () => {
+    expect(dimsOf([m('bladmaal', 'højde', 'millimeter', '238'), m('bladmaal', 'bredde', 'millimeter', '180')]))
+      .toBe('Sheet: 238 x 180 mm');
+  });
+
+  it('names every part SMK uses, whatever the spelling, in the order the record gives them', () => {
+    expect(dimsOf([
+      m('monteringsmaal', 'højde', 'millimeter', '500'), m('monteringsmaal', 'bredde', 'millimeter', '400'),
+      m('monteringsmaal', 'dybde', 'millimeter', '20'),
+      m('Bladmål', 'højde', 'millimeter', '300'), m('Bladmål', 'bredde', 'millimeter', '250'),
+      m('Plademål', 'højde', 'millimeter', '200'), m('Plademål', 'bredde', 'millimeter', '150'),
+      m('billedmaal', 'højde', 'millimeter', '180'), m('billedmaal', 'bredde', 'millimeter', '130'),
+    ])).toBe('Mount: 500 x 400 x 20 mm; Sheet: 300 x 250 mm; Plate: 200 x 150 mm; Image: 180 x 130 mm');
+    expect(dimsOf([
+      m('netto', 'højde', 'centimeter', '10'), m('netto', 'bredde', 'centimeter', '8'),
+      m('Bruttomål', 'højde', 'centimeter', '12'), m('Bruttomål', 'bredde', 'centimeter', '10'),
+    ])).toBe('Object: 10 x 8 cm; Overall: 12 x 10 cm');
+    expect(dimsOf([m('Nettomål', 'højde', 'centimeter', '10'), m('Nettomål', 'bredde', 'centimeter', '8')]))
+      .toBe('Object: 10 x 8 cm');
+  });
+
+  it('labels net and gross sizes without claiming a frame', () => {
+    // KAS385 as published, a plaster statue group: a gross size only.
+    expect(dimsOf([
+      m('brutto', 'højde', 'centimeter', '242'), m('brutto', 'bredde', 'centimeter', '162.5'),
+      m('brutto', 'dybde', 'centimeter', '103'),
+    ])).toBe('Overall: 242 x 162.5 x 103 cm');
+    // KKS14024 as published, a drawing.
+    expect(dimsOf([m('brutto', 'højde', 'millimeter', '197'), m('brutto', 'bredde', 'millimeter', '136')]))
+      .toBe('Overall: 197 x 136 mm');
+  });
+
+  it('groups a part whose entries are not adjacent', () => {
+    expect(dimsOf([
+      m('bladmaal', 'højde', 'millimeter', '300'), m('plademaal', 'højde', 'millimeter', '200'),
+      m('bladmaal', 'bredde', 'millimeter', '250'), m('plademaal', 'bredde', 'millimeter', '150'),
+    ])).toBe('Sheet: 300 x 250 mm; Plate: 200 x 150 mm');
+  });
+
+  it('writes a size with no part and no label when the record names none', () => {
+    expect(dimsOf([m(undefined, 'højde', 'centimeter', '50'), m(undefined, 'bredde', 'centimeter', '40')]))
+      .toBe('50 x 40 cm');
+  });
+
+  it('labels each measurement when height and width are not both given', () => {
+    expect(dimsOf([m(undefined, 'højde', 'centimeter', '39.5')])).toBe('height 39.5 cm');
+    expect(dimsOf([m('Netto', 'bredde', 'centimeter', '34')])).toBe('Object: width 34 cm');
+    expect(dimsOf([m('bladmaal', 'diameter', 'millimeter', '265')])).toBe('Sheet: diameter 265 mm');
+    expect(dimsOf([m('Netto', 'højde', 'centimeter', '30'), m('Netto', 'diameter', 'centimeter', '12')]))
+      .toBe('Object: height 30 cm, diameter 12 cm');
+    expect(dimsOf([m('Netto', 'højde', 'centimeter', '30'), m('Netto', 'dybde', 'centimeter', '5')]))
+      .toBe('Object: height 30 cm, depth 5 cm');
+  });
+
+  it('labels each measurement when a diameter comes with height and width', () => {
+    expect(dimsOf([
+      m('Netto', 'højde', 'centimeter', '30'), m('Netto', 'bredde', 'centimeter', '20'),
+      m('Netto', 'diameter', 'centimeter', '12'),
+    ])).toBe('Object: height 30 cm, width 20 cm, diameter 12 cm');
+  });
+
+  it('reads the English names the API gives with lang=en, and the unit spellings in the data', () => {
+    expect(dimsOf([m('Netto', 'height', 'cm', '239'), m('Netto', 'width', 'cm', '307'), m('Netto', 'depth', 'cm', '9')]))
+      .toBe('Object: 239 x 307 x 9 cm');
+    expect(dimsOf([m('bladmaal', 'højde', 'milimeter', '161'), m('bladmaal', 'bredde', 'mm', '120')]))
+      .toBe('Sheet: 161 x 120 mm');
+  });
+
+  it('keeps the value as SMK writes it', () => {
+    expect(dimsOf([m('Netto', 'højde', 'centimeter', '91.0'), m('Netto', 'bredde', 'centimeter', '73.50')]))
+      .toBe('Object: 91.0 x 73.50 cm');
+  });
+
+  it('ignores a weight and keeps the size beside it', () => {
+    expect(dimsOf([
+      m('Netto', 'højde', 'centimeter', '91'), m('Netto', 'bredde', 'centimeter', '73.5'),
+      m(undefined, 'vægt', 'kilo', '12'), m('Netto', 'weight', 'kg', '12'),
+    ])).toBe('Object: 91 x 73.5 cm');
+  });
+
+  it('drops a part when any of its measurements lacks a unit, and writes the rest', () => {
+    // KMS8914 as published: the height carries no unit.
+    expect(dimsOf([m('Netto', 'højde', undefined, '39.5'), m('Netto', 'bredde', 'centimeter', '34')])).toBeUndefined();
+    expect(dimsOf([
+      m('Netto', 'højde', undefined, '39.5'), m('Netto', 'bredde', 'centimeter', '34'),
+      m('Brutto', 'højde', 'centimeter', '50'), m('Brutto', 'bredde', 'centimeter', '44'),
+    ])).toBe('Overall: 50 x 44 cm');
+  });
+
+  it('drops a part that gives two values for one measurement', () => {
+    // KKSgb21766 as published: two sheet heights.
+    expect(dimsOf([m('bladmaal', 'højde', 'millimeter', '161'), m('bladmaal', 'højde', 'millimeter', '165')]))
+      .toBeUndefined();
+  });
+
+  it('drops a part that mixes units', () => {
+    expect(dimsOf([m('Netto', 'højde', 'centimeter', '91'), m('Netto', 'bredde', 'millimeter', '735')])).toBeUndefined();
+  });
+
+  it('drops a part whose measurement type is missing or not a size it knows', () => {
+    expect(dimsOf([m('Netto', 'længde', 'centimeter', '91'), m('Netto', 'bredde', 'centimeter', '73.5')])).toBeUndefined();
+    expect(dimsOf([{ part: 'Netto', unit: 'centimeter', value: '91' }, m('Netto', 'bredde', 'centimeter', '73.5')]))
+      .toBeUndefined();
+  });
+
+  it('drops a part with a value that is not a positive number', () => {
+    for (const value of ['0', '0.0', '-12', '', '12 cm', '1,5', '1e3', 'NaN', ' 12', '1234567', '1.12345']) {
+      expect(dimsOf([m('Netto', 'højde', 'centimeter', value), m('Netto', 'bredde', 'centimeter', '40')])).toBeUndefined();
+    }
+    expect(dimsOf([{ part: 'Netto', type: 'højde', unit: 'centimeter', value: 91 }])).toBeUndefined();
+    expect(dimsOf([{ part: 'Netto', type: 'højde', unit: 'centimeter' }])).toBeUndefined();
+  });
+
+  it('drops a part whose name it does not know', () => {
+    expect(dimsOf([m('104,5', 'højde', 'centimeter', '91'), m('104,5', 'bredde', 'centimeter', '73.5')])).toBeUndefined();
+    expect(dimsOf([{ part: 7, type: 'højde', unit: 'centimeter', value: '91' }])).toBeUndefined();
+  });
+
+  it('does not read built-in object keys as SMK terms', () => {
+    for (const key of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf']) {
+      // As a part name, beside a readable part.
+      expect(dimsOf([
+        m(key, 'højde', 'centimeter', '10'), m(key, 'bredde', 'centimeter', '8'),
+        m('Netto', 'højde', 'centimeter', '91'), m('Netto', 'bredde', 'centimeter', '73.5'),
+      ])).toBe('Object: 91 x 73.5 cm');
+      // As a measurement type.
+      expect(dimsOf([m('Netto', key, 'centimeter', '10'), m('Netto', 'bredde', 'centimeter', '8')])).toBeUndefined();
+      // As a unit.
+      expect(dimsOf([m('Netto', 'højde', key, '10'), m('Netto', 'bredde', key, '8')])).toBeUndefined();
+    }
+  });
+
+  it('drops a size with no part when the record names a part elsewhere', () => {
+    // KMS317 as published: a net size, then a size with no part.
+    // What the second measures is not stated, so it is not written.
+    expect(dimsOf([
+      { notes: '650 x 960 mm', part: 'Netto', type: 'højde', unit: 'centimeter', value: '65' },
+      { notes: '650 x 960 mm', part: 'Netto', type: 'bredde', unit: 'centimeter', value: '96' },
+      { type: 'højde', unit: 'centimeter', value: '82' },
+      { type: 'bredde', unit: 'centimeter', value: '114' },
+    ])).toBe('Object: 65 x 96 cm');
+    // Also when the named part is itself left out: the record still says the
+    // sizes it gives belong to parts.
+    expect(dimsOf([
+      m('Netto', 'højde', undefined, '65'), m('Netto', 'bredde', 'centimeter', '96'),
+      m(undefined, 'højde', 'centimeter', '82'), m(undefined, 'bredde', 'centimeter', '114'),
+    ])).toBeUndefined();
+    // A weight that names a part does not count as naming one for a size.
+    expect(dimsOf([
+      m(undefined, 'højde', 'centimeter', '82'), m(undefined, 'bredde', 'centimeter', '114'),
+      m('Netto', 'vægt', 'kilo', '12'),
+    ])).toBe('82 x 114 cm');
+  });
+
+  it('is absent when the record has no usable measurements', () => {
+    expect(dimsOf(undefined)).toBeUndefined();
+    expect(dimsOf([])).toBeUndefined();
+    expect(dimsOf('91 x 73.5 cm')).toBeUndefined();
+    expect(dimsOf([null, 'x', 3])).toBeUndefined();
+    expect(dimsOf([m(undefined, 'vægt', 'kilo', '12')])).toBeUndefined();
+  });
+
+  it('ignores the notes text, which can disagree with the values', () => {
+    // KKS4016 as published: notes "256 x 204 mm" beside values 51 x 52.
+    expect(dimsOf([
+      { notes: '256 x 204 mm', part: 'bladmaal', type: 'højde', unit: 'millimeter', value: '51' },
+      { notes: '256 x 204 mm', part: 'bladmaal', type: 'bredde', unit: 'millimeter', value: '52' },
+    ])).toBe('Sheet: 51 x 52 mm');
   });
 });
