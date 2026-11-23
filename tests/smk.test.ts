@@ -27,10 +27,20 @@ describe('SMK adapter normalization', () => {
     expect(a.license.confidence).toBe('high');
     expect(a.imageOpenAccess).toBe(true);
     expect(a.imageUrls.full).toContain('api.smk.dk');
+    // A small rendition is published for colour extraction: the full-resolution
+    // download host stalls and 503s, so extraction must never be pointed at it.
+    expect(a.imageUrls.thumbnail).toMatch(/^https:\/\/iip-thumb\.smk\.dk\//);
     expect(a.imageUrls.width).toBe(5750);
     expect(a.imageUrls.height).toBe(7229);
     expect(a.imageUrls.maxResolution).toEqual({ width: 5750, height: 7229 });
     expect(a.source.pageUrl).toMatch(/smk\.dk/);
+  });
+
+  it('leaves the thumbnail unset when SMK publishes none', () => {
+    const { image_thumbnail: _omit, ...rest } = fixture('smk-accepted.json') as Record<string, unknown>;
+    const result = smkFetcher.normalize(rest);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.imageUrls.thumbnail).toBeUndefined();
   });
 
   it('tiers a CC0-dedicated record as CC0 (not PD Mark)', () => {
