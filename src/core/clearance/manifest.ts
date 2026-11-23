@@ -124,6 +124,9 @@ export function buildClearancePayload(
 }
 
 function buildAccepted(art: Artwork, opts: BuildOptions): ClearanceManifestPayload {
+  // The verbatim attribution qualifier is engine-record only; the manifest's artist vocabulary is set by the spec.
+  // Dropping it by name keeps the remaining keys, and so the hashed payload bytes, exactly as before.
+  const { attributionQualifier: _engineOnly, ...artist } = art.artist;
   const decision = clearanceForLicense(art.license.type);
   const field = apiFieldOf(art.license.verificationSource);
 
@@ -134,7 +137,7 @@ function buildAccepted(art: Artwork, opts: BuildOptions): ClearanceManifestPaylo
     work: {
       id: art.id,
       title: art.title,
-      artist: art.artist,
+      artist,
       displayDate: art.displayDate,
       yearStart: art.yearStart,
       yearEnd: art.yearEnd,

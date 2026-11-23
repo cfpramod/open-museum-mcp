@@ -189,3 +189,21 @@ describe('buildClearancePayload — PD statement matches gate-accepted vocabular
     expect(p.rights.statement).not.toContain('rightsstatements.org');
   });
 });
+
+describe('attributionQualifier stays out of the Clearance Manifest', () => {
+  it('builds work.artist without attributionQualifier, keeping every other artist field', async () => {
+    const { clevelandFetcher } = await import('../../src/fetchers/cleveland.js');
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const raw: unknown = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../fixtures/cleveland-accepted-possibly-by.json', import.meta.url)), 'utf8'),
+    );
+    const result = clevelandFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.artist.attributionQualifier).toBe('possibly by');
+    const payload = buildClearancePayload(result, { engineVersion: '0.0.0', now: '2026-11-23T00:00:00.000Z' });
+    const { attributionQualifier: _dropped, ...rest } = result.artwork.artist;
+    expect(payload.work.artist).toStrictEqual(rest);
+    expect(JSON.stringify(payload)).not.toContain('attributionQualifier');
+  });
+});

@@ -19,6 +19,13 @@ export interface Artist {
   nationality?: string;
   lifespan?: string;
   attributionType: AttributionType;
+  /**
+   * The museum's own attribution qualifier, verbatim ("possibly by", "attributed to"), when it publishes one as
+   * a separate field. `attributionType` is the nearest controlled bucket and can be broader than the museum's
+   * wording, so a credit printed for a reader should use this text when present. Absent when the museum
+   * publishes no qualifier. Not part of the Clearance Manifest.
+   */
+  attributionQualifier?: string;
 }
 
 export type RightsConfidence = 'high' | 'medium' | 'low';

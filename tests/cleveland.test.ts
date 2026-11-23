@@ -249,3 +249,124 @@ describe('Cleveland provenance mapping (v0.20.0, openclearance P-7 posture)', ()
     expect('provenance' in result.artwork).toBe(false);
   });
 });
+
+// Cleveland publishes the attribution qualifier in its own field, creators[].qualifier ("attributed to",
+// "possibly by", ...), not inside creators[].description. Reading only the description made every qualified
+// attribution read as the artist's own work.
+describe('Cleveland attribution qualifier (creators[].qualifier)', () => {
+  function withQualifier(qualifier: string | null): unknown {
+    const raw = structuredClone(fixture('cleveland-accepted-attributed-to.json')) as {
+      data: { creators: Array<Record<string, unknown>> };
+    };
+    raw.data.creators[0].qualifier = qualifier;
+    return raw;
+  }
+
+  it('maps "attributed to" to attributionType attributed, keeping the bare name (live record 149768)', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted-attributed-to.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.artist.name).toBe('Petrus Christus');
+    expect(result.artwork.artist.attributionType).toBe('attributed');
+  });
+
+  it('maps each qualifier with an exact attribution type to that type', () => {
+    const cases: Array<[string, string]> = [
+      ['attributed to', 'attributed'],
+      ['circle of', 'circle'],
+      ['workshop of', 'workshop'],
+      ['studio of', 'workshop'],
+      ['follower of', 'follower'],
+      ['after', 'after'],
+      ['Attributed to', 'attributed'],
+    ];
+    for (const [qualifier, type] of cases) {
+      const result = clevelandFetcher.normalize(withQualifier(qualifier));
+      expect(result.status, qualifier).toBe('accepted');
+      if (result.status !== 'accepted') continue;
+      expect(result.artwork.artist.attributionType, qualifier).toBe(type);
+      expect(result.artwork.artist.name, qualifier).toBe('Petrus Christus');
+    }
+  });
+
+  it('never reads an uncertain qualifier as the artist\'s own work: "possibly by" (live record 130169)', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted-possibly-by.json'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.artist.name).toBe('Gobelins Manufactory');
+    expect(result.artwork.artist.attributionType).toBe('attributed');
+  });
+
+  it('treats any qualifier it does not recognise as a qualified attribution, not as named', () => {
+    for (const qualifier of ['probably by', 'style of', 'manner of', 'near the', 'circle or workshop of', 'a new wording']) {
+      const result = clevelandFetcher.normalize(withQualifier(qualifier));
+      expect(result.status, qualifier).toBe('accepted');
+      if (result.status !== 'accepted') continue;
+      expect(result.artwork.artist.attributionType, qualifier).toBe('attributed');
+    }
+  });
+
+  it('reads any qualifier that copies another maker\'s design ("after a design by", "cast after a model by") as after', () => {
+    for (const qualifier of ['after a design by', 'cast after a model by', 'possibly after', 'after a work attributed to']) {
+      const result = clevelandFetcher.normalize(withQualifier(qualifier));
+      expect(result.status, qualifier).toBe('accepted');
+      if (result.status !== 'accepted') continue;
+      expect(result.artwork.artist.attributionType, qualifier).toBe('after');
+    }
+  });
+
+  it('keeps a qualifier that names the maker outright ("firm of") as named', () => {
+    const result = clevelandFetcher.normalize(withQualifier('firm of'));
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.artist.attributionType).toBe('named');
+  });
+
+  it('falls back to the description when no qualifier is published', () => {
+    for (const q of [null, '']) {
+      const result = clevelandFetcher.normalize(withQualifier(q as string | null));
+      expect(result.status).toBe('accepted');
+      if (result.status !== 'accepted') continue;
+      expect(result.artwork.artist.attributionType).toBe('named');
+    }
+  });
+});
+
+describe('Cleveland verbatim qualifier and one-sided lifespans', () => {
+  it('carries the museum\'s own qualifier verbatim in artist.attributionQualifier', () => {
+    const possibly = clevelandFetcher.normalize(fixture('cleveland-accepted-possibly-by.json'));
+    const attributed = clevelandFetcher.normalize(fixture('cleveland-accepted-attributed-to.json'));
+    if (possibly.status !== 'accepted' || attributed.status !== 'accepted') throw new Error('expected accepted');
+    expect(possibly.artwork.artist.attributionQualifier).toBe('possibly by');
+    expect(attributed.artwork.artist.attributionQualifier).toBe('attributed to');
+  });
+
+  it('omits attributionQualifier when the museum publishes none', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect('attributionQualifier' in result.artwork.artist).toBe(false);
+  });
+
+  it('marks a lifespan with only a death year as "d." rather than printing a bare year (live record 130169)', () => {
+    const result = clevelandFetcher.normalize(fixture('cleveland-accepted-possibly-by.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.artist.lifespan).toBe('d. 1799');
+  });
+
+  it('marks a lifespan with only a birth year as "b.", and keeps a full range as it was', () => {
+    const raw = structuredClone(fixture('cleveland-accepted-attributed-to.json')) as {
+      data: { creators: Array<Record<string, unknown>> };
+    };
+    const full = clevelandFetcher.normalize(raw);
+    if (full.status !== 'accepted') throw new Error('expected accepted');
+    expect(full.artwork.artist.lifespan).toBe('1410–1476');
+    raw.data.creators[0].death_year = null;
+    const birthOnly = clevelandFetcher.normalize(raw);
+    if (birthOnly.status !== 'accepted') throw new Error('expected accepted');
+    expect(birthOnly.artwork.artist.lifespan).toBe('b. 1410');
+    raw.data.creators[0].birth_year = null;
+    const neither = clevelandFetcher.normalize(raw);
+    if (neither.status !== 'accepted') throw new Error('expected accepted');
+    expect(neither.artwork.artist.lifespan).toBeUndefined();
+  });
+});

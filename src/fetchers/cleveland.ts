@@ -2,7 +2,7 @@ import { parseDisplayDate } from '../dateParser.js';
 import { validateCleveland3DLicense, validateClevelandLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
-import type { Artwork, Model3D, ValidationResult } from '../types.js';
+import type { Artwork, AttributionType, Model3D, ValidationResult } from '../types.js';
 import {
   asFiniteNumber,
   asOptionalString,
@@ -37,6 +37,46 @@ function parseCreatorDescription(description: string): { name: string; nationali
   // ("Anonymous (1850)") and we should not surface it.
   const looksLikeYear = /^\d{2,4}$/.test(firstToken);
   return looksLikeYear || !firstToken ? { name } : { name, nationality: firstToken };
+}
+
+// Cleveland publishes the attribution qualifier in its own field, creators[].qualifier, not in the description.
+// Qualifiers with an exact controlled type map to it.
+const EXACT_QUALIFIERS: Readonly<Record<string, AttributionType>> = {
+  'attributed to': 'attributed',
+  'circle of': 'circle',
+  'workshop of': 'workshop',
+  'studio of': 'workshop',
+  'follower of': 'follower',
+  after: 'after',
+};
+// Qualifiers that still name the maker outright.
+const NAMING_QUALIFIERS: ReadonlySet<string> = new Set(['firm of']);
+
+/**
+ * The attribution type for a creator, from its published qualifier first and its description otherwise.
+ * A qualifier that copies another maker's design is 'after'. Any other qualifier ("possibly by", "probably by", "style of", or a wording not seen before) is a hedged
+ * attribution with no exact controlled type, so it goes to 'attributed' and never to 'named'. 'attributed'
+ * is a stronger claim than "possibly"; the verbatim `attributionQualifier` is what keeps a printed credit
+ * exact. When the controlled vocabulary gains a 'possibly' type, remap "possibly by" here.
+ */
+function attributionFor(qualifier: string, description: string): AttributionType {
+  const q = qualifier.toLowerCase();
+  if (!q) return detectAttributionType(description);
+  if (NAMING_QUALIFIERS.has(q)) return 'named';
+  const exact = EXACT_QUALIFIERS[q];
+  if (exact) return exact;
+  // "after a design by", "cast after a model by", "possibly after": the work follows another maker's design,
+  // which 'attributed' would misstate as probably by that maker.
+  if (/\bafter\b/.test(q)) return 'after';
+  return 'attributed';
+}
+
+/** "1853–1890", "b. 1738" or "d. 1799": a one-sided span is marked so a single year is not read as a date. */
+function lifespanOf(birth: string, death: string): string | undefined {
+  if (birth && death) return `${birth}–${death}`;
+  if (birth) return `b. ${birth}`;
+  if (death) return `d. ${death}`;
+  return undefined;
 }
 
 export const clevelandFetcher: Fetcher = {
@@ -115,13 +155,14 @@ export const clevelandFetcher: Fetcher = {
       : [];
     const primary = creators[0];
     const description = sanitizeArtistName(asString(primary?.description));
-    const attributionType = detectAttributionType(description);
+    const qualifier = sanitizeArtistName(asString(primary?.qualifier)).trim();
+    const attributionType = attributionFor(qualifier, description);
     const parsed = parseCreatorDescription(description);
     const cleanName = cleanArtistName(parsed.name);
 
     const birth = asString(primary?.birth_year);
     const death = asString(primary?.death_year);
-    const lifespan = birth || death ? `${birth}–${death}`.replace(/^–|–$/g, '') : undefined;
+    const lifespan = lifespanOf(birth, death);
 
     const cultureArr = Array.isArray(r.culture) ? (r.culture as unknown[]) : [];
     const cultureStr = asString(cultureArr[0]);
@@ -224,6 +265,7 @@ export const clevelandFetcher: Fetcher = {
         nationality: parsed.nationality,
         lifespan,
         attributionType,
+        ...(qualifier ? { attributionQualifier: qualifier } : {}),
       },
       displayDate,
       yearStart: dateRange.yearStart,
