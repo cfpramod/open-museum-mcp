@@ -803,7 +803,7 @@ export const validateYcbaLicense: LicenseValidator = (raw) => {
 //
 // Strict-default-deny: a record is ACCEPTED only when an image has BOTH
 // `fieldImageLibre === true` AND a `fieldImageDroits` that matches,
-// in full, a known "CC0 Paris Musées / <museum>" statement. Either signal alone
+// in full, a CC0 statement seen on live records. Either signal alone
 // rejects, and so does a qualified statement ("CC0-NC …", "… / Petit Palais sauf
 // droits des tiers") or a museum not yet seen. The image URL
 // must also be an https URL on the Paris Musées collections host. The chosen image is the first such one; the fetcher
@@ -814,32 +814,53 @@ export const validateYcbaLicense: LicenseValidator = (raw) => {
 // (Paris Musées "Open Content", January 2020). No licence for the catalogue
 // metadata itself was found in the API or its documentation, so it is not
 // claimed.
-// The complete statements seen on live free images (2026-11), one per museum
-// observed. The WHOLE statement must match one of these (after normalising case,
-// whitespace and dash variants), so a qualification added after the museum name
-// ("… / Petit Palais sauf droits des tiers") fails closed. A museum is added
-// only once a real "CC0 Paris Musées / …" statement for it has been seen.
-const PARISMUSEES_CC0_MUSEUMS: ReadonlySet<string> = new Set([
-  'petit palais, musée des beaux-arts de la ville de paris',
-  'maisons de victor hugo paris-guernesey',
-  'musée carnavalet - histoire de paris',
-]);
-const PARISMUSEES_CC0_PREFIX = 'cc0 paris musées / ';
+// Every statement seen on a free image (fieldImageLibre=true) in a live survey
+// of 1,881 artworks across 11 museums (2026-11-23). The WHOLE statement must
+// equal one of these once case, spacing, commas, dashes and apostrophes are
+// normalised, so a qualification added to a known statement ("… / Petit Palais
+// sauf droits des tiers") or an unseen wording fails closed. The museums spell
+// their own names inconsistently, which is why this is a list of statements
+// rather than a pattern. Add a wording only after seeing it on a live record.
+const PARISMUSEES_CC0_STATEMENTS: ReadonlySet<string> = new Set(
+  [
+    'CC0 Paris Musées / Maison de Balzac',
+    'CC0 Paris Musées / Maisons de Victor Hugo',
+    'CC0 Paris Musées / Maisons de Victor Hugo Paris-Guernesey',
+    'CC0 Maisons de Victor Hugo Paris-Guernesey',
+    'CC0 Paris Musées / Musée Bourdelle',
+    'CC0 Paris Musées / Musée Carnavalet',
+    'CC0 Paris Musées / Musée Carnavalet - Histoire de Paris',
+    'CC0 Paris Musées / Musée Carnavalet, Histoire de Paris',
+    "CC0 Paris Musées / Musée Cernuschi, musée des arts de l'Asie de la Ville de Paris",
+    'CC0 Paris Musées / Musée Cognacq-Jay, le goût du XVIIIe',
+    "CC0 Paris Musées / Musée d'art moderne de Paris",
+    'CC0 Paris Musées / Musée de la Libération',
+    'CC0 Paris Musées / Musée de la Libération de Paris',
+    'CC0 Paris Musées / Musée de la Libération de Paris - musée du général Leclerc - musée Jean Moulin',
+    'CC0 Paris Musées / Musée de la Vie romantique',
+    'CC0 Musée de La Vie Romantique / Ville de Paris',
+    'CC0 Paris Musées / Palais Galliera, musée de la Mode de la Ville de Paris',
+    'CC0 Paris Musées / Palais Galliera, musée de la Mode de Paris',
+    'CC0 Paris Musées / Petit Palais, musée des Beaux-Arts de la Ville de Paris',
+  ].map(normalizeParisMuseesRights),
+);
 
-/** Case, whitespace and dash variants (Carnavalet appears with both - and –) are one spelling. */
+/** Case, spacing, commas, full stops, dash variants and apostrophe variants are one spelling. */
 function normalizeParisMuseesRights(rights: string): string {
   return rights
     .normalize('NFC')
-    .replace(/[\u2010-\u2015]/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[,.]/g, ' ')
+    .replace(/\s*\/\s*/g, ' / ')
+    .replace(/[\s\u2010-\u2015-]+/g, ' ')
+    .trim();
 }
 
 function isParisMuseesCc0Statement(rights: string): boolean {
-  const n = normalizeParisMuseesRights(rights);
-  return n.startsWith(PARISMUSEES_CC0_PREFIX) && PARISMUSEES_CC0_MUSEUMS.has(n.slice(PARISMUSEES_CC0_PREFIX.length));
+  return PARISMUSEES_CC0_STATEMENTS.has(normalizeParisMuseesRights(rights));
 }
+
 const PARISMUSEES_SITE_HOST = 'www.parismuseescollections.paris.fr';
 const PARISMUSEES_API_HOST = 'apicollections.parismusees.paris.fr';
 const PARISMUSEES_FILES_PATH = /^\/sites\/default\/files\//;

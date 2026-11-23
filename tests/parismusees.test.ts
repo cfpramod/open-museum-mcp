@@ -83,6 +83,7 @@ describe('Paris Musées adapter normalization', () => {
       'CC0 Paris Musées / Petit Palais, musée des Beaux-Arts de la Ville de Paris sauf droits des tiers',
       'CC0 Paris Musées / Petit Palais sauf droits des tiers',
       'CC0 Paris Musées / Un musée inconnu',
+      'CC0 Paris Musées / Musée Carnavalet - Histoire de Paris. Photo Philippe Ladet',
     ]) {
       const raw = withFirstImage({ fieldImageDroits: rights });
       const result = parismuseesFetcher.normalize(raw);
@@ -91,14 +92,31 @@ describe('Paris Musées adapter normalization', () => {
     }
   });
 
-  it('accepts the known museum statements, whichever dash Carnavalet uses', () => {
+  it('accepts the statement wordings seen live, whatever the dash, spacing or case', () => {
     for (const rights of [
       'CC0 Paris Musées / Musée Carnavalet - Histoire de Paris',
       'CC0 Paris Musées / Musée Carnavalet \u2013 Histoire de Paris',
-      'CC0 Paris Musées / Maisons de Victor Hugo Paris-Guernesey',
+      'CC0 Paris Musées / Maisons de Victor Hugo Paris \u2013 Guernesey',
+      'CC0 Maisons de Victor Hugo Paris-Guernesey',
+      'CC0 Paris Musées /Musée Cognacq-Jay, le goût du XVIIIe',
+      "CC0 Paris Musées / Musée Cernuschi, musée des Arts de l\u2019Asie de la Ville de Paris",
+      'CC0 Paris Musées / Petit Palais, Musée des Beaux Arts de la Ville de Paris',
+      'CC0 Musée de La Vie Romantique / Ville de Paris',
     ]) {
       expect(parismuseesFetcher.normalize(withFirstImage({ fieldImageDroits: rights })).status, rights).toBe('accepted');
     }
+  });
+
+  it('accepts every fieldImageDroits wording seen on a free image in the live survey (2026-11-23)', () => {
+    // 34 distinct statements from 4,237 free images across 11 museums.
+    const statements = JSON.parse(
+      readFileSync(join(here, 'fixtures', 'parismusees-free-statements.json'), 'utf-8'),
+    ) as string[];
+    expect(statements).toHaveLength(34);
+    const refused = statements.filter(
+      (rights) => parismuseesFetcher.normalize(withFirstImage({ fieldImageDroits: rights })).status !== 'accepted',
+    );
+    expect(refused).toEqual([]);
   });
 
   it('rejects a free image whose URL is not https on the collections host', () => {
