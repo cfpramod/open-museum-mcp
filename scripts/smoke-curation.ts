@@ -2,15 +2,13 @@
 // real Commons + Europeana APIs through the actual fetchers and prints a
 // before/after sample: junk filtered, genuine art kept.
 //   npm run smoke:curation
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import dotenv from 'dotenv';
+import { loadEnv } from '../src/loadEnv.js';
 import { europeanaFetcher } from '../src/fetchers/europeana.js';
 import { wikimediaFetcher } from '../src/fetchers/wikimedia.js';
 import type { Fetcher } from '../src/fetchers/types.js';
 
-dotenv.config({ quiet: true });
-dotenv.config({ quiet: true, path: join(homedir(), '.open-museum-mcp', '.env') });
+// Same guarded loader the server uses: a launch directory that has gone away cannot stop it.
+loadEnv();
 
 async function sample(fetcher: Fetcher, query: string, limit: number) {
   console.log(`\n===== ${fetcher.code} · search "${query}" =====`);
