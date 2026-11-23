@@ -80,11 +80,24 @@ describe('Paris Musées adapter normalization', () => {
       'CC0 sauf droits des tiers',
       'CC0 Paris Musées sauf droits des tiers',
       'CC0 Paris Musées /',
+      'CC0 Paris Musées / Petit Palais, musée des Beaux-Arts de la Ville de Paris sauf droits des tiers',
+      'CC0 Paris Musées / Petit Palais sauf droits des tiers',
+      'CC0 Paris Musées / Un musée inconnu',
     ]) {
       const raw = withFirstImage({ fieldImageDroits: rights });
       const result = parismuseesFetcher.normalize(raw);
       expect(result.status, rights).toBe('rejected');
       expect(validateLicense('parismusees', raw).accepted, rights).toBe(false);
+    }
+  });
+
+  it('accepts the known museum statements, whichever dash Carnavalet uses', () => {
+    for (const rights of [
+      'CC0 Paris Musées / Musée Carnavalet - Histoire de Paris',
+      'CC0 Paris Musées / Musée Carnavalet \u2013 Histoire de Paris',
+      'CC0 Paris Musées / Maisons de Victor Hugo Paris-Guernesey',
+    ]) {
+      expect(parismuseesFetcher.normalize(withFirstImage({ fieldImageDroits: rights })).status, rights).toBe('accepted');
     }
   });
 

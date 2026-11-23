@@ -802,9 +802,10 @@ export const validateYcbaLicense: LicenseValidator = (raw) => {
 // them only as thumbnails.
 //
 // Strict-default-deny: a record is ACCEPTED only when an image has BOTH
-// `fieldImageLibre === true` AND a `fieldImageDroits` of exactly the form
-// "CC0 Paris Musées / <museum>". Either signal alone rejects, and so does a
-// qualified statement ("CC0-NC …", "CC0 sauf droits des tiers"). The image URL
+// `fieldImageLibre === true` AND a `fieldImageDroits` that matches,
+// in full, a known "CC0 Paris Musées / <museum>" statement. Either signal alone
+// rejects, and so does a qualified statement ("CC0-NC …", "… / Petit Palais sauf
+// droits des tiers") or a museum not yet seen. The image URL
 // must also be an https URL on the Paris Musées collections host. The chosen image is the first such one; the fetcher
 // surfaces exactly that image (parisMuseesFreeImage), so the licence describes
 // the asset on the wire.
@@ -813,7 +814,32 @@ export const validateYcbaLicense: LicenseValidator = (raw) => {
 // (Paris Musées "Open Content", January 2020). No licence for the catalogue
 // metadata itself was found in the API or its documentation, so it is not
 // claimed.
-const PARISMUSEES_CC0_STATEMENT = /^CC0 Paris Musées \/ \S/u;
+// The complete statements seen on live free images (2026-11), one per museum
+// observed. The WHOLE statement must match one of these (after normalising case,
+// whitespace and dash variants), so a qualification added after the museum name
+// ("… / Petit Palais sauf droits des tiers") fails closed. A museum is added
+// only once a real "CC0 Paris Musées / …" statement for it has been seen.
+const PARISMUSEES_CC0_MUSEUMS: ReadonlySet<string> = new Set([
+  'petit palais, musée des beaux-arts de la ville de paris',
+  'maisons de victor hugo paris-guernesey',
+  'musée carnavalet - histoire de paris',
+]);
+const PARISMUSEES_CC0_PREFIX = 'cc0 paris musées / ';
+
+/** Case, whitespace and dash variants (Carnavalet appears with both - and –) are one spelling. */
+function normalizeParisMuseesRights(rights: string): string {
+  return rights
+    .normalize('NFC')
+    .replace(/[\u2010-\u2015]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function isParisMuseesCc0Statement(rights: string): boolean {
+  const n = normalizeParisMuseesRights(rights);
+  return n.startsWith(PARISMUSEES_CC0_PREFIX) && PARISMUSEES_CC0_MUSEUMS.has(n.slice(PARISMUSEES_CC0_PREFIX.length));
+}
 const PARISMUSEES_SITE_HOST = 'www.parismuseescollections.paris.fr';
 const PARISMUSEES_API_HOST = 'apicollections.parismusees.paris.fr';
 const PARISMUSEES_FILES_PATH = /^\/sites\/default\/files\//;
@@ -878,9 +904,9 @@ export function parisMuseesFreeImage(raw: unknown): ParisMuseesImage | null {
     const entity = v && typeof v === 'object' ? (v as { entity?: unknown }).entity : undefined;
     if (!entity || typeof entity !== 'object') continue;
     const e = entity as Record<string, unknown>;
-    const rights = typeof e.fieldImageDroits === 'string' ? e.fieldImageDroits.trim().normalize('NFC') : '';
+    const rights = typeof e.fieldImageDroits === 'string' ? e.fieldImageDroits.trim() : '';
     const full = parisMuseesImageUrl(e.publicUrl);
-    if (e.fieldImageLibre === true && PARISMUSEES_CC0_STATEMENT.test(rights) && full) {
+    if (e.fieldImageLibre === true && isParisMuseesCc0Statement(rights) && full) {
       // An unusable thumbnail is simply left out; it doesn't affect the licence.
       return { full, thumbnail: parisMuseesThumbnailUrl(e.vignette), rights };
     }
