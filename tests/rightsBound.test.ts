@@ -165,7 +165,8 @@ describe('the rights bound on a cache hit', () => {
     const f = fed({ met: s.fetcher }, store);
     const one = await f.getArtwork('met:1');
     const two = await f.getArtwork('met:2');
-    expect(s.calls()).toBe(2);
+    // The first live attempt threw, so the source is backed off and the second read makes none (tests/rightsBackoff.test.ts).
+    expect(s.calls()).toBe(1);
     expect(one.ok && one.freshness).toMatchObject({ rightsVerifiedAt: null, rightsAgeDays: null, rightsStale: true });
     expect(two.ok && two.freshness).toMatchObject({ rightsVerifiedAt: null, rightsAgeDays: null, rightsStale: true });
   });

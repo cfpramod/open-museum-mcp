@@ -39,6 +39,8 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 /** The default rights bound, in days: how old a served record's rights check may be (see `rightsMaxAgeDays`). */
 const DEFAULT_RIGHTS_MAX_AGE_DAYS = 30;
 const DEFAULT_SOURCE_TIMEOUT_MS = 15_000;
+/** The default re-verify failure backoff, per source (see `rightsRetryBackoffMs`). */
+const DEFAULT_RIGHTS_RETRY_BACKOFF_MS = 15 * 60 * 1000;
 /** Largest delay `setTimeout` honours (2^31 - 1 ms, about 24.8 days); above it the timer fires at once. */
 const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 
@@ -196,6 +198,16 @@ export interface FederationOptions {
    * finite number; `createFederation` throws a `RangeError` otherwise.
    */
   rightsMaxAgeDays?: number;
+  /**
+   * How long, in milliseconds, a source is left alone after a live re-verification of one of its records
+   * THROWS (default 15 minutes). The backoff is per source and held in memory. Within it, a record past the
+   * rights bound is served from the cache with `freshness.rightsStale` true and no live attempt is made, so a
+   * source that is down is not retried (timeout included) on every read. It ends when the time passes, or at
+   * the first successful live fetch of that source; a failure after it starts a new one. A rights-gate
+   * rejection is an answer from the source, not a failure, and starts nothing. Must be a positive, finite
+   * number; `createFederation` throws a `RangeError` otherwise.
+   */
+  rightsRetryBackoffMs?: number;
   /**
    * Invoked when a fetched record is rejected by its rights gate. Rejections
    * are expected — strict-default-deny is the project's spine — so this is a
@@ -395,6 +407,10 @@ export function createFederation(opts: FederationOptions): Federation {
     throw new RangeError(`rightsMaxAgeDays must be a positive, finite number of days (got ${String(requestedRightsDays)})`);
   }
   const rightsMaxAgeMs = requestedRightsDays * MS_PER_DAY;
+  const rightsRetryBackoffMs = opts.rightsRetryBackoffMs ?? DEFAULT_RIGHTS_RETRY_BACKOFF_MS;
+  if (!Number.isFinite(rightsRetryBackoffMs) || rightsRetryBackoffMs <= 0) {
+    throw new RangeError(`rightsRetryBackoffMs must be a positive, finite number of milliseconds (got ${String(rightsRetryBackoffMs)})`);
+  }
   const onReject = opts.onReject;
   const onSourceFailure = opts.onSourceFailure;
   const engineVersion = opts.engineVersion ?? '0.0.0';
@@ -468,9 +484,16 @@ export function createFederation(opts: FederationOptions): Federation {
     };
   }
 
+  // Per-source re-verify failure backoff: source code -> the time (ms) its backoff ends. In memory, so a new
+  // federation (a restarted process) starts with none.
+  const reverifyBackoffUntil = new Map<string, number>();
+  const isBackedOff = (code: string): boolean => (reverifyBackoffUntil.get(code) ?? Number.NEGATIVE_INFINITY) > Date.parse(clock());
+
   // Fetch a record live, run it through the rights gate, and store it. Rejected records are never stored.
   async function fetchLive(id: string, fetcher: Fetcher): Promise<FetchOutcome> {
     const raw = await fetcher.getRaw(id);
+    // The source answered, so it is up: any backoff it was under is over.
+    reverifyBackoffUntil.delete(fetcher.code);
     const result = fetcher.normalize(raw);
     if (result.status === 'rejected') {
       onReject?.(id, result.rejection.reason);
@@ -517,9 +540,12 @@ export function createFederation(opts: FederationOptions): Federation {
             freshness: freshnessOf(cached, 'cache', true, cachedAt),
           });
           if (!fetcher) return asStale();
+          // A source whose last re-verification threw is left alone until its backoff ends.
+          if (isBackedOff(fetcher.code)) return asStale();
           try {
             return await fetchLive(id, fetcher);
           } catch {
+            reverifyBackoffUntil.set(fetcher.code, Date.parse(clock()) + rightsRetryBackoffMs);
             return asStale();
           }
         }
