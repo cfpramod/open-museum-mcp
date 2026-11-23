@@ -210,6 +210,14 @@ describe('Rijksmuseum makers named by attribution, and records with several time
     expect(a.artist.attributionType).toBe('anonymous');
   });
 
+  it('falls back to Unknown when the museum answers 200 with a person record that carries no name', async () => {
+    const responses = dodoResponses();
+    responses[MATHAM] = { type: 'Person' };
+    const a = await normalizeDodo(responses);
+    expect(a.artist.name).toBe('Unknown');
+    expect(a.artist.attributionType).toBe('anonymous');
+  });
+
   // Not yet mapped: "possibly" and the unqualified form the museum shows as
   // "(mentioned on object)" need attribution types of their own. Until they have
   // them, neither may surface as a named or attributed maker.
