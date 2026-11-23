@@ -67,6 +67,18 @@ describe('Paris Musées adapter normalization', () => {
     expect(result.rejection.reason).toContain('strict default reject');
   });
 
+  it('rejects a public-domain work whose image is not released as Open Content (Modigliani, MZD 290)', () => {
+    // Real record, Musée Zadkine node 310909. The work is public domain
+    // (Modigliani died in 1920) and the statement reads "domaine public", but
+    // fieldImageLibre is false and the public API serves no image URL, so there
+    // is nothing to offer and no CC0 release to rely on.
+    const result = parismuseesFetcher.normalize(fixture('parismusees-rejected-public-domain-not-free.json'));
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') return;
+    expect(result.rejection.id).toBe('parismusees:310909');
+    expect(result.rejection.reason).toContain('strict default reject');
+  });
+
   it('rejects fieldImageLibre=true without a CC0 rights statement (both signals required)', () => {
     const result = parismuseesFetcher.normalize(fixture('parismusees-rejected-flag-without-cc0.json'));
     expect(result.status).toBe('rejected');
