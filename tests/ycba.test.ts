@@ -598,12 +598,23 @@ describe('YCBA search', () => {
     const controller = new AbortController();
     const pending = ycbaFetcher.search('horse', 5, { signal: controller.signal });
     await vi.waitFor(() => expect(calls).toBe(1));
-    const abortedAt = Date.now();
-    controller.abort();
-    await expect(pending).rejects.toThrow();
-    expect(calls).toBe(1);
-    // Rejects at once rather than after the first 500 ms backoff.
-    expect(Date.now() - abortedAt).toBeLessThan(250);
+    // With the clock stopped, a retry could not get past its 500 ms backoff, so
+    // settling without any timer advancing shows the abort was not retried.
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      let settled = false;
+      pending.then(
+        () => (settled = true),
+        () => (settled = true),
+      );
+      controller.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settled).toBe(true);
+      await expect(pending).rejects.toThrow();
+      expect(calls).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('makes no request when the signal is already aborted', async () => {
