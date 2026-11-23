@@ -93,7 +93,60 @@ describe('loadEnv: cwd .env, then ~/.open-museum-mcp/.env', () => {
   });
 });
 
-describe('loadEnv is the only reader of a .env file', () => {
+// True when the source uses one of the .env readers listed below. Matching the call `dotenv.config(` is not
+// enough: an aliased default import, a named `config` import, a side-effect `import 'dotenv/config'`, a
+// `require` and a dynamic `import()` all reach the same unguarded cwd lookup without ever spelling it.
+const DOTENV_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(['"`])dotenv(?:\/[^'"`]*)?\1/;
+const DOTENV_CALL = /\bdotenv\s*\.\s*config\s*\(/;
+// Node's own .env reader: it never mentions dotenv, resolves a relative path against the working directory, and is
+// the one plausible way around the package import.
+const NODE_ENV_READER = /\bloadEnvFile\b/;
+const readsEnvFile = (source: string): boolean =>
+  DOTENV_SPECIFIER.test(source) || DOTENV_CALL.test(source) || NODE_ENV_READER.test(source);
+
+describe('the .env-reader detector', () => {
+  const offending = [
+    ["import dotenv from 'dotenv';", 'a default import'],
+    ['import dotenv from "dotenv";', 'a default import in double quotes'],
+    ["import env from 'dotenv';\nenv.config();", 'an aliased default import'],
+    ["import { config } from 'dotenv';", 'a named config import'],
+    ["import { config as load, parse } from 'dotenv';", 'a renamed named import'],
+    ["import * as dotenv from 'dotenv';", 'a namespace import'],
+    ["import 'dotenv/config';", 'the side-effect import'],
+    ["import dotenv from 'dotenv/config.js';", 'a subpath import'],
+    ["const d = require('dotenv');", 'a require'],
+    ["const { config } = await import('dotenv');", 'a dynamic import'],
+    ["process.loadEnvFile();", "Node's built-in .env reader"],
+    ["process.loadEnvFile('.env');", "Node's built-in .env reader with a path"],
+    ["const { loadEnvFile } = process;", "Node's built-in .env reader, destructured"],
+    ["const d = require(`dotenv`);", 'a require with a backtick-quoted specifier'],
+    ["const { config } = await import(`dotenv/config`);", 'a dynamic import with a backtick-quoted specifier'],
+    ["import dotenv from 'dotenv'\ndotenv . config ( { quiet: true } )", 'a spaced call'],
+  ] as const;
+  for (const [source, what] of offending) {
+    it(`flags ${what}`, () => {
+      expect(readsEnvFile(source)).toBe(true);
+    });
+  }
+
+  // What a static source scan cannot see, stated rather than hidden: `createRequire(import.meta.url)('dotenv')`
+  // and an import whose specifier is computed (`import(name)`) never spell the package where a scan can read it.
+  // The scan is a guard against the common forms, not a proof.
+  const clean = [
+    ["import { loadEnv } from '../src/loadEnv.js';", 'the guarded loader'],
+    ["loadEnv();", 'a call to the guarded loader'],
+    ["const note = 'see the dotenvx docs';", 'a similar word in a string'],
+    ["import { x } from './dotenv-helper.js';", 'a local file with a similar name'],
+    ["// dotenv is only imported in src/loadEnv.ts", 'a comment that names the package'],
+  ] as const;
+  for (const [source, what] of clean) {
+    it(`does not flag ${what}`, () => {
+      expect(readsEnvFile(source)).toBe(false);
+    });
+  }
+});
+
+describe('no dotenv import, dotenv.config() call or process.loadEnvFile() outside the guarded loader', () => {
   // dotenv.config() asks for process.cwd() itself, even with an explicit path, so a process whose launch
   // directory has gone away dies on it. Every entry point (the server and the dev smoke scripts) must go
   // through loadEnv, which guards that call.
@@ -110,10 +163,10 @@ describe('loadEnv is the only reader of a .env file', () => {
     expect(files.some((f) => f.name === 'scripts/smoke-curation.ts')).toBe(true);
   });
 
-  it('has no dotenv.config() call outside the guarded loader', () => {
+  it('finds none in src/ or scripts/ outside src/loadEnv.ts', () => {
     const offenders = files
       .filter((f) => f.name !== 'src/loadEnv.ts')
-      .filter((f) => /\bdotenv\s*\.\s*config\s*\(/.test(readFileSync(f.url, 'utf8')))
+      .filter((f) => readsEnvFile(readFileSync(f.url, 'utf8')))
       .map((f) => f.name);
     expect(offenders).toEqual([]);
   });
