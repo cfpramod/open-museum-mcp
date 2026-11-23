@@ -1,5 +1,5 @@
 import { parseDisplayDate } from '../dateParser.js';
-import { parisMuseesFreeImage, validateParisMuseesLicense } from '../licenseGate.js';
+import { parisMuseesFreeImage, parisMuseesPageUrl, validateParisMuseesLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
@@ -15,7 +15,8 @@ import type { Fetcher, SearchOptions } from './types.js';
 //
 // Rights are per IMAGE, judged by validateParisMuseesLicense: a record is
 // accepted only when one of its images carries `fieldImageLibre: true` AND a
-// `fieldImageDroits` statement beginning "CC0". Records and labels are French.
+// `fieldImageDroits` statement of the form "CC0 Paris Musées / <museum>", with
+// an https image URL on the collections host. Records and labels are French.
 //
 // Quota: the public API allows 1,000 requests a day. The federation's usual
 // shape (search → ids, then one getRaw per id) would spend 1 + N requests per
@@ -43,15 +44,15 @@ const RETRY_DELAY_MS = 1000;
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(signal.reason);
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer);
-        reject(signal.reason);
-      },
-      { once: true },
-    );
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
 
@@ -319,25 +320,27 @@ export const parismuseesFetcher: Fetcher = {
     const endYear = asFiniteNumber(dp.endYear);
     // The label date when there is one; otherwise the structured years, which
     // read better than the API's own rendering ("En 03-1883").
-    const displayDate =
+    const displayDate = sanitizeTitle(
       asString(r.fieldCartelDatation).trim() ||
       (startYear !== null
         ? endYear !== null && endYear !== startYear
           ? `${startYear}–${endYear}`
           : String(startYear)
-        : asString(dp.processed).trim());
+        : asString(dp.processed).trim()),
+    ).trim();
     const dateRange =
       startYear !== null
         ? { yearStart: startYear, yearEnd: endYear ?? startYear }
         : parseDisplayDate(displayDate);
 
-    const medium =
-      asString(r.fieldCartelMateriaux).trim() || namesOf(r.fieldMateriauxTechnique).join(', ');
+    const medium = sanitizeDescription(
+      asString(r.fieldCartelMateriaux).trim() || namesOf(r.fieldMateriauxTechnique).join(', '),
+    ).trim();
     const objectType = namesOf(r.fieldOeuvreTypesObjet).join(', ');
     const museum = r.fieldMusee && typeof r.fieldMusee === 'object'
       ? (r.fieldMusee as { entity?: Record<string, unknown> | null }).entity ?? {}
       : {};
-    const museumName = asString(museum.name).trim();
+    const museumName = sanitizeTitle(asString(museum.name)).trim();
     const description = sanitizeDescription(
       textValue(r.fieldOeuvreDescriptionIcono) || textValue(r.fieldDescription),
     );
@@ -378,11 +381,12 @@ export const parismuseesFetcher: Fetcher = {
       license: decision.license,
       source: {
         apiUrl: PM_GRAPHQL,
-        pageUrl: asOptionalString(r.absolutePath) ?? `${PM_SITE}/node/${nid}`,
+        // An off-host or non-https page URL is ignored in favour of the canonical node URL.
+        pageUrl: parisMuseesPageUrl(r.absolutePath) ?? `${PM_SITE}/node/${nid}`,
       },
       description: asOptionalString(description),
       objectType: objectType ? sanitizeTitle(objectType) : undefined,
-      dimensions: asOptionalString(asString(r.fieldCartelDimension).trim()),
+      dimensions: asOptionalString(sanitizeDescription(asString(r.fieldCartelDimension)).trim()),
     };
 
     return { status: 'accepted', artwork };

@@ -802,8 +802,10 @@ export const validateYcbaLicense: LicenseValidator = (raw) => {
 // them only as thumbnails.
 //
 // Strict-default-deny: a record is ACCEPTED only when an image has BOTH
-// `fieldImageLibre === true` AND a `fieldImageDroits` beginning "CC0". Either
-// signal alone rejects. The chosen image is the first such one; the fetcher
+// `fieldImageLibre === true` AND a `fieldImageDroits` of exactly the form
+// "CC0 Paris Musées / <museum>". Either signal alone rejects, and so does a
+// qualified statement ("CC0-NC …", "CC0 sauf droits des tiers"). The image URL
+// must also be an https URL on the Paris Musées collections host. The chosen image is the first such one; the fetcher
 // surfaces exactly that image (parisMuseesFreeImage), so the licence describes
 // the asset on the wire.
 //
@@ -811,7 +813,55 @@ export const validateYcbaLicense: LicenseValidator = (raw) => {
 // (Paris Musées "Open Content", January 2020). No licence for the catalogue
 // metadata itself was found in the API or its documentation, so it is not
 // claimed.
-const PARISMUSEES_CC0_PREFIX = /^CC0\b/i;
+const PARISMUSEES_CC0_STATEMENT = /^CC0 Paris Musées \/ \S/u;
+const PARISMUSEES_SITE_HOST = 'www.parismuseescollections.paris.fr';
+const PARISMUSEES_API_HOST = 'apicollections.parismusees.paris.fr';
+const PARISMUSEES_FILES_PATH = /^\/sites\/default\/files\//;
+
+/**
+ * Parse `value` and return it rebuilt from its checked parts only when it is an
+ * https URL on exactly `host` (no credentials, no port). The query string is
+ * kept only when `allowQuery` is set (thumbnails carry an `itok` token), and
+ * the fragment is always dropped, so nothing unchecked reaches the output.
+ */
+function pinnedParisMuseesUrl(
+  value: unknown,
+  host: string,
+  pathPattern: RegExp | null,
+  allowQuery: boolean,
+): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  let u: URL;
+  try {
+    u = new URL(value);
+  } catch {
+    return undefined;
+  }
+  const ok =
+    u.protocol === 'https:' &&
+    u.hostname === host &&
+    u.port === '' &&
+    u.username === '' &&
+    u.password === '' &&
+    (pathPattern === null || pathPattern.test(u.pathname));
+  if (!ok) return undefined;
+  return `${u.origin}${u.pathname}${allowQuery ? u.search : ''}`;
+}
+
+/** Original image URL: https, the collections site host, under /sites/default/files/. */
+export function parisMuseesImageUrl(value: unknown): string | undefined {
+  return pinnedParisMuseesUrl(value, PARISMUSEES_SITE_HOST, PARISMUSEES_FILES_PATH, false);
+}
+
+/** Thumbnail URL: https, the API host, under /sites/default/files/. */
+export function parisMuseesThumbnailUrl(value: unknown): string | undefined {
+  return pinnedParisMuseesUrl(value, PARISMUSEES_API_HOST, PARISMUSEES_FILES_PATH, true);
+}
+
+/** Catalogue page URL: https on the collections site host; anything else is dropped. */
+export function parisMuseesPageUrl(value: unknown): string | undefined {
+  return pinnedParisMuseesUrl(value, PARISMUSEES_SITE_HOST, null, false);
+}
 
 interface ParisMuseesImage {
   full: string;
@@ -828,11 +878,11 @@ export function parisMuseesFreeImage(raw: unknown): ParisMuseesImage | null {
     const entity = v && typeof v === 'object' ? (v as { entity?: unknown }).entity : undefined;
     if (!entity || typeof entity !== 'object') continue;
     const e = entity as Record<string, unknown>;
-    const rights = typeof e.fieldImageDroits === 'string' ? e.fieldImageDroits.trim() : '';
-    const full = typeof e.publicUrl === 'string' ? e.publicUrl : '';
-    if (e.fieldImageLibre === true && PARISMUSEES_CC0_PREFIX.test(rights) && full) {
-      const thumbnail = typeof e.vignette === 'string' && e.vignette ? e.vignette : undefined;
-      return { full, thumbnail, rights };
+    const rights = typeof e.fieldImageDroits === 'string' ? e.fieldImageDroits.trim().normalize('NFC') : '';
+    const full = parisMuseesImageUrl(e.publicUrl);
+    if (e.fieldImageLibre === true && PARISMUSEES_CC0_STATEMENT.test(rights) && full) {
+      // An unusable thumbnail is simply left out; it doesn't affect the licence.
+      return { full, thumbnail: parisMuseesThumbnailUrl(e.vignette), rights };
     }
   }
   return null;
@@ -849,7 +899,7 @@ export const validateParisMuseesLicense: LicenseValidator = (raw) => {
   const image = parisMuseesFreeImage(raw);
   if (!image) {
     return reject(
-      'parismusees: no image with fieldImageLibre=true and fieldImageDroits=CC0 (strict default reject)',
+      'parismusees: no image with fieldImageLibre=true and fieldImageDroits "CC0 Paris Musées / …" and an https image on the collections host (strict default reject)',
     );
   }
   return {
@@ -863,7 +913,7 @@ export const validateParisMuseesLicense: LicenseValidator = (raw) => {
     },
     imageOpenAccess: true,
     metadataOpenAccess: false,
-    reason: 'parismusees: fieldImageLibre=true, fieldImageDroits=CC0',
+    reason: 'parismusees: fieldImageLibre=true, fieldImageDroits="CC0 Paris Musées / …"',
   };
 };
 

@@ -11,6 +11,13 @@ function fixture(name: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(here, 'fixtures', name), 'utf-8')) as Record<string, unknown>;
 }
 
+function withFirstImage(patch: Record<string, unknown>): Record<string, unknown> {
+  const raw = fixture('parismusees-accepted.json');
+  const visuels = raw.fieldVisuels as Array<{ entity: Record<string, unknown> }>;
+  visuels[0] = { entity: { ...visuels[0].entity, ...patch } };
+  return raw;
+}
+
 describe('Paris Musées adapter normalization', () => {
   it('accepts a CC0 record (Monet, Soleil couchant sur la Seine à Lavacourt)', () => {
     const result = parismuseesFetcher.normalize(fixture('parismusees-accepted.json'));
@@ -65,6 +72,61 @@ describe('Paris Musées adapter normalization', () => {
     expect(result.status).toBe('rejected');
     if (result.status !== 'rejected') return;
     expect(result.rejection.reason).toContain('strict default reject');
+  });
+
+  it('rejects a qualified CC0 statement (only "CC0 Paris Musées / <museum>" passes)', () => {
+    for (const rights of [
+      'CC0-NC Paris Musées / Petit Palais',
+      'CC0 sauf droits des tiers',
+      'CC0 Paris Musées sauf droits des tiers',
+      'CC0 Paris Musées /',
+    ]) {
+      const raw = withFirstImage({ fieldImageDroits: rights });
+      const result = parismuseesFetcher.normalize(raw);
+      expect(result.status, rights).toBe('rejected');
+      expect(validateLicense('parismusees', raw).accepted, rights).toBe(false);
+    }
+  });
+
+  it('rejects a free image whose URL is not https on the collections host', () => {
+    for (const publicUrl of [
+      'file:///etc/passwd',
+      'javascript:alert(1)',
+      'http://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/x.jpg',
+      'https://evil.example/sites/default/files/atoms/images/PPA/x.jpg',
+      'https://www.parismuseescollections.paris.fr@evil.example/sites/default/files/x.jpg',
+      'https://www.parismuseescollections.paris.fr/elsewhere/x.jpg',
+    ]) {
+      const result = parismuseesFetcher.normalize(withFirstImage({ publicUrl }));
+      expect(result.status, publicUrl).toBe('rejected');
+    }
+  });
+
+  it('drops an off-host thumbnail and falls back from an off-host page URL', () => {
+    const raw = withFirstImage({ vignette: 'file:///etc/passwd' });
+    raw.absolutePath = 'javascript:alert(1)';
+    const result = parismuseesFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    expect(result.artwork.imageUrls.thumbnail).toBeUndefined();
+    expect(result.artwork.source.pageUrl).toBe('https://www.parismuseescollections.paris.fr/node/226737');
+  });
+
+  it('strips markup from the museum name, date, medium and dimensions', () => {
+    const raw = fixture('parismusees-accepted.json');
+    raw.fieldCartelDatation = '1880<script>alert(1)</script>';
+    raw.fieldCartelMateriaux = '<b>Huile</b> sur toile';
+    raw.fieldCartelDimension = 'H. 101,5 <img src=x onerror=alert(1)> cm';
+    raw.fieldMusee = { entity: { name: '<i>Petit Palais</i>' } };
+    const result = parismuseesFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status !== 'accepted') return;
+    const a = result.artwork;
+    for (const text of [a.museum.name, a.displayDate, a.medium, a.dimensions ?? '']) {
+      expect(text).not.toMatch(/[<>]/);
+    }
+    expect(a.museum.name).toBe('Petit Palais');
+    expect(a.medium).toBe('Huile sur toile');
   });
 
   it('rejects a record with no images', () => {
