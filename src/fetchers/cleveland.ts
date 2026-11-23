@@ -71,8 +71,22 @@ function attributionFor(qualifier: string, description: string): AttributionType
   return 'attributed';
 }
 
-/** "1853–1890", "b. 1738" or "d. 1799": a one-sided span is marked so a single year is not read as a date. */
-function lifespanOf(birth: string, death: string): string | undefined {
+/**
+ * The founding year of an institution, read only from the museum's own "est. YYYY" marker in the creator
+ * description ("Gobelins Manufactory (France, Paris, est. 1662)"). No name list or other heuristic: a creator
+ * counts as an institution only when the museum says it was established.
+ */
+function foundingYearOf(description: string): string | undefined {
+  return /\(([^)]*)\)/.exec(description)?.[1].match(/\best\.\s*(\d{3,4})\b/)?.[1];
+}
+
+/**
+ * "1853–1890", "b. 1738" or "d. 1799": a one-sided span is marked so a single year is not read as a date.
+ * An institution is dated by its founding ("est. 1662") and never by a death year: the museum gives Gobelins
+ * Manufactory a death_year of 1799, and "d. 1799" would tell a reader that a still-operating manufactory closed.
+ */
+function lifespanOf(birth: string, death: string, founded?: string): string | undefined {
+  if (founded) return `est. ${founded}`;
   if (birth && death) return `${birth}–${death}`;
   if (birth) return `b. ${birth}`;
   if (death) return `d. ${death}`;
@@ -162,7 +176,7 @@ export const clevelandFetcher: Fetcher = {
 
     const birth = asString(primary?.birth_year);
     const death = asString(primary?.death_year);
-    const lifespan = lifespanOf(birth, death);
+    const lifespan = lifespanOf(birth, death, foundingYearOf(description));
 
     const cultureArr = Array.isArray(r.culture) ? (r.culture as unknown[]) : [];
     const cultureStr = asString(cultureArr[0]);

@@ -347,8 +347,43 @@ describe('Cleveland verbatim qualifier and one-sided lifespans', () => {
     expect('attributionQualifier' in result.artwork.artist).toBe(false);
   });
 
-  it('marks a lifespan with only a death year as "d." rather than printing a bare year (live record 130169)', () => {
+  it('dates an institution by its founding, not by a death year (live record 130169)', () => {
+    // The museum describes Gobelins Manufactory as "est. 1662" and also gives it a death_year of 1799.
+    // The manufactory still operates, so "d. 1799" would tell a reader it closed.
     const result = clevelandFetcher.normalize(fixture('cleveland-accepted-possibly-by.json'));
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.artist.lifespan).toBe('est. 1662');
+    expect(result.artwork.artist.nationality).toBe('France');
+  });
+
+  it('reads the founding year only from the museum\'s own "est." marker, ignoring any birth or death year', () => {
+    const raw = structuredClone(fixture('cleveland-accepted-possibly-by.json')) as {
+      data: { creators: Array<Record<string, unknown>> };
+    };
+    raw.data.creators[0].birth_year = '1662';
+    raw.data.creators[0].death_year = '1799';
+    const both = clevelandFetcher.normalize(raw);
+    if (both.status !== 'accepted') throw new Error('expected accepted');
+    expect(both.artwork.artist.lifespan).toBe('est. 1662');
+  });
+
+  it('marks a lifespan with only a death year as "d." rather than printing a bare year', () => {
+    // The same record, described as a person (no "est." marker), keeps the death-year rendering.
+    const raw = structuredClone(fixture('cleveland-accepted-possibly-by.json')) as {
+      data: { creators: Array<Record<string, unknown>> };
+    };
+    raw.data.creators[0].description = 'Jean Dupont (French, died 1799)';
+    const result = clevelandFetcher.normalize(raw);
+    if (result.status !== 'accepted') throw new Error('expected accepted');
+    expect(result.artwork.artist.lifespan).toBe('d. 1799');
+  });
+
+  it('does not read "est." inside a name, or a non-year after "est.", as a founding date', () => {
+    const raw = structuredClone(fixture('cleveland-accepted-possibly-by.json')) as {
+      data: { creators: Array<Record<string, unknown>> };
+    };
+    raw.data.creators[0].description = 'Forest Workshop (English, est. unknown)';
+    const result = clevelandFetcher.normalize(raw);
     if (result.status !== 'accepted') throw new Error('expected accepted');
     expect(result.artwork.artist.lifespan).toBe('d. 1799');
   });
