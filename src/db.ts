@@ -32,6 +32,8 @@ export interface DiscoverFilter {
   period?: string;
   notArtist?: string[];
   museumCode?: string;
+  /** Ids not to pick (works already tried and not servable). */
+  notIds?: string[];
 }
 
 /**
@@ -224,6 +226,11 @@ export class Cache {
       conditions.push(`artist_name NOT IN (${placeholders})`);
       params.push(...filter.notArtist);
     }
+    if (filter.notIds && filter.notIds.length > 0) {
+      const placeholders = filter.notIds.map(() => '?').join(',');
+      conditions.push(`id NOT IN (${placeholders})`);
+      params.push(...filter.notIds);
+    }
     // TTL gate: defense in depth on top of pruneExpired() at construction.
     conditions.push('cached_at > ?');
     params.push(new Date(Date.now() - OBJECT_TTL_DAYS * MS_PER_DAY).toISOString());
@@ -237,6 +244,11 @@ export class Cache {
     } catch {
       return null;
     }
+  }
+
+  getCachedAt(id: string): string | null {
+    const row = this.db.prepare(`SELECT cached_at FROM objects WHERE id = ?`).get(id) as { cached_at: string } | undefined;
+    return row?.cached_at ?? null;
   }
 
   getObject(id: string, expect?: ObjectVersion): Artwork | null {

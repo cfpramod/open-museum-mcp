@@ -35,7 +35,12 @@ const DEFAULT_FETCH_CONCURRENCY = 8;
 // it never trims a healthy answer, and it keeps one hung upstream from holding
 // the whole federated query. The object fetches that follow a search (the
 // slow part of a cold facets call) are not covered by this bound.
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+/** The default rights bound, in days: how old a served record's rights check may be (see `rightsMaxAgeDays`). */
+const DEFAULT_RIGHTS_MAX_AGE_DAYS = 30;
 const DEFAULT_SOURCE_TIMEOUT_MS = 15_000;
+/** The default re-verify failure backoff, per source (see `rightsRetryBackoffMs`). */
+const DEFAULT_RIGHTS_RETRY_BACKOFF_MS = 15 * 60 * 1000;
 /** Largest delay `setTimeout` honours (2^31 - 1 ms, about 24.8 days); above it the timer fires at once. */
 const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 
@@ -89,6 +94,11 @@ export interface SearchResult {
    * here with the reason; it is NOT silently folded into "no results".
    */
   sources: SourceStatus[];
+  /**
+   * The freshness of each result's rights check, keyed by result id (see {@link Freshness}). Every id in
+   * `results` has an entry.
+   */
+  freshness: Record<string, Freshness>;
 }
 
 /** One facet value and how many records in the query set carry it. */
@@ -121,8 +131,31 @@ export interface FacetResult {
 // Cap on the artist facet — a swatch/chip list, not the full long tail.
 const TOP_ARTISTS = 10;
 
+/**
+ * How fresh the rights check behind a served record is, and where the record came from. Returned with every
+ * record a read serves (`FetchOutcome`, and per result in `SearchResult`), so a caller can see how old the
+ * claim it is acting on is, and whether the engine it is served by has the latest fixes.
+ */
+export interface Freshness {
+  /** `'live'` when this read fetched the record through the rights gate; `'cache'` when it was served from the cache. */
+  servedFrom: 'cache' | 'live';
+  /** When the cached row was written. Present when `servedFrom` is `'cache'` and the cache store can say. */
+  cachedAt?: string;
+  /** When the rights gate last checked this record: the record's `license.verifiedAt`. `null` when it is missing or unreadable. */
+  rightsVerifiedAt: string | null;
+  /** Whole days from `rightsVerifiedAt` to this read. `null` when `rightsVerifiedAt` is missing or unreadable. */
+  rightsAgeDays: number | null;
+  /**
+   * True when the rights check is older than the bound (`rightsMaxAgeDays`) and no re-verification succeeded for
+   * this read, so the record is served as cached. A missing or unreadable `rightsVerifiedAt` is stale.
+   */
+  rightsStale: boolean;
+  /** The version of the engine serving this read. */
+  engineVersion: string;
+}
+
 export type FetchOutcome =
-  | { ok: true; artwork: Artwork }
+  | { ok: true; artwork: Artwork; freshness: Freshness }
   | { ok: false; reason: string };
 
 export type CiteOutcome =
@@ -155,6 +188,26 @@ export interface FederationOptions {
    * finite number; `createFederation` throws a `RangeError` otherwise.
    */
   sourceTimeoutMs?: number;
+  /**
+   * The longest a served record's rights check (`license.verifiedAt`) may be, in days (default 30). A cached
+   * record past it is re-verified live through its fetcher and the rights gate before it is served: the
+   * fresh record is returned and stored; if the gate now rejects it, it is not served; if the re-verification
+   * fails (upstream down, no fetcher registered), the cached record is served with
+   * `freshness.rightsStale` true. A record with no usable `verifiedAt` counts as
+   * past the bound. The clearance manifest never reads the cache and is unaffected. Must be a positive,
+   * finite number; `createFederation` throws a `RangeError` otherwise.
+   */
+  rightsMaxAgeDays?: number;
+  /**
+   * How long, in milliseconds, a source is left alone after a live re-verification of one of its records
+   * THROWS (default 15 minutes). The backoff is per source and held in memory. Within it, a record past the
+   * rights bound is served from the cache with `freshness.rightsStale` true and no live attempt is made, so a
+   * source that is down is not retried (timeout included) on every read. It ends when the time passes, or at
+   * the first successful live fetch of that source; a failure after it starts a new one. A rights-gate
+   * rejection is an answer from the source, not a failure, and starts nothing. Must be a positive, finite
+   * number; `createFederation` throws a `RangeError` otherwise.
+   */
+  rightsRetryBackoffMs?: number;
   /**
    * Invoked when a fetched record is rejected by its rights gate. Rejections
    * are expected — strict-default-deny is the project's spine — so this is a
@@ -349,6 +402,15 @@ export function createFederation(opts: FederationOptions): Federation {
   // after 1ms, which would time every source out at once. A bound that long means
   // "effectively none", so it is held at the largest delay a timer accepts.
   const sourceTimeoutMs = Math.min(requestedTimeoutMs, MAX_TIMER_DELAY_MS);
+  const requestedRightsDays = opts.rightsMaxAgeDays ?? DEFAULT_RIGHTS_MAX_AGE_DAYS;
+  if (!Number.isFinite(requestedRightsDays) || requestedRightsDays <= 0) {
+    throw new RangeError(`rightsMaxAgeDays must be a positive, finite number of days (got ${String(requestedRightsDays)})`);
+  }
+  const rightsMaxAgeMs = requestedRightsDays * MS_PER_DAY;
+  const rightsRetryBackoffMs = opts.rightsRetryBackoffMs ?? DEFAULT_RIGHTS_RETRY_BACKOFF_MS;
+  if (!Number.isFinite(rightsRetryBackoffMs) || rightsRetryBackoffMs <= 0) {
+    throw new RangeError(`rightsRetryBackoffMs must be a positive, finite number of milliseconds (got ${String(rightsRetryBackoffMs)})`);
+  }
   const onReject = opts.onReject;
   const onSourceFailure = opts.onSourceFailure;
   const engineVersion = opts.engineVersion ?? '0.0.0';
@@ -398,6 +460,59 @@ export function createFederation(opts: FederationOptions): Federation {
   const versionOf = (f: Fetcher | undefined): ObjectVersion | undefined =>
     f?.adapterVersion !== undefined ? { adapterVersion: f.adapterVersion } : undefined;
 
+  // The age of a record's rights check at this read, or null when its verifiedAt is missing or unreadable.
+  function rightsAgeMs(artwork: Artwork): number | null {
+    const verified = Date.parse(artwork.license?.verifiedAt ?? '');
+    return Number.isFinite(verified) ? Date.parse(clock()) - verified : null;
+  }
+
+  // Past the rights bound? A record with no usable verifiedAt counts as past it: nothing vouches for it.
+  function isPastRightsBound(artwork: Artwork): boolean {
+    const age = rightsAgeMs(artwork);
+    return age === null || age > rightsMaxAgeMs;
+  }
+
+  function freshnessOf(artwork: Artwork, servedFrom: 'cache' | 'live', stale: boolean, cachedAt?: string): Freshness {
+    const age = rightsAgeMs(artwork);
+    return {
+      servedFrom,
+      ...(servedFrom === 'cache' && cachedAt !== undefined ? { cachedAt } : {}),
+      rightsVerifiedAt: age === null ? null : (artwork.license?.verifiedAt ?? null),
+      rightsAgeDays: age === null ? null : Math.max(0, Math.floor(age / MS_PER_DAY)),
+      rightsStale: stale,
+      engineVersion,
+    };
+  }
+
+  // Per-source re-verify failure backoff: source code -> the time (ms) its backoff ends. In memory, so a new
+  // federation (a restarted process) starts with none.
+  const reverifyBackoffUntil = new Map<string, number>();
+  const isBackedOff = (code: string): boolean => (reverifyBackoffUntil.get(code) ?? Number.NEGATIVE_INFINITY) > Date.parse(clock());
+
+  // Fetch a record live, run it through the rights gate, and store it. Rejected records are never stored.
+  async function fetchLive(id: string, fetcher: Fetcher): Promise<FetchOutcome> {
+    return gateAndStore(id, fetcher, await fetcher.getRaw(id));
+  }
+
+  // Run a record the source has returned through the rights gate, and store it. The source answered, so any
+  // backoff it was under is over; a throw from here on is a local fault (normalising, colour, the cache write),
+  // not a source failure.
+  async function gateAndStore(id: string, fetcher: Fetcher, raw: unknown): Promise<FetchOutcome> {
+    reverifyBackoffUntil.delete(fetcher.code);
+    const result = fetcher.normalize(raw);
+    if (result.status === 'rejected') {
+      onReject?.(id, result.rejection.reason);
+      return { ok: false, reason: result.rejection.reason };
+    }
+
+    // Apply per-fetcher hotlink flag centrally so every adapter stays flag-free.
+    if (fetcher.hotlinkRestricted) result.artwork.imageUrls.hotlinkRestricted = true;
+
+    await enrichColor(result.artwork);
+    if (!fetcher.noCache) await cache.upsertObject(result.artwork, versionOf(fetcher));
+    return { ok: true, artwork: result.artwork, freshness: freshnessOf(result.artwork, 'live', false) };
+  }
+
   async function getArtwork(id: string): Promise<FetchOutcome> {
     if (!ID_REGEX.test(id)) {
       return { ok: false, reason: `invalid artwork id: ${id}` };
@@ -416,32 +531,48 @@ export function createFederation(opts: FederationOptions): Federation {
       const version = versionOf(fetcher);
       const cached = await cache.getObject(id, version);
       if (cached) {
+        const cachedAt = (await cache.getCachedAt?.(id)) ?? undefined;
+        // Backfill hotlinkRestricted onto records cached before v0.16 added it.
+        if (fetcher?.hotlinkRestricted) cached.imageUrls.hotlinkRestricted = true;
+
+        if (isPastRightsBound(cached)) {
+          // The rights check behind this record is older than the bound: re-verify it live through the gate.
+          // A fresh record is served; one the gate now rejects is not; if the re-verification itself fails
+          // (upstream down, no fetcher registered) the cached record is served, marked stale.
+          const asStale = (): FetchOutcome => ({
+            ok: true,
+            artwork: cached,
+            freshness: freshnessOf(cached, 'cache', true, cachedAt),
+          });
+          if (!fetcher) return asStale();
+          // A source whose last re-verification failed is left alone until its backoff ends.
+          if (isBackedOff(fetcher.code)) return asStale();
+          let raw: unknown;
+          try {
+            raw = await fetcher.getRaw(id);
+          } catch {
+            // Only the source failing to answer starts the backoff.
+            reverifyBackoffUntil.set(fetcher.code, Date.parse(clock()) + rightsRetryBackoffMs);
+            return asStale();
+          }
+          try {
+            return await gateAndStore(id, fetcher, raw);
+          } catch {
+            return asStale();
+          }
+        }
+
         // Backfill colour onto a record cached before it had any — a pre-v0.8b row
         // still within the 90-day TTL, or one written by a sharp-less/Workers
         // process. Without this, such rows would stay colourless until natural
         // expiry and silently under-return from colour search/facets.
         if (await enrichColor(cached)) await cache.upsertObject(cached, version);
-        // Backfill hotlinkRestricted onto records cached before v0.16 added it.
-        if (fetcher?.hotlinkRestricted) cached.imageUrls.hotlinkRestricted = true;
-        return { ok: true, artwork: cached };
+        return { ok: true, artwork: cached, freshness: freshnessOf(cached, 'cache', false, cachedAt) };
       }
     }
 
     if (!fetcher) return { ok: false, reason: `unknown museum code: ${code}` };
-
-    const raw = await fetcher.getRaw(id);
-    const result = fetcher.normalize(raw);
-    if (result.status === 'rejected') {
-      onReject?.(id, result.rejection.reason);
-      return { ok: false, reason: result.rejection.reason };
-    }
-
-    // Apply per-fetcher hotlink flag centrally so every adapter stays flag-free.
-    if (fetcher.hotlinkRestricted) result.artwork.imageUrls.hotlinkRestricted = true;
-
-    await enrichColor(result.artwork);
-    if (!fetcher.noCache) await cache.upsertObject(result.artwork, versionOf(fetcher));
-    return { ok: true, artwork: result.artwork };
+    return fetchLive(id, fetcher);
   }
 
   // Node-only colour enrichment. Runs the injected extractor on a record that has
@@ -469,7 +600,7 @@ export function createFederation(opts: FederationOptions): Federation {
   // so the medium facet reflects every medium present in the query.
   async function gatherCandidates(
     params: SearchParams,
-  ): Promise<{ candidates: Artwork[]; sources: SourceStatus[] }> {
+  ): Promise<{ candidates: Artwork[]; sources: SourceStatus[]; freshnessById: Map<string, Freshness> }> {
     const fetcherList = params.museum
       ? fetchers[params.museum]
         ? [fetchers[params.museum]]
@@ -533,16 +664,16 @@ export function createFederation(opts: FederationOptions): Federation {
         reason: err instanceof Error ? err.message : 'fetch failed',
       })),
     );
-    const accepted: Artwork[] = fetched
-      .filter((r): r is { ok: true; artwork: Artwork } => r.ok)
-      .map((r) => r.artwork);
+    const okOutcomes = fetched.filter((r): r is Extract<FetchOutcome, { ok: true }> => r.ok);
+    const freshnessById = new Map(okOutcomes.map((r) => [r.artwork.id, r.freshness] as const));
+    const accepted: Artwork[] = okOutcomes.map((r) => r.artwork);
     const filtered = accepted.filter((a) => !params.has_image || Boolean(a.imageUrls.full));
     const deduped = dedupeWikimediaUploads(filtered);
-    return { candidates: filterByYearRange(deduped, params.year_min, params.year_max), sources };
+    return { candidates: filterByYearRange(deduped, params.year_min, params.year_max), sources, freshnessById };
   }
 
   async function search(params: SearchParams): Promise<SearchResult> {
-    const { candidates: dated, sources } = await gatherCandidates(params);
+    const { candidates: dated, sources, freshnessById } = await gatherCandidates(params);
     // Medium is a post-fetch filter on the normalized category (like the year
     // filter), not an upstream search constraint. Because it runs over the
     // bounded overfetch window, a medium that is sparse in that window can leave
@@ -584,7 +715,12 @@ export function createFederation(opts: FederationOptions): Federation {
     const page = ordered.slice(0, params.limit);
     const results = params.color ? page : page.sort((a, b) => a.id.localeCompare(b.id));
 
-    return { count: results.length, results, sources };
+    const freshness: Record<string, Freshness> = {};
+    for (const r of results) {
+      const f = freshnessById.get(r.id);
+      if (f) freshness[r.id] = f;
+    }
+    return { count: results.length, results, sources, freshness };
   }
 
   async function facets(params: SearchParams): Promise<FacetResult> {

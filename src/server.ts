@@ -24,6 +24,7 @@ import { createColorExtractor } from './color/extract.js';
 import { COLOR_FAMILY_NAMES } from './core/index.js';
 import { totalFailureResult } from './totalFailure.js';
 import { Cache } from './db.js';
+import { pickDiscoverable } from './discover.js';
 import { buildSeedQueryFromConstraints } from './discoverSeed.js';
 import { aicFetcher } from './fetchers/aic.js';
 import { clevelandFetcher } from './fetchers/cleveland.js';
@@ -363,7 +364,7 @@ async function handleGet(args: unknown) {
   const input = GetInput.parse(args);
   const out = await federation.getArtwork(input.id);
   if (!out.ok) return errorResult(out.reason);
-  return { content: [{ type: 'text' as const, text: JSON.stringify(out.artwork, null, 2) }] };
+  return { content: [{ type: 'text' as const, text: JSON.stringify({ ...out.artwork, freshness: out.freshness }, null, 2) }] };
 }
 
 async function handleCite(args: unknown) {
@@ -386,13 +387,13 @@ async function handleDiscoverRandom(args: unknown) {
     museumCode: input.museum,
   };
 
-  let artwork = cache.getRandomObject(lookup);
+  let picked = await pickDiscoverable({ cache, federation, lookup });
 
   // Cold-start path: when the cache has nothing for these constraints AND the
   // constraints carry enough signal to build a meaningful query, auto-seed
   // by running a small search_artworks call first. Logged to stderr so
   // operators can see the extra fetches happening on a fresh install.
-  if (!artwork) {
+  if (!picked) {
     const seedQuery = buildSeedQueryFromConstraints(input);
     if (seedQuery) {
       console.error(
@@ -404,16 +405,16 @@ async function handleDiscoverRandom(args: unknown) {
         has_image: true,
         museum: input.museum,
       });
-      artwork = cache.getRandomObject(lookup);
+      picked = await pickDiscoverable({ cache, federation, lookup });
     }
   }
 
-  if (!artwork) {
+  if (!picked) {
     return errorResult(
       'No cached artwork matches these constraints. discover_random samples from records you have already collected — try search_artworks with a topic first (e.g. search_artworks({ query: "edo painting" })), then call discover_random again.',
     );
   }
-  return { content: [{ type: 'text' as const, text: JSON.stringify(artwork, null, 2) }] };
+  return { content: [{ type: 'text' as const, text: JSON.stringify({ ...picked.artwork, freshness: picked.freshness }, null, 2) }] };
 }
 
 function handleListTraditions() {

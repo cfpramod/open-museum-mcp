@@ -25,7 +25,7 @@ function makeArtwork(id: string, over: Partial<Artwork> = {}): Artwork {
       type: 'CC0',
       rawValue: 'true',
       verificationSource: `${code}.test`,
-      verifiedAt: '2026-01-01T00:00:00.000Z',
+      verifiedAt: new Date().toISOString(), // inside the rights bound, so a cache hit is served as cached
       confidence: 'high',
     },
     source: { apiUrl: `https://${code}.example/api/${id}`, pageUrl: `https://${code}.example/${id}` },
@@ -614,7 +614,7 @@ describe('createFederation.search has_3d', () => {
               type: 'CC0',
               rawValue: 'CC0',
               verificationSource: 'cleveland.share_license_status+sketchfab_id',
-              verifiedAt: '2026-01-01T00:00:00.000Z',
+              verifiedAt: new Date().toISOString(), // inside the rights bound, so a cache hit is served as cached
               confidence: 'high',
             },
           },
