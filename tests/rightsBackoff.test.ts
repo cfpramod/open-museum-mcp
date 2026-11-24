@@ -35,9 +35,11 @@ function artwork(id: string, code: string, verifiedAt: string, title = 'Cached')
 function setup(codes: string[]) {
   let now = START;
   const rows = new Map<string, Artwork>();
+  let writeFails = false;
   const store: CacheStore = {
     getObject: (id: string) => rows.get(id) ?? null,
     upsertObject: (art: Artwork) => {
+      if (writeFails) throw new Error('disk full');
       rows.set(art.id, art);
     },
     getCachedAt: (id: string) => (rows.has(id) ? '2026-11-01T08:00:00.000Z' : null),
@@ -88,6 +90,9 @@ function setup(codes: string[]) {
     fresh,
     calls: (code: string) => calls.get(code) ?? 0,
     mode: (code: string, m: 'accept' | 'throw' | 'reject') => modes.set(code, m),
+    failWrites: (fail: boolean) => {
+      writeFails = fail;
+    },
     advance: (ms: number) => {
       now += ms;
     },
@@ -109,6 +114,24 @@ describe('the re-verify failure backoff', () => {
     expect(t.calls('met')).toBe(1);
     expect(second).toMatchObject({ ok: true, artwork: { title: 'Cached' }, freshness: { servedFrom: 'cache', rightsStale: true } });
     expect(again).toMatchObject({ ok: true, freshness: { rightsStale: true } });
+  });
+
+  it('does not start when the source answered but our cache write failed: a local fault is not a source failure', async () => {
+    const t = setup(['met']);
+    t.stale('met:1');
+    t.stale('met:2');
+    t.mode('met', 'accept');
+    t.failWrites(true);
+    const first = await t.federation.getArtwork('met:1');
+    expect(t.calls('met')).toBe(1);
+    // The fresh record could not be stored, so the cached one is served, marked stale, as on any failed re-verification.
+    expect(first).toMatchObject({ ok: true, artwork: { title: 'Cached' }, freshness: { servedFrom: 'cache', rightsStale: true } });
+
+    // The source is not backed off: the next past-bound read still goes live, and succeeds once writes work again.
+    t.failWrites(false);
+    const next = await t.federation.getArtwork('met:2');
+    expect(t.calls('met')).toBe(2);
+    expect(next).toMatchObject({ ok: true, artwork: { title: 'Re-verified' }, freshness: { servedFrom: 'live', rightsStale: false } });
   });
 
   it('is per source: a backed-off source does not stop another source being re-verified', async () => {

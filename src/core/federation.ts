@@ -491,8 +491,13 @@ export function createFederation(opts: FederationOptions): Federation {
 
   // Fetch a record live, run it through the rights gate, and store it. Rejected records are never stored.
   async function fetchLive(id: string, fetcher: Fetcher): Promise<FetchOutcome> {
-    const raw = await fetcher.getRaw(id);
-    // The source answered, so it is up: any backoff it was under is over.
+    return gateAndStore(id, fetcher, await fetcher.getRaw(id));
+  }
+
+  // Run a record the source has returned through the rights gate, and store it. The source answered, so any
+  // backoff it was under is over; a throw from here on is a local fault (normalising, colour, the cache write),
+  // not a source failure.
+  async function gateAndStore(id: string, fetcher: Fetcher, raw: unknown): Promise<FetchOutcome> {
     reverifyBackoffUntil.delete(fetcher.code);
     const result = fetcher.normalize(raw);
     if (result.status === 'rejected') {
@@ -540,12 +545,19 @@ export function createFederation(opts: FederationOptions): Federation {
             freshness: freshnessOf(cached, 'cache', true, cachedAt),
           });
           if (!fetcher) return asStale();
-          // A source whose last re-verification threw is left alone until its backoff ends.
+          // A source whose last re-verification failed is left alone until its backoff ends.
           if (isBackedOff(fetcher.code)) return asStale();
+          let raw: unknown;
           try {
-            return await fetchLive(id, fetcher);
+            raw = await fetcher.getRaw(id);
           } catch {
+            // Only the source failing to answer starts the backoff.
             reverifyBackoffUntil.set(fetcher.code, Date.parse(clock()) + rightsRetryBackoffMs);
+            return asStale();
+          }
+          try {
+            return await gateAndStore(id, fetcher, raw);
+          } catch {
             return asStale();
           }
         }
