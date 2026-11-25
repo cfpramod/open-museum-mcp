@@ -369,6 +369,31 @@ describe('Paris Musées output bounds', () => {
     expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
   });
 
+  // Pin each cap at its boundary: a value at the limit passes, one character over does not.
+  const RIGHTS_TAIL = 'Paris Musées / Petit Palais, musée des Beaux-Arts de la Ville de Paris';
+  const rightsOfLength = (n: number): string => `CC0${'\n'.repeat(n - 3 - RIGHTS_TAIL.length)}${RIGHTS_TAIL}`;
+  const imageUrlOfLength = (n: number): string => {
+    const head = 'https://www.parismuseescollections.paris.fr/sites/default/files/';
+    return `${head}${'a'.repeat(n - head.length - 4)}.jpg`;
+  };
+
+  it('accepts a CC0 statement of exactly 256 characters and rejects one of 257', () => {
+    expect(rightsOfLength(256)).toHaveLength(256);
+    expect(rightsOfLength(257)).toHaveLength(257);
+    expect(parismuseesFetcher.normalize(withFirstImage({ fieldImageDroits: rightsOfLength(256) })).status).toBe('accepted');
+    expect(parismuseesFetcher.normalize(withFirstImage({ fieldImageDroits: rightsOfLength(257) })).status).toBe('rejected');
+  });
+
+  it('keeps an image URL of exactly 2048 characters and rejects one of 2049', () => {
+    const atLimit = imageUrlOfLength(2048);
+    expect(atLimit).toHaveLength(2048);
+    expect(imageUrlOfLength(2049)).toHaveLength(2049);
+    const kept = parismuseesFetcher.normalize(withFirstImage({ publicUrl: atLimit }));
+    expect(kept.status).toBe('accepted');
+    if (kept.status === 'accepted') expect(kept.artwork.imageUrls.full).toBe(atLimit);
+    expect(parismuseesFetcher.normalize(withFirstImage({ publicUrl: imageUrlOfLength(2049) })).status).toBe('rejected');
+  });
+
   it('rejects an over-long image URL', () => {
     const raw = withFirstImage({
       publicUrl: `https://www.parismuseescollections.paris.fr/sites/default/files/${longPath}.jpg`,
@@ -487,6 +512,15 @@ describe('Paris Musées request safety (the API key)', () => {
     );
     const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
     expect((err as Error).message).toBe('Paris Musées request failed: 502');
+  });
+
+  it('keeps the key out of the error when a 200 response is not JSON', async () => {
+    // V8's JSON.parse error quotes the start of the body, so parsing must not surface its message.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(`${KEY} not json`, { status: 200 })));
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe('Paris Musées API returned invalid JSON');
+    expect((err as Error).message).not.toContain(KEY.slice(0, 10));
   });
 
   it('ignores a search hit whose id is not a whole number', async () => {
