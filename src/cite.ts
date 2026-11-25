@@ -35,12 +35,35 @@ function shortStyle(a: Artwork): string {
   return `${a.title} (${artist}, ${date})`;
 }
 
+// Paris Musées' terms of use (CGU article 1.3.1.c) require anyone reusing the
+// collections' documents, images or texts to give the source as "Paris Musées"
+// and to provide the link. A record names the City museum that holds the work
+// (or "Paris Musées" when the API names none), so the credit is added here, in
+// the "Paris Musées / <museum>" form the museums use in their own image
+// credits. The link is the record's page URL, which the adapter pins to the
+// Paris Musées collections site.
+const PARIS_MUSEES = 'Paris Musées';
+
+function startsWithParisMusees(name: string): boolean {
+  const folded = name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  return /^paris\s+musees(?![\p{L}\p{N}])/u.test(folded);
+}
+
+function withParisMuseesCredit(a: Artwork): Artwork {
+  const name = a.museum.name.trim();
+  if (startsWithParisMusees(name)) return a;
+  const credited = name ? `${PARIS_MUSEES} / ${name}` : PARIS_MUSEES;
+  return { ...a, museum: { ...a.museum, name: credited } };
+}
+
 const PER_MUSEUM_FULL: Record<string, (a: Artwork) => string> = {
   met: metFull,
+  parismusees: (a) => metFull(withParisMuseesCredit(a)),
 };
 
 const PER_MUSEUM_CAPTION: Record<string, (a: Artwork) => string> = {
   met: metCaption,
+  parismusees: (a) => metCaption(withParisMuseesCredit(a)),
 };
 
 /**
