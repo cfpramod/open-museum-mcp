@@ -3,7 +3,16 @@ import { validateGettyImageLicense, validateGettyLicense } from '../licenseGate.
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asFiniteNumber, asOptionalString, asString, derivePeriodFromYears, httpGet, rejectFor } from './helpers.js';
+import {
+  asFiniteNumber,
+  asOptionalString,
+  asString,
+  dashBetweenHyphenParts,
+  derivePeriodFromYears,
+  httpGet,
+  rejectFor,
+  stripTrailingParenthetical,
+} from './helpers.js';
 import { sanitizeArtistName, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
@@ -125,7 +134,7 @@ function parseNationalityAndDates(s: string | undefined): { nationality?: string
   const firstLooksLikeNationality = /[a-zA-Z]/.test(first) && !/^\d/.test(first);
   const nationality = firstLooksLikeNationality ? first : undefined;
   const datesPart = firstLooksLikeNationality ? rest.join(',').trim() : s;
-  const lifespan = datesPart ? datesPart.replace(/\s*-\s*/g, '–').trim() : undefined;
+  const lifespan = datesPart ? dashBetweenHyphenParts(datesPart).trim() : undefined;
   return { nationality: nationality || undefined, lifespan: lifespan || undefined };
 }
 
@@ -248,7 +257,7 @@ SELECT DISTINCT ?obj WHERE {
 
     const primaryTitle =
       findContentByClassification(r.identified_by, PRIMARY_TITLE) ??
-      asString(r._label).replace(/\s*\([^)]*\)\s*$/, '').trim();
+      stripTrailingParenthetical(asString(r._label)).trim();
     const title = sanitizeTitle(primaryTitle) || '(Untitled)';
     const accessionNumber = findContentByClassification(r.identified_by, ACCESSION_NUMBER);
 
@@ -276,7 +285,7 @@ SELECT DISTINCT ?obj WHERE {
     // itself a Tier-1 keyword in normalizeMedium and, being longer than
     // "oil", would wrongly win a painting on canvas as a textile.
     const materialLabels = madeOf
-      .map((m) => asString(m._label).replace(/\s*\([^)]*\)\s*$/, '').trim())
+      .map((m) => stripTrailingParenthetical(asString(m._label)).trim())
       .filter(Boolean);
     const classifiedAs = Array.isArray(r.classified_as) ? (r.classified_as as Array<Record<string, unknown>>) : [];
     // "Artwork" and "Object Record Structure: Whole" are boilerplate classifications
