@@ -320,3 +320,146 @@ describe('Paris Musées search batching (1,000 requests a day)', () => {
     expect(bodies).toHaveLength(0);
   });
 });
+
+describe('Paris Musées gate: the fieldImageLibre flag is required on its own', () => {
+  // Each case keeps a valid CC0 statement and a valid image URL, so only the
+  // flag decides. Removing the boolean check from the gate fails these.
+  it.each([
+    ['false', false],
+    ['null', null],
+    ['the string "true"', 'true'],
+    ['the number 1', 1],
+  ])('rejects fieldImageLibre = %s', (_label, value) => {
+    const raw = withFirstImage({ fieldImageLibre: value });
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+  });
+
+  it('rejects a missing fieldImageLibre', () => {
+    const raw = fixture('parismusees-accepted.json');
+    const visuels = raw.fieldVisuels as Array<{ entity: Record<string, unknown> }>;
+    const entity = { ...visuels[0].entity };
+    delete entity.fieldImageLibre;
+    visuels[0] = { entity };
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+  });
+
+  it('rejects the two signals split across two images', () => {
+    const raw = fixture('parismusees-accepted.json');
+    const visuels = raw.fieldVisuels as Array<{ entity: Record<string, unknown> }>;
+    const base = visuels[0].entity;
+    raw.fieldVisuels = [
+      { entity: { ...base, fieldImageLibre: true, fieldImageDroits: '© Paris Musées / Petit Palais' } },
+      { entity: { ...base, fieldImageLibre: null } },
+    ];
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+  });
+});
+
+describe('Paris Musées output bounds', () => {
+  const longPath = 'a'.repeat(10_000);
+
+  it('rejects a rights statement padded past the statement length bound', () => {
+    const raw = withFirstImage({
+      fieldImageDroits: `CC0${'\n'.repeat(10_000)}Paris Musées / Petit Palais, musée des Beaux-Arts de la Ville de Paris`,
+    });
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+  });
+
+  it('rejects an over-long image URL', () => {
+    const raw = withFirstImage({
+      publicUrl: `https://www.parismuseescollections.paris.fr/sites/default/files/${longPath}.jpg`,
+    });
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+  });
+
+  it('drops an over-long thumbnail URL', () => {
+    const raw = withFirstImage({
+      vignette: `https://apicollections.parismusees.paris.fr/sites/default/files/t.jpg?itok=${longPath}`,
+    });
+    const result = parismuseesFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status === 'accepted') expect(result.artwork.imageUrls.thumbnail).toBeUndefined();
+  });
+
+  it('falls back from an over-long page URL to the canonical node URL', () => {
+    const raw = fixture('parismusees-accepted.json');
+    raw.absolutePath = `https://www.parismuseescollections.paris.fr/${longPath}`;
+    const result = parismuseesFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status === 'accepted') {
+      expect(result.artwork.source.pageUrl).toBe(`https://www.parismuseescollections.paris.fr/node/${String(raw.entityId)}`);
+    }
+  });
+});
+
+describe('Paris Musées request safety (the API key)', () => {
+  const KEY = 'secret-key-0123456789';
+  const accepted = fixture('parismusees-accepted.json');
+
+  beforeEach(() => {
+    clearParisMuseesPrefetch();
+    vi.stubEnv('PARISMUSEES_API_KEY', KEY);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('refuses redirects, so the auth-token header cannot follow one to another host', async () => {
+    const seen: RequestInit[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: unknown, init?: RequestInit) => {
+        seen.push(init ?? {});
+        return new Response(JSON.stringify({ data: { nodeQuery: { entities: [accepted] } } }), { status: 200 });
+      }),
+    );
+    await parismuseesFetcher.getRaw('parismusees:226737');
+    expect(seen).toHaveLength(1);
+    expect(seen[0].redirect).toBe('error');
+  });
+
+  it('keeps the key out of a GraphQL error message, and bounds its length', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(
+        JSON.stringify({ errors: [{ message: `Invalid token ${KEY}` }, { message: 'x'.repeat(10_000) }], data: null }),
+        { status: 200 },
+      )),
+    );
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    const message = (err as Error).message;
+    expect(message).toContain('Invalid token');
+    expect(message).not.toContain(KEY);
+    expect(message.length).toBeLessThanOrEqual(300);
+  });
+
+  it('keeps the key out of a failed-request error message', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ message: `Invalid token ${KEY}` }), { status: 401 })),
+    );
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain('401');
+    expect((err as Error).message).not.toContain(KEY);
+  });
+
+  it('ignores a search hit whose id is not a whole number', async () => {
+    const bodies: Array<{ variables: Record<string, unknown> }> = [];
+    const responses: unknown[] = [
+      { data: { searchAPISearch: { documents: [{ nid_entier_s: 1.5 }, { nid_entier_s: 226737 }] } } },
+      { data: { nodeQuery: { entities: [{ ...accepted, entityId: '1.5' }, accepted] } } },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: unknown, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify(responses.shift()), { status: 200 });
+      }),
+    );
+    expect(await parismuseesFetcher.search('monet', 5, {})).toEqual(['parismusees:226737']);
+    expect(bodies[1].variables.ids).toEqual(['226737']);
+  });
+});
