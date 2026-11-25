@@ -188,7 +188,18 @@ async function graphql(
     const safe = detail ? upstreamText(detail, key) : '';
     throw new Error(`Paris Musées request failed: ${res.status}${safe ? ` (${safe})` : ''}`);
   }
-  const json = (await res.json()) as { data?: unknown; errors?: Array<{ message?: unknown }> };
+  // Parsed here rather than with res.json(): V8's SyntaxError quotes the start
+  // of the body, which can hold an echoed key, so a body that is not JSON gets
+  // a fixed message instead. The body is read outside the try, so an abort or
+  // network error while reading keeps its own error.
+  const text = await res.text();
+  let json: { data?: unknown; errors?: Array<{ message?: unknown }> };
+  try {
+    json = JSON.parse(text) as typeof json;
+  } catch {
+    throw new Error('Paris Musées API returned invalid JSON');
+  }
+  if (!json || typeof json !== 'object') throw new Error('Paris Musées API returned no data');
   // GraphQL reports failures with a 200 and an `errors` list.
   if (Array.isArray(json.errors) && json.errors.length > 0) {
     const message = upstreamText(json.errors.map((e) => asString(e?.message)).filter(Boolean).join('; '), key);
