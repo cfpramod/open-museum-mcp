@@ -4,7 +4,7 @@
   "display_name": "Open Museum",
   "version": "0.21.0",
   "description": "License-verified federated search across open-access museum collections.",
-  "long_description": "Federated MCP search across open-access museum collections: The Met, Cleveland Museum of Art, Art Institute of Chicago, Rijksmuseum, Smithsonian, SMK, the Walters, Wellcome Collection, the National Gallery of Art, Harvard Art Museums, the J. Paul Getty Museum, the Yale Center for British Art, Wikimedia Commons, and Europeana, with more being added. Records pass per-museum rights verification (strict-default-deny on ambiguous license signals) and ship with citation output in `full`, `caption`, and `short` formats, paste-ready for papers, slide decks, and inline references.",
+  "long_description": "Federated MCP search across open-access museum collections: The Met, Cleveland Museum of Art, Art Institute of Chicago, Rijksmuseum, Smithsonian, SMK, the Walters, Wellcome Collection, the National Gallery of Art, Harvard Art Museums, the J. Paul Getty Museum, the Yale Center for British Art, Paris Musées, Wikimedia Commons, and Europeana, with more being added. Records pass per-museum rights verification (strict-default-deny on ambiguous license signals) and ship with citation output in `full`, `caption`, and `short` formats, paste-ready for papers, slide decks, and inline references.",
   "author": {
     "name": "Pramod Prasanth",
     "url": "https://pramod.ch"
@@ -33,7 +33,8 @@
     "getty",
     "yale-center-for-british-art",
     "wikimedia-commons",
-    "europeana"
+    "europeana",
+    "paris-musees"
   ],
   "server": {
     "type": "node",
@@ -44,7 +45,8 @@
       "env": {
         "EUROPEANA_API_KEY": "${user_config.europeana_api_key}",
         "SMITHSONIAN_API_KEY": "${user_config.smithsonian_api_key}",
-        "HARVARD_API_KEY": "${user_config.harvard_api_key}"
+        "HARVARD_API_KEY": "${user_config.harvard_api_key}",
+        "PARISMUSEES_API_KEY": "${user_config.parismusees_api_key}"
       }
     }
   },
@@ -97,6 +99,13 @@
       "type": "string",
       "title": "Harvard Art Museums API Key",
       "description": "Optional. Free key enables the Harvard Art Museums adapter. Without a key, Harvard silently disables and the other adapters work normally.",
+      "sensitive": true,
+      "required": false
+    },
+    "parismusees_api_key": {
+      "type": "string",
+      "title": "Paris Musées API Token",
+      "description": "Optional. Free account token from https://apicollections.parismusees.paris.fr/ enables the Paris Musées adapter (the 14 City of Paris museums). Without a token, Paris Musées silently disables and the other adapters work normally.",
       "sensitive": true,
       "required": false
     }

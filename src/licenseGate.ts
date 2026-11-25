@@ -793,6 +793,177 @@ export const validateYcbaLicense: LicenseValidator = (raw) => {
   };
 };
 
+// Paris Musées (the 14 City of Paris museums) publishes rights per IMAGE, not
+// per object. Each MediaImage in `fieldVisuels` carries `fieldImageLibre`
+// (true for the museum's Open Content release, null otherwise) and a
+// `fieldImageDroits` statement such as "CC0 Paris Musées / Petit Palais, musée
+// des Beaux-Arts de la Ville de Paris". Live spike (2026-11-19): free images
+// read true + "CC0 …"; non-free images read null, and the public API serves
+// them only as thumbnails.
+//
+// Strict-default-deny: a record is ACCEPTED only when an image has BOTH
+// `fieldImageLibre === true` AND a `fieldImageDroits` that matches,
+// in full, a CC0 statement seen on live records. Either signal alone
+// rejects, and so does a qualified statement ("CC0-NC …", "… / Petit Palais sauf
+// droits des tiers") or a museum not yet seen. The image URL
+// must also be an https URL on the Paris Musées collections host. The chosen image is the first such one; the fetcher
+// surfaces exactly that image (parisMuseesFreeImage), so the licence describes
+// the asset on the wire.
+//
+// metadataOpenAccess is FALSE: the CC0 release covers the image reproductions
+// (Paris Musées "Open Content", January 2020). No licence for the catalogue
+// metadata itself was found in the API or its documentation, so it is not
+// claimed.
+// Every statement seen on a free image (fieldImageLibre=true) in a live survey
+// of 1,881 artworks across 11 museums (2026-11-23). The WHOLE statement must
+// equal one of these once case, spacing, commas, dashes and apostrophes are
+// normalised, so a qualification added to a known statement ("… / Petit Palais
+// sauf droits des tiers") or an unseen wording fails closed. The museums spell
+// their own names inconsistently, which is why this is a list of statements
+// rather than a pattern. Add a wording only after seeing it on a live record.
+const PARISMUSEES_CC0_STATEMENTS: ReadonlySet<string> = new Set(
+  [
+    'CC0 Paris Musées / Maison de Balzac',
+    'CC0 Paris Musées / Maisons de Victor Hugo',
+    'CC0 Paris Musées / Maisons de Victor Hugo Paris-Guernesey',
+    'CC0 Maisons de Victor Hugo Paris-Guernesey',
+    'CC0 Paris Musées / Musée Bourdelle',
+    'CC0 Paris Musées / Musée Carnavalet',
+    'CC0 Paris Musées / Musée Carnavalet - Histoire de Paris',
+    'CC0 Paris Musées / Musée Carnavalet, Histoire de Paris',
+    "CC0 Paris Musées / Musée Cernuschi, musée des arts de l'Asie de la Ville de Paris",
+    'CC0 Paris Musées / Musée Cognacq-Jay, le goût du XVIIIe',
+    "CC0 Paris Musées / Musée d'art moderne de Paris",
+    'CC0 Paris Musées / Musée de la Libération',
+    'CC0 Paris Musées / Musée de la Libération de Paris',
+    'CC0 Paris Musées / Musée de la Libération de Paris - musée du général Leclerc - musée Jean Moulin',
+    'CC0 Paris Musées / Musée de la Vie romantique',
+    'CC0 Musée de La Vie Romantique / Ville de Paris',
+    'CC0 Paris Musées / Palais Galliera, musée de la Mode de la Ville de Paris',
+    'CC0 Paris Musées / Palais Galliera, musée de la Mode de Paris',
+    'CC0 Paris Musées / Petit Palais, musée des Beaux-Arts de la Ville de Paris',
+  ].map(normalizeParisMuseesRights),
+);
+
+/** Case, spacing, commas, full stops, dash variants and apostrophe variants are one spelling. */
+function normalizeParisMuseesRights(rights: string): string {
+  return rights
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[,.]/g, ' ')
+    .replace(/\s*\/\s*/g, ' / ')
+    .replace(/[\s\u2010-\u2015-]+/g, ' ')
+    .trim();
+}
+
+function isParisMuseesCc0Statement(rights: string): boolean {
+  return PARISMUSEES_CC0_STATEMENTS.has(normalizeParisMuseesRights(rights));
+}
+
+const PARISMUSEES_SITE_HOST = 'www.parismuseescollections.paris.fr';
+const PARISMUSEES_API_HOST = 'apicollections.parismusees.paris.fr';
+const PARISMUSEES_FILES_PATH = /^\/sites\/default\/files\//;
+
+/**
+ * Parse `value` and return it rebuilt from its checked parts only when it is an
+ * https URL on exactly `host` (no credentials, no port). The query string is
+ * kept only when `allowQuery` is set (thumbnails carry an `itok` token), and
+ * the fragment is always dropped, so nothing unchecked reaches the output.
+ */
+function pinnedParisMuseesUrl(
+  value: unknown,
+  host: string,
+  pathPattern: RegExp | null,
+  allowQuery: boolean,
+): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  let u: URL;
+  try {
+    u = new URL(value);
+  } catch {
+    return undefined;
+  }
+  const ok =
+    u.protocol === 'https:' &&
+    u.hostname === host &&
+    u.port === '' &&
+    u.username === '' &&
+    u.password === '' &&
+    (pathPattern === null || pathPattern.test(u.pathname));
+  if (!ok) return undefined;
+  return `${u.origin}${u.pathname}${allowQuery ? u.search : ''}`;
+}
+
+/** Original image URL: https, the collections site host, under /sites/default/files/. */
+export function parisMuseesImageUrl(value: unknown): string | undefined {
+  return pinnedParisMuseesUrl(value, PARISMUSEES_SITE_HOST, PARISMUSEES_FILES_PATH, false);
+}
+
+/** Thumbnail URL: https, the API host, under /sites/default/files/. */
+export function parisMuseesThumbnailUrl(value: unknown): string | undefined {
+  return pinnedParisMuseesUrl(value, PARISMUSEES_API_HOST, PARISMUSEES_FILES_PATH, true);
+}
+
+/** Catalogue page URL: https on the collections site host; anything else is dropped. */
+export function parisMuseesPageUrl(value: unknown): string | undefined {
+  return pinnedParisMuseesUrl(value, PARISMUSEES_SITE_HOST, null, false);
+}
+
+interface ParisMuseesImage {
+  full: string;
+  thumbnail?: string;
+  rights: string;
+}
+
+/** The first image that passes the Paris Musées gate, or null. Shared with the fetcher. */
+export function parisMuseesFreeImage(raw: unknown): ParisMuseesImage | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const visuels = (raw as Record<string, unknown>).fieldVisuels;
+  if (!Array.isArray(visuels)) return null;
+  for (const v of visuels) {
+    const entity = v && typeof v === 'object' ? (v as { entity?: unknown }).entity : undefined;
+    if (!entity || typeof entity !== 'object') continue;
+    const e = entity as Record<string, unknown>;
+    const rights = typeof e.fieldImageDroits === 'string' ? e.fieldImageDroits.trim() : '';
+    const full = parisMuseesImageUrl(e.publicUrl);
+    if (e.fieldImageLibre === true && isParisMuseesCc0Statement(rights) && full) {
+      // An unusable thumbnail is simply left out; it doesn't affect the licence.
+      return { full, thumbnail: parisMuseesThumbnailUrl(e.vignette), rights };
+    }
+  }
+  return null;
+}
+
+export const validateParisMuseesLicense: LicenseValidator = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return reject('parismusees: object missing or not an object');
+  }
+  const visuels = (raw as Record<string, unknown>).fieldVisuels;
+  if (!Array.isArray(visuels) || visuels.length === 0) {
+    return reject('parismusees: no images (fieldVisuels empty or missing)');
+  }
+  const image = parisMuseesFreeImage(raw);
+  if (!image) {
+    return reject(
+      'parismusees: no image with fieldImageLibre=true and fieldImageDroits "CC0 Paris Musées / …" and an https image on the collections host (strict default reject)',
+    );
+  }
+  return {
+    accepted: true,
+    license: {
+      type: 'CC0',
+      rawValue: image.rights,
+      verificationSource: 'parismusees.fieldVisuels[].fieldImageLibre+fieldImageDroits',
+      verifiedAt: nowIso(),
+      confidence: 'high',
+    },
+    imageOpenAccess: true,
+    metadataOpenAccess: false,
+    reason: 'parismusees: fieldImageLibre=true, fieldImageDroits="CC0 Paris Musées / …"',
+  };
+};
+
 const VALIDATORS: Record<string, LicenseValidator> = {
   met: validateMetLicense,
   cleveland: validateClevelandLicense,
@@ -807,6 +978,7 @@ const VALIDATORS: Record<string, LicenseValidator> = {
   harvard: validateHarvardLicense,
   getty: validateGettyLicense,
   ycba: validateYcbaLicense,
+  parismusees: validateParisMuseesLicense,
 };
 
 export function validateLicense(museumCode: string, raw: unknown): LicenseDecision {
