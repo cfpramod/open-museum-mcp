@@ -3,7 +3,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearParisMuseesPrefetch, parismuseesFetcher } from '../src/fetchers/parismusees.js';
-import { validateLicense } from '../src/licenseGate.js';
+import {
+  normalizeParisMuseesRights,
+  PARISMUSEES_CC0_WORDINGS,
+  validateLicense,
+} from '../src/licenseGate.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -318,5 +322,275 @@ describe('Paris Musées search batching (1,000 requests a day)', () => {
     stub([]);
     await expect(parismuseesFetcher.getRaw('parismusees:abc')).rejects.toThrow('invalid id');
     expect(bodies).toHaveLength(0);
+  });
+});
+
+describe('Paris Musées gate: the fieldImageLibre flag is required on its own', () => {
+  // Each case keeps a valid CC0 statement and a valid image URL, so only the
+  // flag decides. Removing the boolean check from the gate fails these.
+  it.each([
+    ['false', false],
+    ['null', null],
+    ['the string "true"', 'true'],
+    ['the number 1', 1],
+  ])('rejects fieldImageLibre = %s', (_label, value) => {
+    const raw = withFirstImage({ fieldImageLibre: value });
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+  });
+
+  it('rejects a missing fieldImageLibre', () => {
+    const raw = fixture('parismusees-accepted.json');
+    const visuels = raw.fieldVisuels as Array<{ entity: Record<string, unknown> }>;
+    const entity = { ...visuels[0].entity };
+    delete entity.fieldImageLibre;
+    visuels[0] = { entity };
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+  });
+
+  it('rejects the two signals split across two images', () => {
+    const raw = fixture('parismusees-accepted.json');
+    const visuels = raw.fieldVisuels as Array<{ entity: Record<string, unknown> }>;
+    const base = visuels[0].entity;
+    raw.fieldVisuels = [
+      { entity: { ...base, fieldImageLibre: true, fieldImageDroits: '© Paris Musées / Petit Palais' } },
+      { entity: { ...base, fieldImageLibre: null } },
+    ];
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+  });
+});
+
+describe('Paris Musées output bounds', () => {
+  const longPath = 'a'.repeat(10_000);
+
+  it('rejects a rights statement padded past the statement length bound', () => {
+    const raw = withFirstImage({
+      fieldImageDroits: `CC0${'\n'.repeat(10_000)}Paris Musées / Petit Palais, musée des Beaux-Arts de la Ville de Paris`,
+    });
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+  });
+
+  // Pin each cap at its boundary: a value at the limit passes, one character over does not.
+  const RIGHTS_TAIL = 'Paris Musées / Petit Palais, musée des Beaux-Arts de la Ville de Paris';
+  const rightsOfLength = (n: number): string => `CC0${'\n'.repeat(n - 3 - RIGHTS_TAIL.length)}${RIGHTS_TAIL}`;
+  const imageUrlOfLength = (n: number): string => {
+    const head = 'https://www.parismuseescollections.paris.fr/sites/default/files/';
+    return `${head}${'a'.repeat(n - head.length - 4)}.jpg`;
+  };
+
+  it('accepts a CC0 statement of exactly 256 characters and rejects one of 257', () => {
+    expect(rightsOfLength(256)).toHaveLength(256);
+    expect(rightsOfLength(257)).toHaveLength(257);
+    expect(parismuseesFetcher.normalize(withFirstImage({ fieldImageDroits: rightsOfLength(256) })).status).toBe('accepted');
+    expect(parismuseesFetcher.normalize(withFirstImage({ fieldImageDroits: rightsOfLength(257) })).status).toBe('rejected');
+  });
+
+  it('keeps an image URL of exactly 2048 characters and rejects one of 2049', () => {
+    const atLimit = imageUrlOfLength(2048);
+    expect(atLimit).toHaveLength(2048);
+    expect(imageUrlOfLength(2049)).toHaveLength(2049);
+    const kept = parismuseesFetcher.normalize(withFirstImage({ publicUrl: atLimit }));
+    expect(kept.status).toBe('accepted');
+    if (kept.status === 'accepted') expect(kept.artwork.imageUrls.full).toBe(atLimit);
+    expect(parismuseesFetcher.normalize(withFirstImage({ publicUrl: imageUrlOfLength(2049) })).status).toBe('rejected');
+  });
+
+  it('rejects an over-long image URL', () => {
+    const raw = withFirstImage({
+      publicUrl: `https://www.parismuseescollections.paris.fr/sites/default/files/${longPath}.jpg`,
+    });
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+  });
+
+  it('drops an over-long thumbnail URL', () => {
+    const raw = withFirstImage({
+      vignette: `https://apicollections.parismusees.paris.fr/sites/default/files/t.jpg?itok=${longPath}`,
+    });
+    const result = parismuseesFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status === 'accepted') expect(result.artwork.imageUrls.thumbnail).toBeUndefined();
+  });
+
+  it('falls back from an over-long page URL to the canonical node URL', () => {
+    const raw = fixture('parismusees-accepted.json');
+    raw.absolutePath = `https://www.parismuseescollections.paris.fr/${longPath}`;
+    const result = parismuseesFetcher.normalize(raw);
+    expect(result.status).toBe('accepted');
+    if (result.status === 'accepted') {
+      expect(result.artwork.source.pageUrl).toBe(`https://www.parismuseescollections.paris.fr/node/${String(raw.entityId)}`);
+    }
+  });
+});
+
+describe('Paris Musées request safety (the API key)', () => {
+  const KEY = 'secret-key-0123456789';
+  const accepted = fixture('parismusees-accepted.json');
+
+  beforeEach(() => {
+    clearParisMuseesPrefetch();
+    vi.stubEnv('PARISMUSEES_API_KEY', KEY);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('refuses redirects, so the auth-token header cannot follow one to another host', async () => {
+    const seen: RequestInit[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: unknown, init?: RequestInit) => {
+        seen.push(init ?? {});
+        return new Response(JSON.stringify({ data: { nodeQuery: { entities: [accepted] } } }), { status: 200 });
+      }),
+    );
+    await parismuseesFetcher.getRaw('parismusees:226737');
+    expect(seen).toHaveLength(1);
+    expect(seen[0].redirect).toBe('error');
+  });
+
+  it('keeps the key out of a GraphQL error message, and bounds its length', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(
+        JSON.stringify({ errors: [{ message: `Invalid token ${KEY}` }, { message: 'x'.repeat(10_000) }], data: null }),
+        { status: 200 },
+      )),
+    );
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    const message = (err as Error).message;
+    expect(message).toContain('Invalid token');
+    expect(message).not.toContain(KEY);
+    expect(message.length).toBeLessThanOrEqual(300);
+  });
+
+  it('keeps the key out of a failed-request error message', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ message: `Invalid token ${KEY}` }), { status: 401 })),
+    );
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain('401');
+    expect((err as Error).message).not.toContain(KEY);
+  });
+
+  it('keeps the key out of a failed-request error whose body escapes a character of it', async () => {
+    // PHP's default json_encode writes `/` as `\/`, so the raw body never holds the key verbatim.
+    const slashKey = 'secret/key/0123456789';
+    vi.stubEnv('PARISMUSEES_API_KEY', slashKey);
+    const body = JSON.stringify({ message: `Invalid token ${slashKey} for "search"` }).replace(/\//g, '\\/');
+    expect(body).not.toContain(slashKey);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 403 })));
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    const message = (err as Error).message;
+    expect(message).toContain('403');
+    expect(message).toContain('Invalid token [redacted] for "search"');
+    expect(message).not.toContain('0123456789');
+  });
+
+  it('keeps the messages of a GraphQL error list on a failed request, without the key', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(
+        JSON.stringify({ errors: [{ message: `Invalid token ${KEY}` }, { message: 'Quota exceeded' }] }),
+        { status: 400 },
+      )),
+    );
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    const message = (err as Error).message;
+    expect(message).toContain('400');
+    expect(message).toContain('Invalid token [redacted]; Quota exceeded');
+    expect(message).not.toContain(KEY);
+  });
+
+  it('reports only the status when a failed request body is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(`<html>"message": "token ${KEY}"</html>`, { status: 502 })),
+    );
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    expect((err as Error).message).toBe('Paris Musées request failed: 502');
+  });
+
+  it('keeps the key out of the error when a 200 response is not JSON', async () => {
+    // V8's JSON.parse error quotes the start of the body, so parsing must not surface its message.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(`${KEY} not json`, { status: 200 })));
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe('Paris Musées API returned invalid JSON');
+    expect((err as Error).message).not.toContain(KEY.slice(0, 10));
+  });
+
+  it('ignores a search hit whose id is not a whole number', async () => {
+    const bodies: Array<{ variables: Record<string, unknown> }> = [];
+    const responses: unknown[] = [
+      { data: { searchAPISearch: { documents: [{ nid_entier_s: 1.5 }, { nid_entier_s: 226737 }] } } },
+      { data: { nodeQuery: { entities: [{ ...accepted, entityId: '1.5' }, accepted] } } },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: unknown, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify(responses.shift()), { status: 200 });
+      }),
+    );
+    expect(await parismuseesFetcher.search('monet', 5, {})).toEqual(['parismusees:226737']);
+    expect(bodies[1].variables.ids).toEqual(['226737']);
+  });
+});
+
+describe('Paris Musées rights normalisation runs in linear time', () => {
+  // The normaliser before the rewrite, kept here as the reference: the rewrite
+  // must give the same spelling for every wording the gate accepts.
+  function previousNormalisation(rights: string): string {
+    return rights
+      .normalize('NFC')
+      .toLowerCase()
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[,.]/g, ' ')
+      .replace(/\s*\/\s*/g, ' / ')
+      .replace(/[\s\u2010-\u2015-]+/g, ' ')
+      .trim();
+  }
+
+  // Each accepted wording plus the spelling variants the gate is meant to
+  // treat as the same statement.
+  const variants = PARISMUSEES_CC0_WORDINGS.flatMap((w) => [
+    w,
+    w.toUpperCase(),
+    w.replace(/ \/ /g, '/'),
+    w.replace(/ \/ /g, '  /\t'),
+    w.replace(/'/g, '\u2019'),
+    w.replace(/ - /g, ' \u2013 '),
+    w.replace(/-/g, '\u2010'),
+    `  ${w}.  `,
+  ]);
+
+  it.each(variants)('normalises %j exactly as before', (w) => {
+    expect(normalizeParisMuseesRights(w)).toBe(previousNormalisation(w));
+  });
+
+  it('still accepts every listed wording through the gate', () => {
+    for (const w of PARISMUSEES_CC0_WORDINGS) {
+      const raw = withFirstImage({ fieldImageDroits: w });
+      expect(parismuseesFetcher.normalize(raw).status, w).toBe('accepted');
+    }
+  });
+
+  it('normalises a 100,000-character whitespace run quickly', () => {
+    const start = performance.now();
+    normalizeParisMuseesRights(`CC0${' '.repeat(100_000)}x`);
+    expect(performance.now() - start).toBeLessThan(250);
+  });
+
+  it('rejects a statement carrying a 100,000-character whitespace run, quickly', () => {
+    const raw = withFirstImage({
+      fieldImageDroits: `CC0 Paris Musées${' \t'.repeat(50_000)}/ Petit Palais, musée des Beaux-Arts de la Ville de Paris`,
+    });
+    const start = performance.now();
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+    expect(performance.now() - start).toBeLessThan(250);
   });
 });
