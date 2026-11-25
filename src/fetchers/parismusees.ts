@@ -130,6 +130,27 @@ function upstreamText(text: string, key: string): string {
     : redacted;
 }
 
+// The message of a failed request's JSON body: the GraphQL `errors` list, or a
+// top-level `message`. Anything that is not JSON yields '' and the error carries
+// the status alone.
+function errorBodyMessage(body: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return '';
+  }
+  if (!parsed || typeof parsed !== 'object') return '';
+  const { errors, message } = parsed as { errors?: unknown; message?: unknown };
+  if (Array.isArray(errors)) {
+    return errors
+      .map((e) => (e && typeof e === 'object' ? asString((e as { message?: unknown }).message) : ''))
+      .filter(Boolean)
+      .join('; ');
+  }
+  return asString(message);
+}
+
 async function graphql(
   query: string,
   variables: Record<string, unknown>,
@@ -159,9 +180,11 @@ async function graphql(
     res = await httpGet(PM_GRAPHQL, init);
   }
   if (!res.ok) {
-    // A failed query can carry a GraphQL error body; keep its message.
+    // A failed query can carry a JSON error body; keep its message. The body is
+    // decoded before redaction, since an encoder may escape a character of the
+    // key (PHP writes `/` as `\/`) and the raw text would then not contain it.
     const body = await res.text().catch(() => '');
-    const detail = body.match(/"message"\s*:\s*"([^"]{1,200})"/)?.[1];
+    const detail = errorBodyMessage(body);
     const safe = detail ? upstreamText(detail, key) : '';
     throw new Error(`Paris Musées request failed: ${res.status}${safe ? ` (${safe})` : ''}`);
   }
