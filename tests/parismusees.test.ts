@@ -3,7 +3,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearParisMuseesPrefetch, parismuseesFetcher } from '../src/fetchers/parismusees.js';
-import { validateLicense } from '../src/licenseGate.js';
+import {
+  normalizeParisMuseesRights,
+  PARISMUSEES_CC0_WORDINGS,
+  validateLicense,
+} from '../src/licenseGate.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -461,5 +465,59 @@ describe('Paris Musées request safety (the API key)', () => {
     );
     expect(await parismuseesFetcher.search('monet', 5, {})).toEqual(['parismusees:226737']);
     expect(bodies[1].variables.ids).toEqual(['226737']);
+  });
+});
+
+describe('Paris Musées rights normalisation runs in linear time', () => {
+  // The normaliser before the rewrite, kept here as the reference: the rewrite
+  // must give the same spelling for every wording the gate accepts.
+  function previousNormalisation(rights: string): string {
+    return rights
+      .normalize('NFC')
+      .toLowerCase()
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[,.]/g, ' ')
+      .replace(/\s*\/\s*/g, ' / ')
+      .replace(/[\s\u2010-\u2015-]+/g, ' ')
+      .trim();
+  }
+
+  // Each accepted wording plus the spelling variants the gate is meant to
+  // treat as the same statement.
+  const variants = PARISMUSEES_CC0_WORDINGS.flatMap((w) => [
+    w,
+    w.toUpperCase(),
+    w.replace(/ \/ /g, '/'),
+    w.replace(/ \/ /g, '  /\t'),
+    w.replace(/'/g, '\u2019'),
+    w.replace(/ - /g, ' \u2013 '),
+    w.replace(/-/g, '\u2010'),
+    `  ${w}.  `,
+  ]);
+
+  it.each(variants)('normalises %j exactly as before', (w) => {
+    expect(normalizeParisMuseesRights(w)).toBe(previousNormalisation(w));
+  });
+
+  it('still accepts every listed wording through the gate', () => {
+    for (const w of PARISMUSEES_CC0_WORDINGS) {
+      const raw = withFirstImage({ fieldImageDroits: w });
+      expect(parismuseesFetcher.normalize(raw).status, w).toBe('accepted');
+    }
+  });
+
+  it('normalises a 100,000-character whitespace run quickly', () => {
+    const start = performance.now();
+    normalizeParisMuseesRights(`CC0${' '.repeat(100_000)}x`);
+    expect(performance.now() - start).toBeLessThan(250);
+  });
+
+  it('rejects a statement carrying a 100,000-character whitespace run, quickly', () => {
+    const raw = withFirstImage({
+      fieldImageDroits: `CC0 Paris Musées${' \t'.repeat(50_000)}/ Petit Palais, musée des Beaux-Arts de la Ville de Paris`,
+    });
+    const start = performance.now();
+    expect(parismuseesFetcher.normalize(raw).status).toBe('rejected');
+    expect(performance.now() - start).toBeLessThan(250);
   });
 });
