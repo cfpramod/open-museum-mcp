@@ -450,6 +450,45 @@ describe('Paris Musées request safety (the API key)', () => {
     expect((err as Error).message).not.toContain(KEY);
   });
 
+  it('keeps the key out of a failed-request error whose body escapes a character of it', async () => {
+    // PHP's default json_encode writes `/` as `\/`, so the raw body never holds the key verbatim.
+    const slashKey = 'secret/key/0123456789';
+    vi.stubEnv('PARISMUSEES_API_KEY', slashKey);
+    const body = JSON.stringify({ message: `Invalid token ${slashKey} for "search"` }).replace(/\//g, '\\/');
+    expect(body).not.toContain(slashKey);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 403 })));
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    const message = (err as Error).message;
+    expect(message).toContain('403');
+    expect(message).toContain('Invalid token [redacted] for "search"');
+    expect(message).not.toContain('0123456789');
+  });
+
+  it('keeps the messages of a GraphQL error list on a failed request, without the key', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(
+        JSON.stringify({ errors: [{ message: `Invalid token ${KEY}` }, { message: 'Quota exceeded' }] }),
+        { status: 400 },
+      )),
+    );
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    const message = (err as Error).message;
+    expect(message).toContain('400');
+    expect(message).toContain('Invalid token [redacted]; Quota exceeded');
+    expect(message).not.toContain(KEY);
+  });
+
+  it('reports only the status when a failed request body is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(`<html>"message": "token ${KEY}"</html>`, { status: 502 })),
+    );
+    const err = await parismuseesFetcher.getRaw('parismusees:226737').then(() => null, (e: unknown) => e);
+    expect((err as Error).message).toBe('Paris Musées request failed: 502');
+  });
+
   it('ignores a search hit whose id is not a whole number', async () => {
     const bodies: Array<{ variables: Record<string, unknown> }> = [];
     const responses: unknown[] = [
