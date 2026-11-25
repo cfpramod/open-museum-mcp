@@ -43,6 +43,56 @@ export function asString(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
+// Text clean-up on upstream strings. Each of these replaces a regular
+// expression that took quadratic time on a long run of whitespace (a `\s*` or
+// `\s+` that the engine retries from every position in the run). They give the
+// same output as the expression named in their comment, in linear time;
+// tests/linearText.test.ts checks both properties. `trim`, `trimStart` and
+// `trimEnd` remove exactly the characters `\s` matches.
+
+/**
+ * Removes a trailing parenthetical holding no `)`, with the whitespace around
+ * it: `Canvas (Textile Material)` -> `Canvas`. Same as
+ * `s.replace(/\s*\([^)]*\)\s*$/, '')`.
+ */
+export function stripTrailingParenthetical(s: string): string {
+  const t = s.trimEnd();
+  const close = t.length - 1;
+  if (close < 0 || t[close] !== ')') return s;
+  // The parenthetical cannot contain `)`, so it opens after the previous one.
+  const segmentStart = close === 0 ? 0 : t.lastIndexOf(')', close - 1) + 1;
+  const open = t.indexOf('(', segmentStart);
+  if (open < 0 || open >= close) return s;
+  return t.slice(0, open).trimEnd();
+}
+
+/**
+ * Replaces each hyphen, with any whitespace around it, by an en dash:
+ * `1606 - 1669` -> `1606–1669`. Same as `s.replace(/\s*-\s*\/g, '–')`.
+ */
+export function dashBetweenHyphenParts(s: string): string {
+  const parts = s.split('-');
+  const last = parts.length - 1;
+  return parts
+    .map((p, i) => {
+      const left = i > 0 ? p.trimStart() : p;
+      return i < last ? left.trimEnd() : left;
+    })
+    .join('–');
+}
+
+/**
+ * Removes a whitespace-led, zero-padded trailing number of two or three digits
+ * (` 02`, ` 099`), with the whole whitespace run before it. Same as
+ * `s.replace(/\s+0\d{1,2}$/, '')`.
+ */
+export function stripTrailingFileNumber(s: string): string {
+  // One whitespace character is enough to anchor the match, and each attempt
+  // is bounded, so this pattern runs in linear time.
+  const m = /\s0\d{1,2}$/.exec(s);
+  return m ? s.slice(0, m.index).trimEnd() : s;
+}
+
 /** Returns the trimmed-truthy string, or undefined for missing/empty/non-string. */
 export function asOptionalString(v: unknown): string | undefined {
   return typeof v === 'string' && v.length > 0 ? v : undefined;

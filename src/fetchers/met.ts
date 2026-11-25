@@ -3,7 +3,14 @@ import { validateMetLicense } from '../licenseGate.js';
 import { cleanArtistName, detectAttributionType, normalizeRegion } from '../mappings.js';
 import { normalizeMedium } from '../medium.js';
 import type { Artwork, ValidationResult } from '../types.js';
-import { asOptionalString, asString, httpGet, isValidPositiveInt, rejectFor } from './helpers.js';
+import {
+  asOptionalString,
+  asString,
+  httpGet,
+  isValidPositiveInt,
+  rejectFor,
+  stripTrailingParenthetical,
+} from './helpers.js';
 import { sanitizeArtistName, sanitizeDescription, sanitizeTitle } from './sanitize.js';
 import type { Fetcher, SearchOptions } from './types.js';
 
@@ -112,7 +119,7 @@ export const metFetcher: Fetcher = {
     const region = normalizeRegion(cultureOrCountry);
 
     const periodRaw = (asString(r.period) || asString(r.dynasty)).toLowerCase().trim();
-    const period = periodRaw.replace(/\s*\([^)]*\)\s*$/, '').trim() || null;
+    const period = stripTrailingParenthetical(periodRaw).trim() || null;
 
     const fullImage = asString(r.primaryImage) || asString(r.primaryImageSmall);
     const thumbnail = asOptionalString(r.primaryImageSmall);
