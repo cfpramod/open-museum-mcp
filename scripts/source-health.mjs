@@ -38,7 +38,7 @@ export const DEFAULTS = {
  * list: a keyless source that starts reporting `requiresApiKey` (or otherwise
  * stops being checked) is a failure, so no live source can drop out quietly.
  */
-export const EXPECTED_KEY_GATED = ['europeana', 'smithsonian', 'harvard'];
+export const EXPECTED_KEY_GATED = ['europeana', 'smithsonian', 'harvard', 'parismusees'];
 
 function withTimeout(promise, ms, label) {
   let timer;

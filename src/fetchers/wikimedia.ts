@@ -11,6 +11,7 @@ import {
   isValidPositiveInt,
   pickMaxResolution,
   rejectFor,
+  stripTrailingFileNumber,
 } from './helpers.js';
 // Commons text fields are HTML-laden. The shared stripHtml strips tags in one
 // linear pass, decodes entities, and collapses whitespace.
@@ -95,10 +96,8 @@ function stripLanguagePrefix(s: string): string {
 // suffix is file-management metadata, not part of the artwork title. Strict
 // pattern: zero-padded 2–3 digit trailing number (matches " 02", " 099"
 // but not " 5" or " 12" — those are far less likely to be file numbers).
-const FILE_NUMBER_SUFFIX_RE = /\s+0\d{1,2}$/;
-
 function stripFileNumberSuffix(s: string): string {
-  return s.replace(FILE_NUMBER_SUFFIX_RE, '').trim();
+  return stripTrailingFileNumber(s).trim();
 }
 
 // Commons `Credit` extmetadata is the upstream-source field. It is often a

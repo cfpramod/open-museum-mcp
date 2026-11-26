@@ -1,0 +1,20 @@
+{
+  "entityId": "310909",
+  "title": "Portrait de Zadkine",
+  "fieldCartelAuteur": null,
+  "fieldCartelDenominationTitre": null,
+  "fieldMusee": {
+    "entity": {
+      "name": "Musée Zadkine"
+    }
+  },
+  "fieldVisuels": [
+    {
+      "entity": {
+        "fieldImageLibre": false,
+        "fieldImageDroits": "domaine public",
+        "publicUrl": null
+      }
+    }
+  ]
+}
