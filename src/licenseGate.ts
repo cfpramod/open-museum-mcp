@@ -816,8 +816,8 @@ export const validateYcbaLicense: LicenseValidator = (raw) => {
 // claimed.
 // Every statement seen on a free image (fieldImageLibre=true) in a live survey
 // of 1,881 artworks across 11 museums (2026-11-23). The WHOLE statement must
-// equal one of these once case, spacing, commas, dashes and apostrophes are
-// normalised, so a qualification added to a known statement ("… / Petit Palais
+// equal one of these once case, spacing, commas, full stops, dashes and
+// apostrophes are normalised, so a qualification added to a known statement ("… / Petit Palais
 // sauf droits des tiers") or an unseen wording fails closed. The museums spell
 // their own names inconsistently, which is why this is a list of statements
 // rather than a pattern. Add a wording only after seeing it on a live record.
