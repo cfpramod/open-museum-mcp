@@ -117,6 +117,40 @@ const GET_QUERY = `query Get($id: [String]!) {
 
 // --- Request -------------------------------------------------------------------
 
+// Upstream error text is kept for diagnosis, but it is the API's text, not
+// ours: a misconfigured or hostile server could echo the request's token back,
+// or send megabytes. The key is replaced wherever it appears (before the cut,
+// so no part of it survives at the boundary) and the result is capped.
+const UPSTREAM_TEXT_MAX_LENGTH = 200;
+
+function upstreamText(text: string, key: string): string {
+  const redacted = text.split(key).join('[redacted]');
+  return redacted.length > UPSTREAM_TEXT_MAX_LENGTH
+    ? `${redacted.slice(0, UPSTREAM_TEXT_MAX_LENGTH)}…`
+    : redacted;
+}
+
+// The message of a failed request's JSON body: the GraphQL `errors` list, or a
+// top-level `message`. Anything that is not JSON yields '' and the error carries
+// the status alone.
+function errorBodyMessage(body: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return '';
+  }
+  if (!parsed || typeof parsed !== 'object') return '';
+  const { errors, message } = parsed as { errors?: unknown; message?: unknown };
+  if (Array.isArray(errors)) {
+    return errors
+      .map((e) => (e && typeof e === 'object' ? asString((e as { message?: unknown }).message) : ''))
+      .filter(Boolean)
+      .join('; ');
+  }
+  return asString(message);
+}
+
 async function graphql(
   query: string,
   variables: Record<string, unknown>,
@@ -126,10 +160,14 @@ async function graphql(
   if (!key) throw new Error('Paris Musées: PARISMUSEES_API_KEY not set');
   const init: RequestInit = {
     // httpGet is the shared fetch wrapper (it sets the User-Agent); it passes
-    // the method and body straight through.
+    // the method, body and redirect mode straight through.
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'auth-token': key },
     body: JSON.stringify({ query, variables }),
+    // The key travels in a header, and fetch would resend it to wherever a
+    // redirect points. The API answers this endpoint directly, so a redirect
+    // is refused rather than followed (as the Rijksmuseum fetcher does).
+    redirect: 'error',
     signal,
   };
   let res = await httpGet(PM_GRAPHQL, init);
@@ -142,15 +180,29 @@ async function graphql(
     res = await httpGet(PM_GRAPHQL, init);
   }
   if (!res.ok) {
-    // A failed query can carry a GraphQL error body; keep its message.
+    // A failed query can carry a JSON error body; keep its message. The body is
+    // decoded before redaction, since an encoder may escape a character of the
+    // key (PHP writes `/` as `\/`) and the raw text would then not contain it.
     const body = await res.text().catch(() => '');
-    const detail = body.match(/"message"\s*:\s*"([^"]{1,200})"/)?.[1];
-    throw new Error(`Paris Musées request failed: ${res.status}${detail ? ` (${detail})` : ''}`);
+    const detail = errorBodyMessage(body);
+    const safe = detail ? upstreamText(detail, key) : '';
+    throw new Error(`Paris Musées request failed: ${res.status}${safe ? ` (${safe})` : ''}`);
   }
-  const json = (await res.json()) as { data?: unknown; errors?: Array<{ message?: unknown }> };
+  // Parsed here rather than with res.json(): V8's SyntaxError quotes the start
+  // of the body, which can hold an echoed key, so a body that is not JSON gets
+  // a fixed message instead. The body is read outside the try, so an abort or
+  // network error while reading keeps its own error.
+  const text = await res.text();
+  let json: { data?: unknown; errors?: Array<{ message?: unknown }> };
+  try {
+    json = JSON.parse(text) as typeof json;
+  } catch {
+    throw new Error('Paris Musées API returned invalid JSON');
+  }
+  if (!json || typeof json !== 'object') throw new Error('Paris Musées API returned no data');
   // GraphQL reports failures with a 200 and an `errors` list.
   if (Array.isArray(json.errors) && json.errors.length > 0) {
-    const message = json.errors.map((e) => asString(e?.message)).filter(Boolean).join('; ');
+    const message = upstreamText(json.errors.map((e) => asString(e?.message)).filter(Boolean).join('; '), key);
     throw new Error(`Paris Musées API error: ${message || 'unknown error'}`);
   }
   if (!json.data || typeof json.data !== 'object') throw new Error('Paris Musées API returned no data');
@@ -253,8 +305,12 @@ export const parismuseesFetcher: Fetcher = {
     const docs = ssa && typeof ssa === 'object' ? (ssa as { documents?: unknown }).documents : undefined;
     const ranked: string[] = [];
     for (const d of Array.isArray(docs) ? docs : []) {
-      const nid = d && typeof d === 'object' ? asFiniteNumber((d as { nid_entier_s?: unknown }).nid_entier_s) : null;
-      if (nid !== null && nid > 0 && !ranked.includes(String(nid))) ranked.push(String(nid));
+      const nid = d && typeof d === 'object' ? (d as { nid_entier_s?: unknown }).nid_entier_s : undefined;
+      // Node ids are positive whole numbers; anything else (1.5, 1e21) would
+      // turn into an id string the server never issued.
+      if (typeof nid === 'number' && Number.isSafeInteger(nid) && nid > 0 && !ranked.includes(String(nid))) {
+        ranked.push(String(nid));
+      }
     }
     if (ranked.length === 0) return [];
 

@@ -821,49 +821,66 @@ export const validateYcbaLicense: LicenseValidator = (raw) => {
 // sauf droits des tiers") or an unseen wording fails closed. The museums spell
 // their own names inconsistently, which is why this is a list of statements
 // rather than a pattern. Add a wording only after seeing it on a live record.
-const PARISMUSEES_CC0_STATEMENTS: ReadonlySet<string> = new Set(
-  [
-    'CC0 Paris Musées / Maison de Balzac',
-    'CC0 Paris Musées / Maisons de Victor Hugo',
-    'CC0 Paris Musées / Maisons de Victor Hugo Paris-Guernesey',
-    'CC0 Maisons de Victor Hugo Paris-Guernesey',
-    'CC0 Paris Musées / Musée Bourdelle',
-    'CC0 Paris Musées / Musée Carnavalet',
-    'CC0 Paris Musées / Musée Carnavalet - Histoire de Paris',
-    'CC0 Paris Musées / Musée Carnavalet, Histoire de Paris',
-    "CC0 Paris Musées / Musée Cernuschi, musée des arts de l'Asie de la Ville de Paris",
-    'CC0 Paris Musées / Musée Cognacq-Jay, le goût du XVIIIe',
-    "CC0 Paris Musées / Musée d'art moderne de Paris",
-    'CC0 Paris Musées / Musée de la Libération',
-    'CC0 Paris Musées / Musée de la Libération de Paris',
-    'CC0 Paris Musées / Musée de la Libération de Paris - musée du général Leclerc - musée Jean Moulin',
-    'CC0 Paris Musées / Musée de la Vie romantique',
-    'CC0 Musée de La Vie Romantique / Ville de Paris',
-    'CC0 Paris Musées / Palais Galliera, musée de la Mode de la Ville de Paris',
-    'CC0 Paris Musées / Palais Galliera, musée de la Mode de Paris',
-    'CC0 Paris Musées / Petit Palais, musée des Beaux-Arts de la Ville de Paris',
-  ].map(normalizeParisMuseesRights),
-);
+export const PARISMUSEES_CC0_WORDINGS: readonly string[] = [
+  'CC0 Paris Musées / Maison de Balzac',
+  'CC0 Paris Musées / Maisons de Victor Hugo',
+  'CC0 Paris Musées / Maisons de Victor Hugo Paris-Guernesey',
+  'CC0 Maisons de Victor Hugo Paris-Guernesey',
+  'CC0 Paris Musées / Musée Bourdelle',
+  'CC0 Paris Musées / Musée Carnavalet',
+  'CC0 Paris Musées / Musée Carnavalet - Histoire de Paris',
+  'CC0 Paris Musées / Musée Carnavalet, Histoire de Paris',
+  "CC0 Paris Musées / Musée Cernuschi, musée des arts de l'Asie de la Ville de Paris",
+  'CC0 Paris Musées / Musée Cognacq-Jay, le goût du XVIIIe',
+  "CC0 Paris Musées / Musée d'art moderne de Paris",
+  'CC0 Paris Musées / Musée de la Libération',
+  'CC0 Paris Musées / Musée de la Libération de Paris',
+  'CC0 Paris Musées / Musée de la Libération de Paris - musée du général Leclerc - musée Jean Moulin',
+  'CC0 Paris Musées / Musée de la Vie romantique',
+  'CC0 Musée de La Vie Romantique / Ville de Paris',
+  'CC0 Paris Musées / Palais Galliera, musée de la Mode de la Ville de Paris',
+  'CC0 Paris Musées / Palais Galliera, musée de la Mode de Paris',
+  'CC0 Paris Musées / Petit Palais, musée des Beaux-Arts de la Ville de Paris',
+];
 
-/** Case, spacing, commas, full stops, dash variants and apostrophe variants are one spelling. */
-function normalizeParisMuseesRights(rights: string): string {
+// The longest wording above is under 100 characters. A statement longer than
+// this is rejected before it is normalised or matched, which also keeps the
+// licence rawValue that reaches the wire bounded.
+const PARISMUSEES_RIGHTS_MAX_LENGTH = 256;
+
+/**
+ * Case, spacing, commas, full stops, dash variants and apostrophe variants are
+ * one spelling. Every step is linear in the input: the slash is padded with
+ * spaces first and the whitespace/dash runs are collapsed after, so no pattern
+ * scans a whitespace run more than once (a `\s*\/\s*` form is quadratic on a
+ * long run of whitespace with no slash).
+ */
+export function normalizeParisMuseesRights(rights: string): string {
   return rights
     .normalize('NFC')
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[,.]/g, ' ')
-    .replace(/\s*\/\s*/g, ' / ')
+    .replace(/\//g, ' / ')
     .replace(/[\s\u2010-\u2015-]+/g, ' ')
     .trim();
 }
 
+const PARISMUSEES_CC0_STATEMENTS: ReadonlySet<string> = new Set(
+  PARISMUSEES_CC0_WORDINGS.map(normalizeParisMuseesRights),
+);
+
 function isParisMuseesCc0Statement(rights: string): boolean {
+  if (rights.length > PARISMUSEES_RIGHTS_MAX_LENGTH) return false;
   return PARISMUSEES_CC0_STATEMENTS.has(normalizeParisMuseesRights(rights));
 }
 
 const PARISMUSEES_SITE_HOST = 'www.parismuseescollections.paris.fr';
 const PARISMUSEES_API_HOST = 'apicollections.parismusees.paris.fr';
 const PARISMUSEES_FILES_PATH = /^\/sites\/default\/files\//;
+// Real image, thumbnail and page URLs are well under 300 characters; anything
+// longer than this is dropped rather than parsed and carried onto the wire.
+const PARISMUSEES_URL_MAX_LENGTH = 2048;
 
 /**
  * Parse `value` and return it rebuilt from its checked parts only when it is an
@@ -877,7 +894,7 @@ function pinnedParisMuseesUrl(
   pathPattern: RegExp | null,
   allowQuery: boolean,
 ): string | undefined {
-  if (typeof value !== 'string') return undefined;
+  if (typeof value !== 'string' || value.length > PARISMUSEES_URL_MAX_LENGTH) return undefined;
   let u: URL;
   try {
     u = new URL(value);
