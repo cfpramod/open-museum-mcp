@@ -240,16 +240,16 @@ This is what "rights-verified" means here: validated against published museum me
 | Art Institute of Chicago | `aic` | none | ✅ v0.2 — `imageUrls.hotlinkRestricted: true` (IIIF CDN is browser-only; use `source.pageUrl` in server contexts) |
 | Wikimedia Commons | `wikimedia` | none | ✅ v0.3 |
 | Europeana | `europeana` | API key (free, per-user) | ✅ v0.4 |
+| Smithsonian Open Access | `smithsonian` | API key (free) | ✅ v0.11 |
+| Rijksmuseum | `rijksmuseum` | none | ✅ v0.12 |
 | Walters Art Museum | `walters` | none (bundled CC0 dataset) | ✅ v0.14 |
 | SMK (National Gallery of Denmark) | `smk` | none | ✅ v0.14 |
 | Wellcome Collection | `wellcome` | none | ✅ v0.14 |
 | National Gallery of Art (Washington) | `nga` | none (bundled CC0 dataset) | ✅ v0.15 |
 | Harvard Art Museums | `harvard` | API key (free) | ✅ v0.15 |
 | J. Paul Getty Museum | `getty` | none | ✅ v0.17 — two-tier rights: collection metadata is CC0, but each image's rights are verified independently (~91k of ~168k objects have an Open Content Program image; the rest are metadata-only) |
-| Paris Musées (14 City of Paris museums) | `parismusees` | API key (free account token) | ✅ Unreleased: per-image CC0 gate; normally two requests per search (public quota is 1,000 a day) |
-| Yale Center for British Art | `ycba` | none | ✅ Unreleased: federated through Yale's LUX platform; rights read per object from the YCBA IIIF manifest |
-| Smithsonian Open Access | `si` | API key (free) | 📋 v2 |
-| Rijksmuseum | `rijks` | API key (free) | 📋 v2 |
+| Paris Musées (14 City of Paris museums) | `parismusees` | API key (free account token) | ✅ v0.22: per-image CC0 gate; normally two requests per search (public quota is 1,000 a day) |
+| Yale Center for British Art | `ycba` | none | ✅ v0.22: federated through Yale's LUX platform; rights read per object from the YCBA IIIF manifest |
 
 **On Wikimedia Commons:** Commons is a federation, not a single museum. Rights are per-file. The adapter accepts only `cc0` and the worldwide public-domain templates (`pd`, `pd-art`, `pd-old*`, `pdm`, `pdm-*`); CC-BY, CC-BY-SA, and other attribution-or-restriction licences are rejected even though they're "free", because the per-museum gate model doesn't carry the obligations they impose. Jurisdiction-scoped public-domain tokens (`pd-us*`, `pd-1923`, and similar US-only templates) are also rejected: an accepted record is stamped as a worldwide determination, so a US-only signal must not be promoted to a worldwide claim — the same strict-default-deny reason the Europeana gate rejects `NoC-US`. Adding Commons unlocks works whose home museums don't have public APIs (Bruegel at the Royal Museums of Fine Arts of Belgium, the National Gallery in London pre-API, regional museums worldwide) — at the cost of a thinner metadata layer than the structured-API museums provide. Region and period are not surfaced for Wikimedia records until v0.7 adds Wikidata enrichment.
 

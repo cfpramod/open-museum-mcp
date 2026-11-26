@@ -10,8 +10,8 @@ authors:
 repository-code: "https://github.com/cfpramod/open-museum-mcp"
 url: "https://github.com/cfpramod/open-museum-mcp"
 license: MIT
-version: 0.10.0
-date-released: "2026-06-07"
+version: 0.22.0
+date-released: "2026-11-26"
 keywords:
   - mcp
   - model-context-protocol
